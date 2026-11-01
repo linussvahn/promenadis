@@ -197,6 +197,14 @@ profiles, or an emailed narrative. Without a valid recovery factor or
 predesignated successor, owner-only actions remain unavailable while existing
 co-host permissions continue unchanged.
 
+Local account deletion (2026-11-01) follows this: requests are refused while the
+account owns a live event or a shared organizer with other managers, require
+recent authentication and the typed account email, revoke every session, and
+leave only deletion status/cancellation reachable for seven days before hourly
+erasure. Finished event shells may then have no owner; organizer identities they
+reference are detached and hidden. No cancellation path exists yet because
+publication does not, so live owned events always block.
+
 Every event has exactly one active owner. A planned ownership transfer requires
 recent authentication by the current owner and explicit acceptance by a verified
 existing co-host, with both steps audited. A sole owner may still exercise

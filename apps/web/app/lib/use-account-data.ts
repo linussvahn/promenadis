@@ -1,12 +1,15 @@
+import { PromenadisApiError } from "@promenadis/api-client";
 import type { IdentityDashboard } from "@promenadis/contracts";
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { getPromenadisApiClient, getBrowserAuthClient } from "./supabase";
 import { useExpectedAccountId } from "./account-session";
 
 export function useAccountData() {
   const expectedAccountId = useExpectedAccountId();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [deletionPending, setDeletionPending] = useState(false);
   const [dashboard, setDashboard] = useState<IdentityDashboard | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
 
@@ -30,15 +33,29 @@ export function useAccountData() {
     if (!token) return;
     try {
       setDashboard(await api.getDashboard(token));
+      setDeletionPending(false);
       setLoadFailed(false);
-    } catch {
+    } catch (error) {
+      // A disabled account can only review or cancel its deletion in Settings.
+      if (error instanceof PromenadisApiError && error.code === "account_deletion_pending") {
+        setDeletionPending(true);
+        if (pathname !== "/settings") await navigate("/settings", { replace: true });
+        return;
+      }
       setLoadFailed(true);
     }
-  }, [accessToken]);
+  }, [accessToken, navigate, pathname]);
 
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
 
-  return { accessToken, dashboard, loadDashboard, loadFailed, setDashboard } as const;
+  return {
+    accessToken,
+    dashboard,
+    deletionPending,
+    loadDashboard,
+    loadFailed,
+    setDashboard,
+  } as const;
 }

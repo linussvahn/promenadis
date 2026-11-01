@@ -46,7 +46,8 @@ code redemption, replacement-email verification through Mailpit, a minimum
 2026-11-01) explicit completion: the sign-in email changes, every old session
 ends and the owner, team and previous address are notified. First-event
 review, routing, public delivery, and publication lifecycle transitions are
-still unimplemented.
+still unimplemented. Account deletion (blockers, seven-day disabled window,
+undo, hourly erasure) is implemented locally.
 
 Browser-session hardening (2026-09-15): local sign-in now uses an opaque
 HttpOnly, SameSite cookie through the existing private backend. Supabase tokens

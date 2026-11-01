@@ -9,6 +9,24 @@ export type Json =
 export type Database = {
   app_private: {
     Tables: {
+      account_deletion_requests: {
+        Row: {
+          account_id: string
+          erase_after: string
+          requested_at: string
+        }
+        Insert: {
+          account_id: string
+          erase_after: string
+          requested_at?: string
+        }
+        Update: {
+          account_id?: string
+          erase_after?: string
+          requested_at?: string
+        }
+        Relationships: []
+      }
       account_recovery_claims: {
         Row: {
           account_id: string
@@ -215,6 +233,24 @@ export type Database = {
         }
         Relationships: []
       }
+      erasure_tombstones: {
+        Row: {
+          erased_at: string
+          subject_id: string
+          subject_type: string
+        }
+        Insert: {
+          erased_at?: string
+          subject_id: string
+          subject_type: string
+        }
+        Update: {
+          erased_at?: string
+          subject_id?: string
+          subject_type?: string
+        }
+        Relationships: []
+      }
       feature_flags: {
         Row: {
           created_at: string
@@ -365,6 +401,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_deletion_blockers: {
+        Args: { p_account_id: string }
+        Returns: Json
+      }
+      account_deletion_status: { Args: { p_account_id: string }; Returns: Json }
       account_recovery_claim_summary: {
         Args: {
           p_claim: Database["app_private"]["Tables"]["account_recovery_claims"]["Row"]
@@ -372,6 +413,7 @@ export type Database = {
         Returns: Json
       }
       account_recovery_status: { Args: { p_account_id: string }; Returns: Json }
+      erase_due_accounts_command: { Args: never; Returns: number }
       event_boundary_summary: {
         Args: {
           p_boundary: Database["public"]["Tables"]["event_boundaries"]["Row"]
@@ -878,7 +920,7 @@ export type Database = {
       events: {
         Row: {
           created_at: string
-          created_by_account_id: string
+          created_by_account_id: string | null
           description: string
           id: string
           organizer_profile_id: string
@@ -892,7 +934,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by_account_id: string
+          created_by_account_id?: string | null
           description?: string
           id?: string
           organizer_profile_id: string
@@ -906,7 +948,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by_account_id?: string
+          created_by_account_id?: string | null
           description?: string
           id?: string
           organizer_profile_id?: string
@@ -1022,7 +1064,8 @@ export type Database = {
       organizer_profiles: {
         Row: {
           created_at: string
-          created_by_account_id: string
+          created_by_account_id: string | null
+          detached_at: string | null
           display_name: string
           id: string
           locality: string | null
@@ -1033,7 +1076,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by_account_id: string
+          created_by_account_id?: string | null
+          detached_at?: string | null
           display_name: string
           id?: string
           locality?: string | null
@@ -1044,7 +1088,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by_account_id?: string
+          created_by_account_id?: string | null
+          detached_at?: string | null
           display_name?: string
           id?: string
           locality?: string | null
@@ -1120,6 +1165,10 @@ export type Database = {
         }
         Returns: Json
       }
+      account_deletion_pending: {
+        Args: { p_account_id: string }
+        Returns: boolean
+      }
       account_recovery_notices_accepted: {
         Args: { p_claim_id: string }
         Returns: boolean
@@ -1144,6 +1193,10 @@ export type Database = {
           p_correlation_id: string
           p_verification_token: string
         }
+        Returns: Json
+      }
+      cancel_account_deletion_command: {
+        Args: { p_actor_id: string; p_correlation_id: string }
         Returns: Json
       }
       cancel_account_recovery_claim_command: {
@@ -1313,6 +1366,10 @@ export type Database = {
         Args: { p_delivered: boolean; p_job_id: string; p_lease_id: string }
         Returns: boolean
       }
+      get_account_deletion_command: {
+        Args: { p_actor_id: string }
+        Returns: Json
+      }
       get_account_security_command: {
         Args: { p_actor_id: string }
         Returns: Json
@@ -1460,6 +1517,15 @@ export type Database = {
           p_expected_team_version: number
           p_membership_id: string
           p_organizer_profile_id: string
+        }
+        Returns: Json
+      }
+      request_account_deletion_command: {
+        Args: {
+          p_actor_id: string
+          p_authenticated_at: string
+          p_confirmation_email: string
+          p_correlation_id: string
         }
         Returns: Json
       }

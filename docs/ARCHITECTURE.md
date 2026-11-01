@@ -386,7 +386,14 @@ Names are conceptual and can change during schema design.
   implemented. A local global budget bounds expensive anonymous work without
   retaining IP/email identifiers; production per-subject abuse controls remain
   a deployment gate.
-- `account_deletion_requests`: recovery and erasure workflow.
+- `account_deletion_requests`: recovery and erasure workflow. Implemented
+  locally 2026-11-01: refused while the account owns a live event or a shared
+  organizer with other managers; recent authentication plus the typed account
+  email; revokes every session and disables BFF access except deletion status/
+  cancellation for seven days; an hourly job then deletes the Auth identity
+  (cascading private records), keeps finished event shells and referenced
+  organizer identities detached/hidden, and writes an opaque
+  `erasure_tombstones` row for backup replay.
 - `platform_admins`: privileged eligibility, never inferred from profile data.
 - `admin_elevation_sessions`: short-lived elevated sessions and reason context.
 - `admin_action_approvals`: pending/approved/rejected second-person authorization

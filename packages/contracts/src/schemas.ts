@@ -93,6 +93,28 @@ export const accountRecoveryStatusSchema = z.strictObject({
 
 export type AccountRecoveryStatus = z.infer<typeof accountRecoveryStatusSchema>;
 
+export const accountDeletionBlockerSchema = z.strictObject({
+  id: opaqueUuid,
+  kind: z.enum(["owned_event", "shared_organizer"]),
+  state: eventStateSchema.nullable(),
+  title: z.string().min(1).max(200),
+});
+
+export const accountDeletionStatusSchema = z.strictObject({
+  blockers: z.array(accountDeletionBlockerSchema).max(500),
+  eraseAfter: isoInstant.nullable(),
+  pending: z.boolean(),
+  requestedAt: isoInstant.nullable(),
+});
+
+export type AccountDeletionStatus = z.infer<typeof accountDeletionStatusSchema>;
+
+export const requestAccountDeletionRequestSchema = z.strictObject({
+  confirmationEmail: z.string().trim().min(3).max(320),
+});
+
+export type RequestAccountDeletionRequest = z.infer<typeof requestAccountDeletionRequestSchema>;
+
 export const recoveryCodeEnrollmentResponseSchema = accountRecoveryStatusSchema.extend({
   code: z.string().regex(/^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){4}$/u),
 });
@@ -596,6 +618,8 @@ export const boundarySchemas = {
   AcceptEventTeamInviteRequest: acceptEventTeamInviteRequestSchema,
   AccountProfile: accountProfileSchema,
   AccountRecoveryStatus: accountRecoveryStatusSchema,
+  AccountDeletionStatus: accountDeletionStatusSchema,
+  RequestAccountDeletionRequest: requestAccountDeletionRequestSchema,
   AccountRecoveryClaim: accountRecoveryClaimSchema,
   AccountRecoveryCompletion: accountRecoveryCompletionSchema,
   AccountRecoveryTokenRequest: accountRecoveryTokenRequestSchema,

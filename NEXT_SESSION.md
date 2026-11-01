@@ -456,6 +456,33 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Batch (2026-11-01): deletion, TOTP, admin review
+
+User asked for fewer stops: implement the next Milestone 1 items as a batch,
+commit and push each, ask only on real blockers. Order: account deletion
+(done), optional owner TOTP, then platform-admin elevation plus first-event
+review.
+
+### Account deletion (2026-11-01)
+
+- `20261101000900_account_deletion.sql`: blockers (owned non-finished events,
+  owned shared organizers with other members), request (recent auth, typed
+  email, cancels a pending recovery claim, revokes Auth + browser sessions),
+  cancel, `account_deletion_pending` gate, hourly erasure with tombstones.
+  `events`/`organizer_profiles.created_by_account_id` are now nullable
+  `ON DELETE SET NULL`; the one-owner trigger allows zero owners only for
+  ended/cancelled/archived shells; `organizer_profiles.detached_at` hides
+  identities kept for history.
+- BFF: `GET/POST /account/deletion`, `POST /account/deletion/cancel`; any other
+  authenticated route answers 403 `account_deletion_pending`. Web: Settings
+  "Delete account" (blockers link to events, email confirmation, signs out),
+  and a disabled account is routed to Settings showing only "Undo deletion".
+- Caught in e2e: two `clock_timestamp()` calls differed by a microsecond and
+  broke the exact seven-day check; now one timestamp.
+- Verified: 495 DB assertions, verify (114 tests), local slice, 6 local-auth
+  and 5 smoke e2e. Not done: hiding detached organizers in future public
+  delivery, a published-event cancellation path, deletion notices.
+
 ### Local recovery completion (2026-11-01)
 
 - User decision: after recovery completes, notify the previous sign-in address.

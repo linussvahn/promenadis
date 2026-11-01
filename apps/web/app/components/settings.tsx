@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
+import { AccountDeletion } from "./account-deletion";
 import { AccountShell } from "./account-shell";
 import { OrganizerTeam } from "./organizer-team";
 import { RecoveryCode } from "./recovery-code";
@@ -15,7 +16,8 @@ export function Settings() {
 }
 
 function SettingsContent({ locale }: { readonly locale: Locale }) {
-  const { accessToken, dashboard, loadDashboard, loadFailed, setDashboard } = useAccountData();
+  const { accessToken, dashboard, deletionPending, loadDashboard, loadFailed, setDashboard } =
+    useAccountData();
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState<BusyAction>(null);
   const [status, setStatus] = useState("");
@@ -83,7 +85,9 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
         <p className="lede">{translate(locale, "settings.intro")}</p>
       </header>
 
-      {loadFailed ? (
+      {deletionPending ? (
+        <AccountDeletion accessToken={accessToken} locale={locale} onCancelled={loadDashboard} />
+      ) : loadFailed ? (
         <p className="notice notice-error" role="alert">
           {translate(locale, "dashboard.sessionExpired")}
         </p>
@@ -184,6 +188,7 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
             </details>
           </section>
           <RecoveryCode accessToken={accessToken} locale={locale} />
+          <AccountDeletion accessToken={accessToken} locale={locale} onCancelled={loadDashboard} />
         </div>
       )}
       <p aria-live="polite" className="form-status">

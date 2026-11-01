@@ -287,6 +287,84 @@ test("a ready recovery changes the sign-in email, ends old sessions and notifies
   }
 });
 
+test("account deletion is blocked by owned events, disables the account and can be undone", async ({
+  request,
+}) => {
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const email = `deletion-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const client = createClient(localStatus.API_URL, publicKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password,
+  });
+  if (createError) throw createError;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const signIn = async () => {
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return {
+      apikey: publicKey,
+      authorization: `Bearer ${data.session?.access_token}`,
+      origin: "http://127.0.0.1:5173",
+    };
+  };
+  try {
+    let headers = await signIn();
+    const event = await request.post(`${base}/events`, {
+      headers,
+      data: {
+        description: "Synthetic deletion fixture",
+        endsAt: "2031-09-11T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic deletion owner",
+        startsAt: "2031-09-11T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic deletion walk",
+        visibility: "unlisted",
+      },
+    });
+    expect(event.status()).toBe(201);
+    const blocked = await request.get(`${base}/account/deletion`, { headers });
+    expect((await blocked.json()).blockers[0].kind).toBe("owned_event");
+    const refused = await request.post(`${base}/account/deletion`, {
+      headers,
+      data: { confirmationEmail: email },
+    });
+    expect(refused.status()).toBe(409);
+
+    localSql(`update public.events set state='ended' where title='Synthetic deletion walk'
+      and created_by_account_id=(select id from auth.users where email='${email}');`);
+    const mismatch = await request.post(`${base}/account/deletion`, {
+      headers,
+      data: { confirmationEmail: "someone-else@example.invalid" },
+    });
+    expect(mismatch.status()).toBe(400);
+    const scheduled = await request.post(`${base}/account/deletion`, {
+      headers,
+      data: { confirmationEmail: email.toUpperCase() },
+    });
+    expect(scheduled.status()).toBe(200);
+    expect((await scheduled.json()).pending).toBe(true);
+    expect((await request.get(`${base}/dashboard`, { headers })).status()).toBe(401);
+
+    headers = await signIn();
+    const disabled = await request.get(`${base}/dashboard`, { headers });
+    expect(disabled.status()).toBe(403);
+    expect((await disabled.json()).code).toBe("account_deletion_pending");
+    const undone = await request.post(`${base}/account/deletion/cancel`, { headers });
+    expect(undone.status()).toBe(200);
+    expect((await undone.json()).pending).toBe(false);
+    expect((await request.get(`${base}/dashboard`, { headers })).status()).toBe(200);
+  } finally {
+    await deleteSyntheticAccount(email);
+  }
+});
+
 test("the visible email OTP signs in", async ({ page, request }) => {
   test.setTimeout(90_000);
   const email = `otp-${randomUUID()}@example.invalid`;

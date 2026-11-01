@@ -2,6 +2,8 @@ import {
   type AcceptEventTeamInviteRequest,
   type AccountRecoveryTokenRequest,
   type AttestEventPublicationRequest,
+  type RequestAccountDeletionRequest,
+  accountDeletionStatusSchema,
   accountRecoveryClaimSchema,
   accountRecoveryCompletionSchema,
   accountRecoveryStatusSchema,
@@ -276,6 +278,20 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     enrollRecoveryCode(accessToken: string, input: EnrollRecoveryCodeRequest) {
       return request("/account/recovery-code", accessToken, recoveryCodeEnrollmentResponseSchema, {
         body: input,
+        method: "POST",
+      });
+    },
+    getAccountDeletion(accessToken: string) {
+      return request("/account/deletion", accessToken, accountDeletionStatusSchema);
+    },
+    requestAccountDeletion(accessToken: string, input: RequestAccountDeletionRequest) {
+      return request("/account/deletion", accessToken, accountDeletionStatusSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    cancelAccountDeletion(accessToken: string) {
+      return request("/account/deletion/cancel", accessToken, accountDeletionStatusSchema, {
         method: "POST",
       });
     },

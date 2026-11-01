@@ -334,6 +334,23 @@ const sv = {
   "accountRecovery.expiresAt": "Går ut:",
   "accountRecovery.waitHelp":
     "Öppna länken i e-postmeddelandet igen när väntetiden är slut för att slutföra återställningen.",
+  "deletion.title": "Radera kontot",
+  "deletion.help":
+    "Kontot inaktiveras direkt och alla inloggningar avslutas. Efter sju dagar raderas kontot permanent. Avslutade evenemang finns kvar utan koppling till dig.",
+  "deletion.blockersIntro":
+    "Lös det här först: överlåt eller radera evenemangen och lämna över eller töm delade arrangörer.",
+  "deletion.blocker.owned_event": "evenemang du äger",
+  "deletion.blocker.shared_organizer": "delad arrangör med andra hanterare",
+  "deletion.confirmLabel": "Skriv kontots e-postadress för att bekräfta",
+  "deletion.request": "Radera kontot",
+  "deletion.pending": "Kontot raderas tidigast:",
+  "deletion.pendingHelp": "Kontot är inaktiverat. Du kan ångra raderingen fram till dess.",
+  "deletion.cancel": "Ångra radering",
+  "deletion.cancelled": "Raderingen är ångrad. Kontot är aktivt igen.",
+  "deletion.recentAuth": "Logga ut och in igen innan du raderar kontot.",
+  "deletion.mismatch": "E-postadressen stämmer inte med kontot.",
+  "deletion.blocked": "Något hindrar fortfarande raderingen. Listan har uppdaterats.",
+  "deletion.error": "Raderingen kunde inte hämtas eller ändras.",
   "accountRecovery.readyTitle": "Klar att slutföras",
   "accountRecovery.checking": "Kontrollerar återställningslänken …",
   "accountRecovery.completeHelp":
@@ -775,6 +792,23 @@ const en = {
   "accountRecovery.expiresAt": "Expires:",
   "accountRecovery.waitHelp":
     "Open the link in the email again after the waiting period ends to finish recovery.",
+  "deletion.title": "Delete account",
+  "deletion.help":
+    "The account is disabled immediately and every sign-in ends. After seven days it is permanently deleted. Finished events remain without a link to you.",
+  "deletion.blockersIntro":
+    "Resolve these first: transfer or delete the events, and hand over or empty shared organizers.",
+  "deletion.blocker.owned_event": "event you own",
+  "deletion.blocker.shared_organizer": "shared organizer with other managers",
+  "deletion.confirmLabel": "Type the account email address to confirm",
+  "deletion.request": "Delete account",
+  "deletion.pending": "The account will be deleted no earlier than:",
+  "deletion.pendingHelp": "The account is disabled. You can undo the deletion until then.",
+  "deletion.cancel": "Undo deletion",
+  "deletion.cancelled": "Deletion undone. The account is active again.",
+  "deletion.recentAuth": "Sign out and in again before deleting the account.",
+  "deletion.mismatch": "The email address does not match the account.",
+  "deletion.blocked": "Something still blocks deletion. The list was refreshed.",
+  "deletion.error": "Deletion could not be loaded or changed.",
   "accountRecovery.readyTitle": "Ready to finish",
   "accountRecovery.checking": "Checking the recovery link …",
   "accountRecovery.completeHelp":

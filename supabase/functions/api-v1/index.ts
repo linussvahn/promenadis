@@ -4,6 +4,7 @@ import { sessionFromVerifiedAccessToken } from "../../../packages/domain/src/aut
 import {
   acceptEventTeamInviteRequestSchema,
   accountProfileSchema,
+  accountDeletionStatusSchema,
   accountRecoveryClaimSchema,
   accountRecoveryCompletionSchema,
   accountRecoveryStatusSchema,
@@ -24,6 +25,7 @@ import {
   incomingEventTeamInvitesSchema,
   incomingOrganizerInvitesSchema,
   initiateAccountRecoveryRequestSchema,
+  requestAccountDeletionRequestSchema,
   initiateAccountRecoveryResponseSchema,
   initiateEventOwnershipTransferRequestSchema,
   inviteEventTeamMemberRequestSchema,
@@ -629,6 +631,95 @@ Deno.serve(async (request) => {
       return apiError("unauthorized", "Authentication is required.", 401, correlationId, origin);
     }
     const actorId = actor.id;
+
+    // A pending deletion disables the account: only its status and cancellation remain.
+    const deletionRoute = route === "/account/deletion" || route === "/account/deletion/cancel";
+    const { data: deletionPending, error: deletionError } = await admin.rpc(
+      "account_deletion_pending",
+      { p_account_id: actorId },
+    );
+    if (deletionError) throw deletionError;
+    if (deletionPending === true && !deletionRoute) {
+      operation = "account.disabled_access_denied";
+      status = "denied";
+      return apiError(
+        "account_deletion_pending",
+        "This account is scheduled for deletion.",
+        403,
+        correlationId,
+        origin,
+      );
+    }
+
+    if (request.method === "GET" && route === "/account/deletion") {
+      operation = "account.deletion_status_read";
+      const { data, error } = await admin.rpc("get_account_deletion_command", {
+        p_actor_id: actorId,
+      });
+      if (error) throw error;
+      const parsed = accountDeletionStatusSchema.safeParse(data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
+
+    if (request.method === "POST" && route === "/account/deletion") {
+      operation = "account.deletion_request";
+      const input = requestAccountDeletionRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Confirm with your email.", 400, correlationId, origin);
+      }
+      const { data, error } = await admin.rpc("request_account_deletion_command", {
+        p_actor_id: actorId,
+        p_authenticated_at: actor.authenticatedAt,
+        p_confirmation_email: input.data.confirmationEmail,
+        p_correlation_id: correlationId,
+      });
+      if (error) {
+        const mapped = new Map<string, [string, string, number]>([
+          [
+            "Recent authentication required",
+            ["recent_auth_required", "Sign in again before deleting the account.", 403],
+          ],
+          [
+            "Deletion confirmation mismatch",
+            ["confirmation_mismatch", "The confirmation does not match.", 400],
+          ],
+          ["Account deletion blocked", ["deletion_blocked", "Resolve the listed items.", 409]],
+          [
+            "Account deletion already requested",
+            ["deletion_pending", "Deletion is already scheduled.", 409],
+          ],
+        ]).get(error.message);
+        if (mapped) {
+          status = "denied";
+          return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+        }
+        throw error;
+      }
+      const parsed = accountDeletionStatusSchema.safeParse(data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
+
+    if (request.method === "POST" && route === "/account/deletion/cancel") {
+      operation = "account.deletion_cancel";
+      const { data, error } = await admin.rpc("cancel_account_deletion_command", {
+        p_actor_id: actorId,
+        p_correlation_id: correlationId,
+      });
+      if (error) {
+        if (error.message !== "Account deletion not pending") throw error;
+        status = "denied";
+        return apiError("not_pending", "No deletion is scheduled.", 409, correlationId, origin);
+      }
+      const parsed = accountDeletionStatusSchema.safeParse(data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
 
     if (request.method === "GET" && route === "/dashboard") {
       operation = "identity.dashboard_read";
