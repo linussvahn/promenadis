@@ -897,6 +897,16 @@ Internal recovery targets:
 
 ## 11. Email delivery
 
+Local implementation preview: a manually invoked Node worker claims bounded
+security-notification outbox batches using expiring, token-fenced leases and
+delivers fixed bilingual plain text only to Mailpit. It uses the local Docker
+database, not a hosted service credential or scheduled queue consumer. Addresses
+are resolved transiently, logs contain counts, and existing job expiry applies.
+This is not the production worker: old-address binding, claim-specific delivery
+evidence, provider deduplication/reconciliation and safe Auth mutation remain
+required before account recovery completion can be enabled. A stable job header
+does not establish exactly-once mail delivery.
+
 AWS SES in Stockholm is the initial transactional email provider.
 
 - Configure as custom SMTP for Supabase authentication email where supported.

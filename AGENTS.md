@@ -15,6 +15,12 @@ public/unlisted pilots still require their separate gates. Preserve existing
 local accounts/events: use forward migrations and rollback-only database tests,
 not database resets.
 
+Check usage headroom during longer implementation sessions. When approaching a
+usage limit, finish a safe bounded checkpoint, record completed work, verification
+and remaining work in NEXT_SESSION.md, commit and push to origin, then pause.
+Never commit credentials, local databases or generated runtime state. If pushing
+fails, report the local commit and blocker instead of claiming it was saved remotely.
+
 During discovery:
 
 - Continue with the ordered open questions in `NEXT_SESSION.md`.

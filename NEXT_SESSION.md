@@ -18,6 +18,10 @@ In the current task, simply say: **Continue Promenadis.**
 
 ## Current phase and instruction
 
+User checkpoint rule: monitor usage during longer work. Near the limit, stop at
+a safe checkpoint, update this handoff, commit and push, then pause. Report any
+push failure explicitly. GitHub origin is linussvahn/promenadis over SSH.
+
 Creation mode is active. The user approved the architecture and authorized
 Milestone 0 on 2026-09-07. Implement autonomously within the accepted scope and
 vertical milestone order. Ask only when a missing decision would materially
@@ -451,6 +455,32 @@ Treat those documents as canonical rather than relying on chat memory.
   and contract artifacts are current.
 
 ## Recommended next work
+
+### Local security-notification adapter (2026-11-01)
+
+- Added `pnpm notifications:local`: manual batches of at most ten existing
+  recovery/successor jobs, fixed Swedish/English plain-text templates and a
+  hardcoded local Mailpit transport. No provider account, remote mail or spend.
+- Recipient email and locale are resolved in memory from the current verified
+  account after a live lease/cancellation/expiry check. Logs contain only counts.
+  No user-authored content, names, replacement emails or tokens in team notices.
+- Six deterministic delivery tests cover templates, failure/retry acknowledgement,
+  unavailable recipients, ambiguous acknowledgement and batch isolation. The
+  isolated SQL → Mailpit → acknowledgement regression passes and removes its
+  disposable database fixture, leaving one synthetic message in the test inbox.
+- Full `pnpm verify` passed: 100 existing tests plus six new delivery tests,
+  formatting/lint, secret scan, contracts, typechecks and production build.
+  Existing map bundle-size warning remains. The local transport regression is
+  wired into database CI; hosted results have not been verified this session.
+- This manual local adapter does not complete the production notification gate:
+  resolve/freeze the old-email recipient safely before any Auth rebinding, add
+  delivery evidence tied to the claim, durable reconciliation and revocation.
+  Current email lookup is safe only while Auth completion stays disabled. A
+  cancellation cannot recall in-flight mail; ambiguous sends may duplicate.
+  Exhausted jobs remain visible in the private outbox until existing expiry.
+- Next: enforce claim-specific delivered-notice prerequisites and old-recipient
+  binding, then implement the retry-safe recovery completion protocol. Hosted
+  mail, automatic scheduling and Auth email mutation remain disabled.
 
 ### Notification delivery foundation (2026-11-01)
 

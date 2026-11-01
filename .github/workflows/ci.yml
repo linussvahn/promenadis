@@ -80,6 +80,8 @@ jobs:
         run: pnpm db:verify
       - name: Check per-session authentication freshness and revocation
         run: pnpm test:local-session-security
+      - name: Check local security-notification transport
+        run: pnpm test:local-notifications
       - name: Stop local Supabase
         if: always()
         run: pnpm db:stop --no-backup

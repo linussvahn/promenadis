@@ -1,5 +1,16 @@
 # Promenadis
 
+### Local security-notification preview
+
+With local Supabase/Docker and Mailpit running, `pnpm notifications:local` drains
+at most ten eligible recovery/successor security notices into the local inbox.
+Run it again after the retry delay to retry failures. Docker must be on PATH.
+`pnpm test:local-notifications` tests delivery with a disposable synthetic account
+without claiming existing jobs. It leaves one synthetic message in Mailpit.
+There is no external mail transport or scheduled worker, and account-recovery
+completion remains disabled. The worker reports counts only; a stable message
+header aids correlation but does not provide provider-side deduplication.
+
 Promenadis is a mobile-first web app for organizing and visiting geographically
 distributed community events, initially Swedish neighbourhood walking flea
 markets (`promenadloppis`). It is intended to remain general enough to support
