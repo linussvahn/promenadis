@@ -456,6 +456,28 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Usage checkpoint (2026-11-01)
+
+- Paused before starting external Auth dispatch at 75% of the five-hour usage
+  window, following the user's request to preserve a safe checkpoint near limits.
+  Latest implementation checkpoint is `06b9fe2`; no Auth side effects enabled.
+- Resume with the durable dispatch/reconciliation design, not another preparation
+  layer. Inspect the installed Supabase Auth client/server capabilities and verify
+  current official API support for email updates and account-wide session
+  revocation before implementing the adapter.
+- Explicitly cover: cancellation winning before dispatch; cancellation/rotation
+  after a provider call may have started; worker crash before/after acceptance;
+  late responses after lease expiry; duplicate dispatch; destination collision;
+  expired claims during ambiguous operations; and stale bearer/refresh/cookie
+  sessions after a successful recovery. A lease cannot fence an external service
+  unless that service honors the fencing/idempotency mechanism.
+- Do not cascade-delete the sole reconciliation evidence after dispatch starts,
+  blindly resend an ambiguous email update, or assume a successful email update
+  revokes sessions. Resolve any conflict with the seven-day claim retention
+  requirement explicitly before enabling the workflow. Until then, completion
+  remains unavailable and the existing preparation operation ID grants no Auth
+  mutation authority.
+
 ### Durable recovery preparation (2026-11-01)
 
 - Added an internal service-only preparation command. It locks recovery code then
