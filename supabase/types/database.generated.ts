@@ -18,7 +18,9 @@ export type Database = {
           id: string
           initiated_at: string
           new_email: string
+          original_email: string | null
           ready_at: string
+          required_notice_count: number
           verification_token_hash: string
         }
         Insert: {
@@ -29,7 +31,9 @@ export type Database = {
           id?: string
           initiated_at?: string
           new_email: string
+          original_email?: string | null
           ready_at: string
+          required_notice_count?: number
           verification_token_hash: string
         }
         Update: {
@@ -40,7 +44,9 @@ export type Database = {
           id?: string
           initiated_at?: string
           new_email?: string
+          original_email?: string | null
           ready_at?: string
+          required_notice_count?: number
           verification_token_hash?: string
         }
         Relationships: []
@@ -996,6 +1002,10 @@ export type Database = {
         }
         Returns: Json
       }
+      account_recovery_notices_accepted: {
+        Args: { p_claim_id: string }
+        Returns: boolean
+      }
       attest_event_publication_command: {
         Args: {
           p_actor_id: string
@@ -1305,6 +1315,10 @@ export type Database = {
           p_membership_id: string
           p_organizer_profile_id: string
         }
+        Returns: Json
+      }
+      resolve_security_notification_recipient: {
+        Args: { p_job_id: string; p_lease_id: string }
         Returns: Json
       }
       set_event_emergency_successor_command: {

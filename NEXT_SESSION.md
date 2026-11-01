@@ -456,6 +456,31 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Claim-bound recovery security notices (2026-11-01)
+
+- New recovery claims capture the original verified account email privately at
+  creation. The local worker uses a service-only lease-fenced recipient resolver;
+  later Auth email changes cannot redirect the owner's original-address notice.
+  The extra address is erased with the claim (at most seven days), never placed
+  in outbox rows, logs or browser DTOs.
+- A service-only mail-acceptance predicate requires the initial notice count and
+  owner notice to be satisfied. Missing/deleted jobs cannot silently reduce the
+  required set. This records transport acceptance, NOT proof of inbox receipt,
+  and is not a recovery-completion authorization command.
+- Existing pending claims are deliberately not backfilled with a guessed old
+  email: they fail closed. Cancel/rotate and initiate a new local request to test
+  the new binding. Existing accounts/events were preserved by forward migration.
+- Verified 406 rollback-only database assertions, SQL lint, workspace typechecks
+  and the local Mailpit delivery regression. The transport regression changes its
+  disposable Auth email after claim creation and checks delivery to the original
+  destination plus acceptance evidence. No existing local accounts are changed.
+  Full `pnpm verify` also passes (106 tests and production build), with generated
+  database types matching. Existing map bundle warning remains.
+- Next: integrate this prerequisite into a durable recovery completion protocol
+  with consistent cancellation/rotation locks, Auth reconciliation and old-session
+  revocation. Verification, the full delay and all other gates still apply.
+  No Auth mutation, hosted mail or completion endpoint has been enabled.
+
 ### Local security-notification adapter (2026-11-01)
 
 - Added `pnpm notifications:local`: manual batches of at most ten existing

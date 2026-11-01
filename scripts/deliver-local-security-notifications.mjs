@@ -42,14 +42,8 @@ export function localDeliveryDependencies() {
     resolveRecipient: async (job) => {
       // Recheck cancellation/expiry immediately before sending. A concurrent
       // cancellation cannot recall a message already accepted by Mailpit.
-      const value = query(`select json_build_object('email',u.email,'locale',p.preferred_locale)
-        from app_private.notification_jobs j
-        join auth.users u on u.id=j.recipient_account_id
-        join public.profiles p on p.account_id=u.id
-        where j.id=${uuid(job.job_id)} and j.delivery_lease_id=${uuid(job.lease_id)}
-          and j.delivery_lease_until>clock_timestamp() and j.expires_at>clock_timestamp()
-          and j.cancelled_at is null and j.completed_at is null
-          and u.email_confirmed_at is not null and u.email is not null;`);
+      const value = query(`select public.resolve_security_notification_recipient(
+        ${uuid(job.job_id)},${uuid(job.lease_id)});`);
       return value ? JSON.parse(value) : null;
     },
     send: async (email, message, jobId) => {

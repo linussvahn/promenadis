@@ -902,9 +902,13 @@ security-notification outbox batches using expiring, token-fenced leases and
 delivers fixed bilingual plain text only to Mailpit. It uses the local Docker
 database, not a hosted service credential or scheduled queue consumer. Addresses
 are resolved transiently, logs contain counts, and existing job expiry applies.
-This is not the production worker: old-address binding, claim-specific delivery
-evidence, provider deduplication/reconciliation and safe Auth mutation remain
-required before account recovery completion can be enabled. A stable job header
+New claims bind the original owner address privately for their seven-day maximum
+lifetime; service-only resolution keeps subsequent Auth changes from redirecting
+that notice. A claim-specific acceptance predicate checks all initial notices,
+including the owner, and fails closed for legacy unbound claims or missing jobs.
+This is not the production worker: provider deduplication/reconciliation and
+integration of this evidence with safe Auth mutation remain required before
+account recovery completion can be enabled. A stable job header
 does not establish exactly-once mail delivery.
 
 AWS SES in Stockholm is the initial transactional email provider.
