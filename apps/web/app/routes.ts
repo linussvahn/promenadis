@@ -12,4 +12,5 @@ export default [
   route("events/:eventId/registration", "routes/event-registration.tsx"),
   route("events/:eventId/review", "routes/event-review.tsx"),
   route("settings", "routes/settings.tsx"),
+  route("admin", "routes/admin.tsx"),
 ] satisfies RouteConfig;

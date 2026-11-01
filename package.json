@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
+    "admin:grant:local": "node scripts/grant-local-admin.mjs",
     "check": "biome check .",
     "contracts:check": "pnpm --filter @promenadis/contracts contracts:check",
     "contracts:generate": "pnpm --filter @promenadis/contracts contracts:generate",

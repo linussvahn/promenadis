@@ -10,6 +10,8 @@ const blockerKeys = {
   boundary_missing: "publication.blocker.boundary_missing",
   event_not_draft: "publication.blocker.event_not_draft",
   first_event_review_pending: "publication.blocker.first_event_review_pending",
+  first_event_review_rejected: "publication.blocker.first_event_review_rejected",
+  first_event_review_required: "publication.blocker.first_event_review_required",
   owner_email_unverified: "publication.blocker.owner_email_unverified",
   public_delivery_not_ready: "publication.blocker.public_delivery_not_ready",
   publication_attestation_missing: "publication.blocker.publication_attestation_missing",
@@ -94,6 +96,67 @@ export function PublicationReadiness({
     }
   };
 
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
+  useEffect(() => {
+    if (!readiness?.blockers.includes("first_event_review_rejected")) {
+      setRejectionReason(null);
+      return;
+    }
+    void (async () => {
+      const authenticated = await authenticatedClient();
+      if (!authenticated) return;
+      try {
+        const review = await authenticated.api.getFirstEventReview(authenticated.token, event.id);
+        setRejectionReason(review.reason);
+      } catch {
+        setRejectionReason(null);
+      }
+    })();
+  }, [authenticatedClient, event.id, readiness]);
+
+  // Review is requested once only system gates (and the review itself) remain.
+  const reviewable =
+    event.role === "owner" &&
+    readiness !== null &&
+    readiness.blockers.some(
+      (blocker) =>
+        blocker === "first_event_review_required" || blocker === "first_event_review_rejected",
+    ) &&
+    readiness.blockers.every((blocker) =>
+      [
+        "first_event_review_required",
+        "first_event_review_rejected",
+        "routing_not_ready",
+        "public_delivery_not_ready",
+      ].includes(blocker),
+    );
+
+  const requestReview = async () => {
+    setBusy(true);
+    setStatus("");
+    try {
+      const authenticated = await authenticatedClient();
+      if (!authenticated) return;
+      setReadiness(
+        await authenticated.api.requestFirstEventReview(
+          authenticated.token,
+          event.id,
+          event.version,
+        ),
+      );
+      setStatus(translate(locale, "publication.reviewRequested"));
+    } catch (error) {
+      if (error instanceof PromenadisApiError && error.code === "version_conflict") {
+        await loadReadiness();
+        setStatus(translate(locale, "publication.versionConflict"));
+      } else {
+        setStatus(translate(locale, "publication.error"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const attestationMissing = readiness?.blockers.includes("publication_attestation_missing");
   const canAttest = event.role === "owner" && event.boundary && event.registration;
 
@@ -113,6 +176,21 @@ export function PublicationReadiness({
               <li key={blocker}>{translate(locale, blockerKeys[blocker])}</li>
             ))}
           </ul>
+          {rejectionReason ? (
+            <p className="notice">
+              {translate(locale, "publication.reviewReason")} {rejectionReason}
+            </p>
+          ) : null}
+          {reviewable ? (
+            <button
+              className="primary-button"
+              disabled={busy}
+              onClick={() => void requestReview()}
+              type="button"
+            >
+              {translate(locale, "publication.requestReview")}
+            </button>
+          ) : null}
           {readiness.blockers.includes("recovery_code_missing") ? (
             <Link className="secondary-button button-link" to="/settings">
               {translate(locale, "publication.openSecurity")}

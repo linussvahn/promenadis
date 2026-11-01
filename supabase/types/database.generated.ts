@@ -158,6 +158,33 @@ export type Database = {
           },
         ]
       }
+      admin_elevation_sessions: {
+        Row: {
+          account_id: string
+          auth_session_id: string
+          ended_at: string | null
+          expires_at: string
+          id: string
+          started_at: string
+        }
+        Insert: {
+          account_id: string
+          auth_session_id: string
+          ended_at?: string | null
+          expires_at: string
+          id?: string
+          started_at?: string
+        }
+        Update: {
+          account_id?: string
+          auth_session_id?: string
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          started_at?: string
+        }
+        Relationships: []
+      }
       audit_events: {
         Row: {
           action: string
@@ -248,6 +275,45 @@ export type Database = {
           erased_at?: string
           subject_id?: string
           subject_type?: string
+        }
+        Relationships: []
+      }
+      event_first_reviews: {
+        Row: {
+          boundary_version: number
+          decided_at: string | null
+          decided_by_account_id: string | null
+          event_id: string
+          event_version: number
+          reason: string | null
+          registration_version: number
+          requested_at: string
+          status: string
+          visibility: string
+        }
+        Insert: {
+          boundary_version: number
+          decided_at?: string | null
+          decided_by_account_id?: string | null
+          event_id: string
+          event_version: number
+          reason?: string | null
+          registration_version: number
+          requested_at?: string
+          status?: string
+          visibility: string
+        }
+        Update: {
+          boundary_version?: number
+          decided_at?: string | null
+          decided_by_account_id?: string | null
+          event_id?: string
+          event_version?: number
+          reason?: string | null
+          registration_version?: number
+          requested_at?: string
+          status?: string
+          visibility?: string
         }
         Relationships: []
       }
@@ -367,6 +433,21 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          account_id: string
+          granted_at: string
+        }
+        Insert: {
+          account_id: string
+          granted_at?: string
+        }
+        Update: {
+          account_id?: string
+          granted_at?: string
+        }
+        Relationships: []
+      }
       recovery_previous_email_notices: {
         Row: {
           created_at: string
@@ -438,6 +519,10 @@ export type Database = {
         Args: { p_event_id: string; p_include_invite_emails: boolean }
         Returns: Json
       }
+      first_event_review_blocker: {
+        Args: { p_event_id: string; p_owner_account_id: string }
+        Returns: string
+      }
       lock_eligible_recovery_claim: {
         Args: { p_claim_id: string; p_verification_token: string }
         Returns: {
@@ -475,6 +560,10 @@ export type Database = {
       purge_expired_browser_sessions: { Args: never; Returns: undefined }
       purge_expired_recovery_previous_emails_command: {
         Args: never
+        Returns: undefined
+      }
+      require_admin_elevation: {
+        Args: { p_actor_id: string; p_auth_session_id: string }
         Returns: undefined
       }
       require_recent_authentication: {
@@ -1337,6 +1426,18 @@ export type Database = {
         }
         Returns: string
       }
+      decide_first_event_review_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_decision: string
+          p_event_id: string
+          p_expected_event_version: number
+          p_reason: string
+        }
+        Returns: undefined
+      }
       delete_browser_session_command: {
         Args: { p_hash: string }
         Returns: undefined
@@ -1351,6 +1452,10 @@ export type Database = {
           p_expected_version: number
         }
         Returns: string
+      }
+      end_admin_elevation_command: {
+        Args: { p_actor_id: string; p_correlation_id: string }
+        Returns: Json
       }
       enroll_account_recovery_code_command: {
         Args: {
@@ -1378,11 +1483,19 @@ export type Database = {
         Args: { p_actor_id: string }
         Returns: Json
       }
+      get_admin_status_command: {
+        Args: { p_actor_id: string; p_auth_session_id: string }
+        Returns: Json
+      }
       get_event_publication_readiness_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
       }
       get_event_team_command: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: Json
+      }
+      get_first_event_review_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
       }
@@ -1472,6 +1585,15 @@ export type Database = {
         Args: { p_account_id: string; p_session_id: string }
         Returns: boolean
       }
+      is_platform_admin: { Args: { p_account_id: string }; Returns: boolean }
+      list_first_event_reviews_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+        }
+        Returns: Json
+      }
       prepare_account_recovery_command: {
         Args: {
           p_claim_id: string
@@ -1537,6 +1659,15 @@ export type Database = {
         }
         Returns: Json
       }
+      request_first_event_review_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_event_id: string
+          p_expected_event_version: number
+        }
+        Returns: Json
+      }
       resolve_security_notification_recipient: {
         Args: { p_job_id: string; p_lease_id: string }
         Returns: Json
@@ -1550,6 +1681,14 @@ export type Database = {
           p_expected_team_version: number
           p_successor_membership_id: string
           p_target_organizer_profile_id: string
+        }
+        Returns: Json
+      }
+      start_admin_elevation_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
         }
         Returns: Json
       }

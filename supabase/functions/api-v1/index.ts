@@ -5,6 +5,12 @@ import {
   acceptEventTeamInviteRequestSchema,
   accountProfileSchema,
   accountDeletionStatusSchema,
+  adminElevationRequestSchema,
+  adminStatusSchema,
+  decideFirstEventReviewSchema,
+  firstEventReviewQueueSchema,
+  firstEventReviewStatusSchema,
+  requestFirstEventReviewSchema,
   mfaStatusSchema,
   totpEnrollmentSchema,
   accountRecoveryClaimSchema,
@@ -115,6 +121,7 @@ interface AuthenticatedActor {
   readonly assuranceLevel: "aal1" | "aal2";
   readonly authenticatedAt: string | null;
   readonly id: string;
+  readonly sessionId: string;
   readonly token: string;
   readonly totpFactors: ReadonlyArray<{ readonly id: string; readonly verified: boolean }>;
 }
@@ -159,6 +166,7 @@ async function authenticatedActor(request: Request): Promise<AuthenticatedActor 
     assuranceLevel: session.assuranceLevel,
     authenticatedAt: session.authenticatedAt,
     id: data.user.id,
+    sessionId: session.sessionId,
     token,
     totpFactors,
   };
@@ -1421,6 +1429,191 @@ Deno.serve(async (request) => {
       if (!parsed.success) throw new Error("invalid_internal_response");
       status = "succeeded";
       return json(parsed.data, 200, correlationId, origin);
+    }
+
+    const firstReviewRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/first-review$/iu,
+    );
+    if (firstReviewRoute && request.method === "GET") {
+      operation = "event.first_review_read";
+      const { data, error } = await admin.rpc("get_first_event_review_command", {
+        p_actor_id: actorId,
+        p_event_id: firstReviewRoute[1],
+      });
+      if (error) {
+        status = "denied";
+        return apiError("not_found", "Event not found.", 404, correlationId, origin);
+      }
+      const parsed = firstEventReviewStatusSchema.safeParse(data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
+    if (firstReviewRoute && request.method === "POST") {
+      operation = "event.first_review_request";
+      const input = requestFirstEventReviewSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Reload the event.", 400, correlationId, origin);
+      }
+      const { data, error } = await admin.rpc("request_first_event_review_command", {
+        p_actor_id: actorId,
+        p_correlation_id: correlationId,
+        p_event_id: firstReviewRoute[1],
+        p_expected_event_version: input.data.expectedEventVersion,
+      });
+      if (error) {
+        const mapped = new Map<string, [string, string, number]>([
+          [
+            "Only the event owner can request review",
+            ["forbidden", "Only the owner can request review.", 403],
+          ],
+          [
+            "Event version conflict",
+            ["version_conflict", "The event changed. Reload and try again.", 409],
+          ],
+          ["First-event review not needed", ["review_not_needed", "No review is needed now.", 409]],
+          ["Event not ready for review", ["not_ready", "Finish the setup steps first.", 409]],
+        ]).get(error.message);
+        if (mapped) {
+          status = "denied";
+          return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+        }
+        throw error;
+      }
+      const parsed = eventPublicationReadinessSchema.safeParse(data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
+
+    // Admin mode: operator-granted eligibility + aal2 + a fresh TOTP code,
+    // bound to this Auth session for 15 minutes. Never ambient.
+    if (route === "/admin" || route.startsWith("/admin/")) {
+      const adminStatus = async () => {
+        const { data, error } = await admin.rpc("get_admin_status_command", {
+          p_actor_id: actorId,
+          p_auth_session_id: actor.sessionId,
+        });
+        if (error) throw error;
+        return adminStatusSchema.parse(data);
+      };
+      const denied = (code: string, message: string, httpStatus: number) => {
+        status = "denied";
+        return apiError(code, message, httpStatus, correlationId, origin);
+      };
+      if (request.method === "GET" && route === "/admin/status") {
+        operation = "admin.status_read";
+        status = "succeeded";
+        return json(await adminStatus(), 200, correlationId, origin);
+      }
+      if (request.method === "POST" && route === "/admin/elevation") {
+        operation = "admin.elevation_start";
+        const input = adminElevationRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) return denied("invalid_request", "Enter the six-digit code.", 400);
+        const { data: eligible, error: eligibleError } = await admin.rpc("is_platform_admin", {
+          p_account_id: actorId,
+        });
+        if (eligibleError) throw eligibleError;
+        if (eligible !== true) return denied("forbidden", "Not a platform administrator.", 403);
+        const factor = actor.totpFactors.find((candidate) => candidate.verified);
+        if (!factor || actor.assuranceLevel !== "aal2") {
+          return denied("mfa_required", "Two-step verification is required for admin mode.", 403);
+        }
+        const challenge = await authAsUser(
+          actor.token,
+          `/factors/${factor.id}/challenge`,
+          "POST",
+          {},
+        );
+        const verified =
+          challenge.ok && typeof challenge.data?.id === "string"
+            ? await authAsUser(actor.token, `/factors/${factor.id}/verify`, "POST", {
+                challenge_id: challenge.data.id,
+                code: input.data.code,
+              })
+            : null;
+        if (!verified?.ok) return denied("mfa_failed", "The code did not match.", 400);
+        const { error } = await admin.rpc("start_admin_elevation_command", {
+          p_actor_id: actorId,
+          p_auth_session_id: actor.sessionId,
+          p_correlation_id: correlationId,
+        });
+        if (error) throw error;
+        status = "succeeded";
+        return json(await adminStatus(), 200, correlationId, origin);
+      }
+      if (request.method === "POST" && route === "/admin/elevation/end") {
+        operation = "admin.elevation_end";
+        const { error } = await admin.rpc("end_admin_elevation_command", {
+          p_actor_id: actorId,
+          p_correlation_id: correlationId,
+        });
+        if (error) throw error;
+        status = "succeeded";
+        return json(await adminStatus(), 200, correlationId, origin);
+      }
+      if (request.method === "GET" && route === "/admin/reviews") {
+        operation = "admin.first_review_queue_read";
+        const { data, error } = await admin.rpc("list_first_event_reviews_command", {
+          p_actor_id: actorId,
+          p_auth_session_id: actor.sessionId,
+          p_correlation_id: correlationId,
+        });
+        if (error) {
+          if (error.message === "Admin elevation required") {
+            return denied("elevation_required", "Enter admin mode first.", 403);
+          }
+          throw error;
+        }
+        const parsed = firstEventReviewQueueSchema.safeParse(data);
+        if (!parsed.success) throw new Error("invalid_internal_response");
+        status = "succeeded";
+        return json(parsed.data, 200, correlationId, origin);
+      }
+      const decisionRoute = route.match(
+        /^\/admin\/reviews\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/decision$/iu,
+      );
+      if (request.method === "POST" && decisionRoute) {
+        operation = "admin.first_review_decide";
+        const input = decideFirstEventReviewSchema.safeParse(await requestBody(request));
+        if (!input.success)
+          return denied("invalid_request", "Choose a decision and give a reason.", 400);
+        const { error } = await admin.rpc("decide_first_event_review_command", {
+          p_actor_id: actorId,
+          p_auth_session_id: actor.sessionId,
+          p_correlation_id: correlationId,
+          p_decision: input.data.decision,
+          p_event_id: decisionRoute[1],
+          p_expected_event_version: input.data.expectedEventVersion,
+          p_reason: input.data.reason,
+        });
+        if (error) {
+          const mapped = new Map<string, [string, string, number]>([
+            ["Admin elevation required", ["elevation_required", "Enter admin mode first.", 403]],
+            [
+              "Cannot review own event",
+              ["conflict_of_interest", "You cannot review your own event.", 403],
+            ],
+            [
+              "Review unavailable",
+              ["review_unavailable", "This review is no longer pending.", 409],
+            ],
+            [
+              "Event version conflict",
+              ["version_conflict", "The event changed after submission.", 409],
+            ],
+            [
+              "Invalid review decision",
+              ["invalid_request", "Choose a decision and give a reason.", 400],
+            ],
+          ]).get(error.message);
+          if (mapped) return denied(mapped[0], mapped[1], mapped[2]);
+          throw error;
+        }
+        status = "succeeded";
+        return json(await adminStatus(), 200, correlationId, origin);
+      }
     }
 
     const publicationReadinessRoute = route.match(

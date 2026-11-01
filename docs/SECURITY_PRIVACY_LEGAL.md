@@ -255,6 +255,11 @@ fallback, avoiding password reset and credential-storage risks.
 An administrator uses the same account for ordinary participation and admin
 work, but privileged access is never ambient.
 
+- Local implementation (2026-11-01): operator-granted eligibility, aal2 plus a
+  fresh TOTP code per elevation, session-bound 15-minute elevation, explicit
+  exit, a separate `/admin` page with a persistent active-mode warning, and
+  audited elevation, queue reads and review decisions. Admins cannot review
+  events whose team they belong to.
 - Default every session to normal-user mode.
 - Enter admin mode through fresh TOTP verification.
 - Admin elevation expires after approximately 15 minutes.

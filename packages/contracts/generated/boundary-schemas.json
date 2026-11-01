@@ -379,6 +379,223 @@
     ],
     "additionalProperties": false
   },
+  "FirstEventReviewStatus": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "decidedAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "reason": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 500
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "requestedAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "none",
+          "pending",
+          "approved",
+          "rejected"
+        ]
+      }
+    },
+    "required": [
+      "decidedAt",
+      "reason",
+      "requestedAt",
+      "status"
+    ],
+    "additionalProperties": false
+  },
+  "RequestFirstEventReview": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "expectedEventVersion": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "expectedEventVersion"
+    ],
+    "additionalProperties": false
+  },
+  "AdminStatus": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "elevated": {
+        "type": "boolean"
+      },
+      "eligible": {
+        "type": "boolean"
+      },
+      "expiresAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "elevated",
+      "eligible",
+      "expiresAt"
+    ],
+    "additionalProperties": false
+  },
+  "AdminElevationRequest": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "code": {
+        "type": "string",
+        "pattern": "^[0-9]{6}$"
+      }
+    },
+    "required": [
+      "code"
+    ],
+    "additionalProperties": false
+  },
+  "FirstEventReviewQueue": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "maxItems": 500,
+    "type": "array",
+    "items": {
+      "type": "object",
+      "properties": {
+        "current": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "eventVersion": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "organizerName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "organizerType": {
+          "type": "string",
+          "enum": [
+            "individual",
+            "informal_group",
+            "association",
+            "company"
+          ]
+        },
+        "ownEvent": {
+          "type": "boolean"
+        },
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "public",
+            "unlisted"
+          ]
+        }
+      },
+      "required": [
+        "current",
+        "description",
+        "eventId",
+        "eventVersion",
+        "organizerName",
+        "organizerType",
+        "ownEvent",
+        "requestedAt",
+        "title",
+        "visibility"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "DecideFirstEventReview": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "decision": {
+        "type": "string",
+        "enum": [
+          "approved",
+          "rejected"
+        ]
+      },
+      "expectedEventVersion": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "reason": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 500
+      }
+    },
+    "required": [
+      "decision",
+      "expectedEventVersion",
+      "reason"
+    ],
+    "additionalProperties": false
+  },
   "TotpEnrollment": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -1142,7 +1359,9 @@
             "boundary_missing",
             "registration_missing",
             "publication_attestation_missing",
+            "first_event_review_required",
             "first_event_review_pending",
+            "first_event_review_rejected",
             "routing_not_ready",
             "public_delivery_not_ready"
           ]
@@ -2591,7 +2810,9 @@
       "boundary_missing",
       "registration_missing",
       "publication_attestation_missing",
+      "first_event_review_required",
       "first_event_review_pending",
+      "first_event_review_rejected",
       "routing_not_ready",
       "public_delivery_not_ready"
     ]

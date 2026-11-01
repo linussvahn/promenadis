@@ -396,6 +396,16 @@ Names are conceptual and can change during schema design.
   `erasure_tombstones` row for backup replay.
 - `platform_admins`: privileged eligibility, never inferred from profile data.
 - `admin_elevation_sessions`: short-lived elevated sessions and reason context.
+  Implemented locally 2026-11-01: eligibility only via the operator script
+  `pnpm admin:grant:local`; elevation needs aal2 plus a fresh TOTP code verified
+  against Auth, is bound to the Auth session ID, lasts at most 15 minutes and
+  can be ended explicitly. `event_first_reviews` holds owner-submitted
+  first-event reviews bound to the event/boundary/registration versions and
+  visibility; an elevated admin who is not on the event team approves or
+  rejects with a reason. Readiness reports `first_event_review_required`,
+  `_pending` or `_rejected` until approved, or once the owner has an approved
+  first event elsewhere. Second-person approval and reason-gated private reads
+  are not built yet.
 - `admin_action_approvals`: pending/approved/rejected second-person authorization
   for configured high-risk action types, with distinct initiator and approver.
 - `audit_events`: append-oriented sensitive-action history with a restricted

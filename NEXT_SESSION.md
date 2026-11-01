@@ -463,6 +463,38 @@ commit and push each, ask only on real blockers. Order: account deletion
 (done), optional owner TOTP, then platform-admin elevation plus first-event
 review.
 
+### Admin elevation and first-event review (2026-11-01)
+
+- `20261101001100`: `platform_admins` (operator-granted only, via
+  `pnpm admin:grant:local <email>`), `admin_elevation_sessions` (aal2 + a fresh
+  TOTP code verified against Auth, bound to the Auth session ID, max 15 min,
+  explicit exit), `event_first_reviews` (owner submits once only system gates
+  remain; bound to event/boundary/registration versions and visibility).
+  Readiness blockers: `first_event_review_required|pending|rejected`; none
+  once approved for the current versions or when the owner already has an
+  approved first event elsewhere. `totp_recommended` disappears once the
+  owner has a verified factor.
+- BFF: `GET/POST /events/{id}/first-review`, `GET /admin/status`,
+  `POST /admin/elevation`, `POST /admin/elevation/end`, `GET /admin/reviews`,
+  `POST /admin/reviews/{id}/decision`. Web: "Submit for review" plus rejection
+  reason on the event review step; `/admin` page with code form, persistent
+  warning, queue, approve/reject with reason, exit.
+- Verified: pgTAP 230 (22), admin component tests, e2e (eligibility, wrong and
+  right elevation code, queue, approve, readiness cleared, exit), full verify,
+  DB rebuild, slice, all 8 local-auth and 5 smoke e2e.
+- Not done: second-person approval once two admins exist, reason-gated
+  sensitive reads, admin nav link, review notifications to the owner, pruning
+  ended elevation rows, organizer-verification badge (which would exempt
+  verified organizations from review).
+
+### Batch outcome and next work
+
+Batch complete: deletion, TOTP, admin review (each committed and pushed).
+Remaining Milestone 1 per the list below: routing/public-delivery gates,
+publication lifecycle transitions (publish, cancel — which also unblocks
+deleting accounts that own published events), organizer verification state,
+and TOTP as a recovery factor.
+
 ### Optional TOTP (2026-11-01)
 
 - `supabase/config.toml` enables Auth TOTP (restart Supabase after pulling).

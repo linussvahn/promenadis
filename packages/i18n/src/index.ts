@@ -139,7 +139,14 @@ const sv = {
   "publication.blocker.publication_attestation_missing":
     "Ägaren måste bekräfta publiceringsvillkoren för den aktuella konfigurationen.",
   "publication.blocker.first_event_review_pending":
-    "Den första manuella evenemangsgranskningen är ännu inte byggd.",
+    "Ditt första evenemang väntar på manuell granskning av Promenadis.",
+  "publication.blocker.first_event_review_required":
+    "Ditt första evenemang behöver granskas manuellt av Promenadis innan publicering.",
+  "publication.blocker.first_event_review_rejected":
+    "Granskningen godkändes inte. Justera evenemanget och skicka det igen.",
+  "publication.requestReview": "Skicka för granskning",
+  "publication.reviewRequested": "Evenemanget har skickats för granskning.",
+  "publication.reviewReason": "Granskarens kommentar:",
   "publication.blocker.routing_not_ready":
     "Kontroll av gångnät och ruttunderlag är ännu inte byggd.",
   "publication.blocker.public_delivery_not_ready":
@@ -334,6 +341,30 @@ const sv = {
   "accountRecovery.expiresAt": "Går ut:",
   "accountRecovery.waitHelp":
     "Öppna länken i e-postmeddelandet igen när väntetiden är slut för att slutföra återställningen.",
+  "admin.title": "Plattformsadministration",
+  "admin.notEligible": "Kontot är inte plattformsadministratör.",
+  "admin.elevateHelp":
+    "Administratörsläget kräver en ny kod från din autentiseringsapp och gäller i högst 15 minuter. Allt du gör loggas.",
+  "admin.elevate": "Starta administratörsläge",
+  "admin.active": "Administratörsläge aktivt.",
+  "admin.until": "Upphör",
+  "admin.exit": "Avsluta administratörsläge",
+  "admin.queueTitle": "Granskning av första evenemang",
+  "admin.queueEmpty": "Inga evenemang väntar på granskning.",
+  "admin.requestedAt": "Skickat:",
+  "admin.reason": "Motivering (visas för ägaren vid avslag)",
+  "admin.approve": "Godkänn",
+  "admin.reject": "Avslå",
+  "admin.approved": "Evenemanget godkändes.",
+  "admin.rejected": "Evenemanget avslogs.",
+  "admin.ownEvent": "Du kan inte granska ett evenemang där du själv ingår i teamet.",
+  "admin.reviewChanged":
+    "Evenemanget har ändrats sedan det skickades. Ägaren måste skicka det igen.",
+  "admin.codeFailed": "Koden stämde inte.",
+  "admin.totpRequired":
+    "Slå på tvåstegsverifiering och logga in med den innan du använder administratörsläget.",
+  "admin.elevationExpired": "Administratörsläget har upphört. Starta det igen.",
+  "admin.error": "Administrationen kunde inte hämtas eller ändras.",
   "mfa.title": "Tvåstegsverifiering",
   "mfa.intro":
     "Valfritt men rekommenderat för evenemangsägare: en kod från en autentiseringsapp krävs vid varje inloggning.",
@@ -615,7 +646,14 @@ const en = {
   "publication.blocker.publication_attestation_missing":
     "The owner must confirm the publication terms for the current configuration.",
   "publication.blocker.first_event_review_pending":
-    "The first-event manual review is not built yet.",
+    "Your first event is waiting for a manual review by Promenadis.",
+  "publication.blocker.first_event_review_required":
+    "Your first event needs a manual review by Promenadis before publication.",
+  "publication.blocker.first_event_review_rejected":
+    "The review was not approved. Adjust the event and submit it again.",
+  "publication.requestReview": "Submit for review",
+  "publication.reviewRequested": "The event was submitted for review.",
+  "publication.reviewReason": "Reviewer's comment:",
   "publication.blocker.routing_not_ready":
     "Walking-network and route readiness checks are not built yet.",
   "publication.blocker.public_delivery_not_ready":
@@ -811,6 +849,30 @@ const en = {
   "accountRecovery.expiresAt": "Expires:",
   "accountRecovery.waitHelp":
     "Open the link in the email again after the waiting period ends to finish recovery.",
+  "admin.title": "Platform administration",
+  "admin.notEligible": "This account is not a platform administrator.",
+  "admin.elevateHelp":
+    "Admin mode needs a fresh code from your authenticator app and lasts at most 15 minutes. Everything you do is logged.",
+  "admin.elevate": "Enter admin mode",
+  "admin.active": "Admin mode is active.",
+  "admin.until": "Ends",
+  "admin.exit": "Exit admin mode",
+  "admin.queueTitle": "First-event review",
+  "admin.queueEmpty": "No events are waiting for review.",
+  "admin.requestedAt": "Submitted:",
+  "admin.reason": "Reason (shown to the owner if rejected)",
+  "admin.approve": "Approve",
+  "admin.reject": "Reject",
+  "admin.approved": "The event was approved.",
+  "admin.rejected": "The event was rejected.",
+  "admin.ownEvent": "You cannot review an event whose team you belong to.",
+  "admin.reviewChanged":
+    "The event changed after it was submitted. The owner must submit it again.",
+  "admin.codeFailed": "The code did not match.",
+  "admin.totpRequired":
+    "Turn on two-step verification and sign in with it before using admin mode.",
+  "admin.elevationExpired": "Admin mode has ended. Enter it again.",
+  "admin.error": "Administration could not be loaded or changed.",
   "mfa.title": "Two-step verification",
   "mfa.intro":
     "Optional but recommended for event owners: a code from an authenticator app is required at every sign-in.",

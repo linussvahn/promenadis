@@ -467,6 +467,136 @@ test("optional TOTP gates every sign-in until the second step and can be turned 
   }
 });
 
+test("first-event review needs an elevated admin with a fresh TOTP code", async ({ request }) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const ownerEmail = `review-owner-${randomUUID()}@example.invalid`;
+  const adminEmail = `review-admin-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const signIn = async (email: string) => {
+    const client = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return { client, token: data.session?.access_token };
+  };
+  const headersFor = (token: string | undefined) => ({
+    apikey: publicKey,
+    authorization: `Bearer ${token}`,
+    origin: "http://127.0.0.1:5173",
+  });
+  for (const email of [ownerEmail, adminEmail]) {
+    const { error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
+    if (error) throw error;
+  }
+  try {
+    const owner = headersFor((await signIn(ownerEmail)).token);
+    const created = await request.post(`${base}/events`, {
+      headers: owner,
+      data: {
+        description: "Synthetic review fixture",
+        endsAt: "2031-09-12T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic review owner",
+        startsAt: "2031-09-12T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic review walk",
+        visibility: "unlisted",
+      },
+    });
+    expect(created.status()).toBe(201);
+    const eventId = (await created.json()).id as string;
+    await request.post(`${base}/account/recovery-code`, {
+      headers: owner,
+      data: { expectedVersion: 0 },
+    });
+    // Boundary and attestation through the same SQL commands the BFF uses.
+    const ownerId = localSql(`select id from auth.users where email='${ownerEmail}';`);
+    localSql(`select public.upsert_draft_event_boundary_command('${ownerId}','${eventId}',null,'Synthetic area',
+        '{"type":"Polygon","coordinates":[[[18.06,59.33],[18.064,59.33],[18.064,59.333],[18.06,59.33]]]}'::jsonb,gen_random_uuid());
+      select public.attest_event_publication_command('${ownerId}','${eventId}',
+        (select version from public.events where id='${eventId}'),1,1,true,true,now(),gen_random_uuid());`);
+    const version = Number(localSql(`select version from public.events where id='${eventId}';`));
+    const requested = await request.post(`${base}/events/${eventId}/first-review`, {
+      headers: owner,
+      data: { expectedEventVersion: version },
+    });
+    expect(requested.status()).toBe(200);
+    expect((await requested.json()).blockers).toContain("first_event_review_pending");
+
+    // Admin: TOTP on, operator-granted eligibility, then a fresh code for admin mode.
+    const adminSession = await signIn(adminEmail);
+    const enrolled = await (
+      await request.post(`${base}/account/mfa/totp`, {
+        headers: headersFor(adminSession.token),
+        data: {},
+      })
+    ).json();
+    const upgraded = await adminSession.client.auth.mfa.challengeAndVerify({
+      factorId: enrolled.factorId,
+      code: totp(enrolled.secret),
+    });
+    const adminHeaders = headersFor(upgraded.data?.access_token);
+    expect(
+      (await (await request.get(`${base}/admin/status`, { headers: adminHeaders })).json())
+        .eligible,
+    ).toBe(false);
+    execFileSync("node", ["scripts/grant-local-admin.mjs", adminEmail], {
+      cwd: repositoryRoot,
+      stdio: "ignore",
+    });
+    expect((await request.get(`${base}/admin/reviews`, { headers: adminHeaders })).status()).toBe(
+      403,
+    );
+    expect(
+      (
+        await request.post(`${base}/admin/elevation`, {
+          headers: adminHeaders,
+          data: { code: "000000" },
+        })
+      ).status(),
+    ).toBe(400);
+    const elevated = await request.post(`${base}/admin/elevation`, {
+      headers: adminHeaders,
+      data: { code: totp(enrolled.secret) },
+    });
+    expect((await elevated.json()).elevated).toBe(true);
+    const queue = await (
+      await request.get(`${base}/admin/reviews`, { headers: adminHeaders })
+    ).json();
+    const item = queue.find((entry: { eventId: string }) => entry.eventId === eventId);
+    expect(item).toMatchObject({ current: true, ownEvent: false, title: "Synthetic review walk" });
+    const decided = await request.post(`${base}/admin/reviews/${eventId}/decision`, {
+      headers: adminHeaders,
+      data: {
+        decision: "approved",
+        expectedEventVersion: item.eventVersion,
+        reason: "Synthetic check",
+      },
+    });
+    expect(decided.status()).toBe(200);
+    const readiness = await (
+      await request.get(`${base}/events/${eventId}/publication-readiness`, { headers: owner })
+    ).json();
+    expect(readiness.blockers).not.toContain("first_event_review_pending");
+    expect(readiness.blockers).not.toContain("first_event_review_required");
+    const exited = await request.post(`${base}/admin/elevation/end`, {
+      headers: adminHeaders,
+      data: {},
+    });
+    expect((await exited.json()).elevated).toBe(false);
+    expect((await request.get(`${base}/admin/reviews`, { headers: adminHeaders })).status()).toBe(
+      403,
+    );
+  } finally {
+    await deleteSyntheticAccount(adminEmail);
+    await deleteSyntheticAccount(ownerEmail);
+  }
+});
+
 test("the visible email OTP signs in", async ({ page, request }) => {
   test.setTimeout(90_000);
   const email = `otp-${randomUUID()}@example.invalid`;

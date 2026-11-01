@@ -3,7 +3,11 @@ import {
   type AccountRecoveryTokenRequest,
   type AttestEventPublicationRequest,
   type RequestAccountDeletionRequest,
+  type DecideFirstEventReviewRequest,
   accountDeletionStatusSchema,
+  adminStatusSchema,
+  firstEventReviewQueueSchema,
+  firstEventReviewStatusSchema,
   mfaStatusSchema,
   totpEnrollmentSchema,
   accountRecoveryClaimSchema,
@@ -320,6 +324,48 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     },
     getEventTeam(accessToken: string, eventId: string) {
       return request(`/events/${eventId}/team`, accessToken, eventTeamSummarySchema);
+    },
+    getFirstEventReview(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/first-review`, accessToken, firstEventReviewStatusSchema);
+    },
+    requestFirstEventReview(accessToken: string, eventId: string, expectedEventVersion: number) {
+      return request(
+        `/events/${eventId}/first-review`,
+        accessToken,
+        eventPublicationReadinessSchema,
+        {
+          body: { expectedEventVersion },
+          method: "POST",
+        },
+      );
+    },
+    getAdminStatus(accessToken: string) {
+      return request("/admin/status", accessToken, adminStatusSchema);
+    },
+    startAdminElevation(accessToken: string, code: string) {
+      return request("/admin/elevation", accessToken, adminStatusSchema, {
+        body: { code },
+        method: "POST",
+      });
+    },
+    endAdminElevation(accessToken: string) {
+      return request("/admin/elevation/end", accessToken, adminStatusSchema, {
+        body: {},
+        method: "POST",
+      });
+    },
+    listFirstEventReviews(accessToken: string) {
+      return request("/admin/reviews", accessToken, firstEventReviewQueueSchema);
+    },
+    decideFirstEventReview(
+      accessToken: string,
+      eventId: string,
+      input: DecideFirstEventReviewRequest,
+    ) {
+      return request(`/admin/reviews/${eventId}/decision`, accessToken, adminStatusSchema, {
+        body: input,
+        method: "POST",
+      });
     },
     getEventPublicationReadiness(accessToken: string, eventId: string) {
       return request(

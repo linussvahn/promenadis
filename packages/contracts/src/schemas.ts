@@ -487,10 +487,62 @@ export const publicationReadinessBlockerSchema = z.enum([
   "boundary_missing",
   "registration_missing",
   "publication_attestation_missing",
+  "first_event_review_required",
   "first_event_review_pending",
+  "first_event_review_rejected",
   "routing_not_ready",
   "public_delivery_not_ready",
 ]);
+
+export const firstEventReviewStatusSchema = z.strictObject({
+  decidedAt: isoInstant.nullable(),
+  reason: z.string().max(500).nullable(),
+  requestedAt: isoInstant.nullable(),
+  status: z.enum(["none", "pending", "approved", "rejected"]),
+});
+
+export type FirstEventReviewStatus = z.infer<typeof firstEventReviewStatusSchema>;
+
+export const requestFirstEventReviewSchema = z.strictObject({
+  expectedEventVersion: z.number().int().positive(),
+});
+
+export const adminStatusSchema = z.strictObject({
+  elevated: z.boolean(),
+  eligible: z.boolean(),
+  expiresAt: isoInstant.nullable(),
+});
+
+export type AdminStatus = z.infer<typeof adminStatusSchema>;
+
+export const adminElevationRequestSchema = z.strictObject({
+  code: z.string().regex(/^[0-9]{6}$/u),
+});
+
+export const firstEventReviewQueueItemSchema = z.strictObject({
+  current: z.boolean(),
+  description: z.string().max(5_000),
+  eventId: opaqueUuid,
+  eventVersion: z.number().int().positive(),
+  organizerName: z.string().max(200),
+  organizerType: organizerTypeSchema,
+  ownEvent: z.boolean(),
+  requestedAt: isoInstant,
+  title: z.string().max(200),
+  visibility: eventVisibilitySchema,
+});
+
+export const firstEventReviewQueueSchema = z.array(firstEventReviewQueueItemSchema).max(500);
+
+export type FirstEventReviewQueueItem = z.infer<typeof firstEventReviewQueueItemSchema>;
+
+export const decideFirstEventReviewSchema = z.strictObject({
+  decision: z.enum(["approved", "rejected"]),
+  expectedEventVersion: z.number().int().positive(),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export type DecideFirstEventReviewRequest = z.infer<typeof decideFirstEventReviewSchema>;
 
 export const publicationReadinessRecommendationSchema = z.enum([
   "totp_recommended",
@@ -644,6 +696,12 @@ export const boundarySchemas = {
   AccountRecoveryStatus: accountRecoveryStatusSchema,
   AccountDeletionStatus: accountDeletionStatusSchema,
   MfaStatus: mfaStatusSchema,
+  FirstEventReviewStatus: firstEventReviewStatusSchema,
+  RequestFirstEventReview: requestFirstEventReviewSchema,
+  AdminStatus: adminStatusSchema,
+  AdminElevationRequest: adminElevationRequestSchema,
+  FirstEventReviewQueue: firstEventReviewQueueSchema,
+  DecideFirstEventReview: decideFirstEventReviewSchema,
   TotpEnrollment: totpEnrollmentSchema,
   TotpVerifyRequest: totpVerifyRequestSchema,
   RequestAccountDeletionRequest: requestAccountDeletionRequestSchema,
