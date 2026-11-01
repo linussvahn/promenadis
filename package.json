@@ -31,6 +31,7 @@
     "test": "pnpm -r --if-present test && node --test scripts/security-notification-delivery.test.mjs",
     "notifications:local": "node scripts/deliver-local-security-notifications.mjs",
     "test:local-notifications": "node scripts/test-local-security-notifications.mjs",
+    "test:local-recovery-preparation": "node scripts/test-local-recovery-preparation.mjs",
     "test:e2e": "pnpm --filter @promenadis/web test:e2e",
     "test:e2e:local-auth": "pnpm --filter @promenadis/web test:e2e:local-auth",
     "test:local-slice": "pnpm --filter @promenadis/web test:local-slice",

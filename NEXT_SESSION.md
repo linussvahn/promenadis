@@ -456,6 +456,30 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Durable recovery preparation (2026-11-01)
+
+- Added an internal service-only preparation command. It locks recovery code then
+  claim consistently with cancellation/rotation, validates the token proof,
+  verified destination, 24-hour delay, expiry, consumed/current code, original
+  identity, destination collision and accepted notices. Retries recheck these
+  conditions and return the same operation ID without duplicate audit writes.
+- Preparation stores only claim ID, operation ID and timestamp; claim deletion
+  cascades the intent. No extra address/token storage or longer retention.
+  The operation ID is NOT authority to call Auth: no dispatcher, completion HTTP
+  route, email mutation or session revocation was enabled in this slice.
+- Verified 423 rollback-only database assertions, SQL lint, full `pnpm verify`
+  (106 tests and build), and a separate two-connection preparation/cancellation
+  regression. That test holds preparation locks while cancellation starts,
+  then verifies no claim/intent survives and Auth remains unchanged. Fixtures
+  are disposable; no existing accounts/events reset. Added regression to CI.
+- Next: design and implement the dispatch/reconciliation fence before any Auth
+  side effect. A prepared row alone must never authorize a delayed worker:
+  cancellation/rotation/expiry can erase it after preparation returns. Recheck
+  and durably transition under consistent locks, reconcile ambiguous Auth
+  outcomes, revoke old access/refresh sessions and test interrupted races before
+  enabling completion. Do not treat cascade deletion as sufficient once external
+  effects may have started; dispatch state needs explicit lifecycle handling.
+
 ### Claim-bound recovery security notices (2026-11-01)
 
 - New recovery claims capture the original verified account email privately at

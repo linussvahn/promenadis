@@ -82,6 +82,8 @@ jobs:
         run: pnpm test:local-session-security
       - name: Check local security-notification transport
         run: pnpm test:local-notifications
+      - name: Check recovery preparation cancellation race
+        run: pnpm test:local-recovery-preparation
       - name: Stop local Supabase
         if: always()
         run: pnpm db:stop --no-backup

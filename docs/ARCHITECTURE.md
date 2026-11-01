@@ -911,6 +911,14 @@ integration of this evidence with safe Auth mutation remain required before
 account recovery completion can be enabled. A stable job header
 does not establish exactly-once mail delivery.
 
+Recovery preparation is currently an internal idempotent database step only:
+proof, delay, code version, notice acceptance and email eligibility are rechecked
+under the recovery-code/claim locks. The private preparation references the claim
+and is erased with it. No Auth dispatcher consumes this intent. Before adding
+one, a durable dispatch/reconciliation fence must distinguish cancellable
+preparation from an external update that may already have happened; a returned
+operation ID must never bypass that revalidation or authorize Auth mutation.
+
 AWS SES in Stockholm is the initial transactional email provider.
 
 - Configure as custom SMTP for Supabase authentication email where supported.

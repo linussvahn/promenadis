@@ -81,6 +81,32 @@ export type Database = {
         }
         Relationships: []
       }
+      account_recovery_preparations: {
+        Row: {
+          claim_id: string
+          operation_id: string
+          prepared_at: string
+        }
+        Insert: {
+          claim_id: string
+          operation_id?: string
+          prepared_at?: string
+        }
+        Update: {
+          claim_id?: string
+          operation_id?: string
+          prepared_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_recovery_preparations_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: true
+            referencedRelation: "account_recovery_claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_events: {
         Row: {
           action: string
@@ -1280,6 +1306,14 @@ export type Database = {
       is_active_auth_session: {
         Args: { p_account_id: string; p_session_id: string }
         Returns: boolean
+      }
+      prepare_account_recovery_command: {
+        Args: {
+          p_claim_id: string
+          p_correlation_id: string
+          p_verification_token: string
+        }
+        Returns: string
       }
       purge_expired_emergency_successor_claims_command: {
         Args: never
