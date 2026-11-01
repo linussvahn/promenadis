@@ -1,5 +1,6 @@
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
-const signInMethods = new Set(["otp", "magiclink", "password"]);
+// A verified TOTP step is fresh authentication of this session as well.
+const signInMethods = new Set(["otp", "magiclink", "password", "totp"]);
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -8,12 +9,17 @@ function record(value: unknown): value is Record<string, unknown> {
 /** Extract only AFTER Auth has validated this exact token. Decoding is not verification.
  * Freshness comes from this session's authentication methods, never iat,
  * token refresh, account-wide last_sign_in_at, or editable user metadata.
+ * Assurance is aal2 only when Auth itself says so; anything else is aal1.
  */
 export function sessionFromVerifiedAccessToken(
   token: string,
   verifiedAccountId: string,
   nowMilliseconds = Date.now(),
-): { readonly sessionId: string; readonly authenticatedAt: string | null } | null {
+): {
+  readonly sessionId: string;
+  readonly authenticatedAt: string | null;
+  readonly assuranceLevel: "aal1" | "aal2";
+} | null {
   try {
     const parts = token.split(".");
     const payload = parts[1];
@@ -36,6 +42,7 @@ export function sessionFromVerifiedAccessToken(
     )
       return null;
 
+    const assuranceLevel = claims.aal === "aal2" ? "aal2" : "aal1";
     let authenticatedAt: number | null = null;
     if (Array.isArray(claims.amr)) {
       for (const entry of claims.amr) {
@@ -50,13 +57,14 @@ export function sessionFromVerifiedAccessToken(
           timestamp < 0 ||
           timestamp > now + 60
         ) {
-          return { sessionId: claims.session_id, authenticatedAt: null };
+          return { sessionId: claims.session_id, authenticatedAt: null, assuranceLevel };
         }
         authenticatedAt = Math.max(authenticatedAt ?? 0, timestamp);
       }
     }
     return {
       sessionId: claims.session_id,
+      assuranceLevel,
       authenticatedAt:
         authenticatedAt === null ? null : new Date(authenticatedAt * 1000).toISOString(),
     };

@@ -8,6 +8,7 @@ import { AccountDeletion } from "./account-deletion";
 import { AccountShell } from "./account-shell";
 import { OrganizerTeam } from "./organizer-team";
 import { RecoveryCode } from "./recovery-code";
+import { TwoStep } from "./two-step";
 
 type BusyAction = "profile" | "organizer" | null;
 
@@ -188,6 +189,7 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
             </details>
           </section>
           <RecoveryCode accessToken={accessToken} locale={locale} />
+          <TwoStep accessToken={accessToken} locale={locale} />
           <AccountDeletion accessToken={accessToken} locale={locale} onCancelled={loadDashboard} />
         </div>
       )}

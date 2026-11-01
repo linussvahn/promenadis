@@ -351,6 +351,75 @@
         ],
         "additionalProperties": false
       },
+      "MfaStatus": {
+        "type": "object",
+        "properties": {
+          "assuranceLevel": {
+            "type": "string",
+            "enum": [
+              "aal1",
+              "aal2"
+            ]
+          },
+          "totpEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "assuranceLevel",
+          "totpEnabled"
+        ],
+        "additionalProperties": false
+      },
+      "TotpEnrollment": {
+        "type": "object",
+        "properties": {
+          "factorId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "qrCode": {
+            "type": "string",
+            "maxLength": 600000,
+            "pattern": "^data:image\\/svg\\+xml.*"
+          },
+          "secret": {
+            "type": "string",
+            "pattern": "^[A-Z2-7]{16,64}$"
+          },
+          "uri": {
+            "type": "string",
+            "maxLength": 1000,
+            "pattern": "^otpauth:\\/\\/totp\\/.*"
+          }
+        },
+        "required": [
+          "factorId",
+          "qrCode",
+          "secret",
+          "uri"
+        ],
+        "additionalProperties": false
+      },
+      "TotpVerifyRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
+          },
+          "factorId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
       "RequestAccountDeletionRequest": {
         "type": "object",
         "properties": {

@@ -1,6 +1,6 @@
 import { translate } from "@promenadis/i18n";
 import { type FormEvent, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getBrowserAuthClient, hasLocalBackendConfiguration } from "../lib/supabase";
 import { PageHeader } from "./page-header";
@@ -13,6 +13,24 @@ export function SignIn() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const configured = hasLocalBackendConfiguration();
+  const [searchParams] = useSearchParams();
+  const mfaStep = searchParams.get("step") === "mfa";
+
+  const verifyTotp = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const code = String(new FormData(event.currentTarget).get("totp") ?? "").trim();
+    const supabase = getBrowserAuthClient();
+    if (!supabase) return;
+    setBusy(true);
+    setStatus("");
+    const { error } = await supabase.auth.verifyTotp({ code });
+    setBusy(false);
+    if (error) {
+      setStatus(translate(locale, "mfa.failed"));
+      return;
+    }
+    await navigate("/dashboard", { replace: true });
+  };
 
   const sendCode = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -91,6 +109,25 @@ export function SignIn() {
           <p className="notice notice-error" role="alert">
             {translate(locale, "auth.configMissing")}
           </p>
+        ) : mfaStep ? (
+          <form className="panel form-panel" onSubmit={verifyTotp}>
+            <h2>{translate(locale, "mfa.stepTitle")}</h2>
+            <p>{translate(locale, "mfa.stepHelp")}</p>
+            <label htmlFor="totp">{translate(locale, "mfa.code")}</label>
+            <input
+              autoComplete="one-time-code"
+              id="totp"
+              inputMode="numeric"
+              maxLength={6}
+              minLength={6}
+              name="totp"
+              pattern="[0-9]{6}"
+              required
+            />
+            <button className="primary-button" disabled={busy} type="submit">
+              {busy ? translate(locale, "auth.working") : translate(locale, "mfa.verify")}
+            </button>
+          </form>
         ) : (
           <div className="form-stack">
             <form className="panel form-panel" onSubmit={sendCode}>

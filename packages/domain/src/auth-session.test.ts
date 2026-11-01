@@ -19,11 +19,20 @@ function token(overrides: Record<string, unknown> = {}) {
 }
 const read = (value: string) => sessionFromVerifiedAccessToken(value, accountId, now * 1000);
 describe("session-bound authentication evidence", () => {
-  it.each(["otp", "magiclink", "password"])("uses verified %s evidence", (method) => {
+  it.each(["otp", "magiclink", "password", "totp"])("uses verified %s evidence", (method) => {
     expect(read(token({ amr: [{ method, timestamp: now - 120 }] }))).toEqual({
       sessionId,
+      assuranceLevel: "aal1",
       authenticatedAt: new Date((now - 120) * 1000).toISOString(),
     });
+  });
+  it.each([
+    ["aal2", "aal2"],
+    ["aal1", "aal1"],
+    ["AAL2", "aal1"],
+    [undefined, "aal1"],
+  ])("reads assurance %j as %s", (aal, expected) => {
+    expect(read(token({ aal }))?.assuranceLevel).toBe(expected);
   });
   it("does not freshen an old sign-in on token refresh or another device's login", () => {
     const old = now - 1800;
@@ -47,7 +56,11 @@ describe("session-bound authentication evidence", () => {
     [{ method: "unknown", timestamp: now }],
     [{ method: "token_refresh", timestamp: now }],
   ])("missing or unsupported evidence cannot authorize a sensitive action: %j", (amr) => {
-    expect(read(token({ amr }))).toEqual({ sessionId, authenticatedAt: null });
+    expect(read(token({ amr }))).toEqual({
+      sessionId,
+      assuranceLevel: "aal1",
+      authenticatedAt: null,
+    });
   });
   it.each([now + 61, "1800000000", -1, 1.5, null])(
     "rejects invalid AMR timestamp %j",

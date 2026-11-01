@@ -1173,6 +1173,10 @@ export type Database = {
         Args: { p_claim_id: string }
         Returns: boolean
       }
+      assert_recent_authentication_command: {
+        Args: { p_authenticated_at: string }
+        Returns: undefined
+      }
       attest_event_publication_command: {
         Args: {
           p_actor_id: string
@@ -1493,6 +1497,10 @@ export type Database = {
       reconcile_account_recovery_dispatches_command: {
         Args: never
         Returns: number
+      }
+      record_account_mfa_event_command: {
+        Args: { p_action: string; p_actor_id: string; p_correlation_id: string }
+        Returns: undefined
       }
       release_browser_session_command: {
         Args: { p_hash: string; p_lease: string; p_payload: string }

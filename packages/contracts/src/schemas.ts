@@ -93,6 +93,30 @@ export const accountRecoveryStatusSchema = z.strictObject({
 
 export type AccountRecoveryStatus = z.infer<typeof accountRecoveryStatusSchema>;
 
+export const mfaStatusSchema = z.strictObject({
+  assuranceLevel: z.enum(["aal1", "aal2"]),
+  totpEnabled: z.boolean(),
+});
+
+export type MfaStatus = z.infer<typeof mfaStatusSchema>;
+
+// Returned once at enrollment so an authenticator app can be set up. Never logged.
+export const totpEnrollmentSchema = z.strictObject({
+  factorId: opaqueUuid,
+  qrCode: z.string().startsWith("data:image/svg+xml").max(600_000),
+  secret: z.string().regex(/^[A-Z2-7]{16,64}$/u),
+  uri: z.string().startsWith("otpauth://totp/").max(1_000),
+});
+
+export type TotpEnrollment = z.infer<typeof totpEnrollmentSchema>;
+
+export const totpVerifyRequestSchema = z.strictObject({
+  code: z.string().regex(/^[0-9]{6}$/u),
+  factorId: opaqueUuid.optional(),
+});
+
+export type TotpVerifyRequest = z.infer<typeof totpVerifyRequestSchema>;
+
 export const accountDeletionBlockerSchema = z.strictObject({
   id: opaqueUuid,
   kind: z.enum(["owned_event", "shared_organizer"]),
@@ -619,6 +643,9 @@ export const boundarySchemas = {
   AccountProfile: accountProfileSchema,
   AccountRecoveryStatus: accountRecoveryStatusSchema,
   AccountDeletionStatus: accountDeletionStatusSchema,
+  MfaStatus: mfaStatusSchema,
+  TotpEnrollment: totpEnrollmentSchema,
+  TotpVerifyRequest: totpVerifyRequestSchema,
   RequestAccountDeletionRequest: requestAccountDeletionRequestSchema,
   AccountRecoveryClaim: accountRecoveryClaimSchema,
   AccountRecoveryCompletion: accountRecoveryCompletionSchema,

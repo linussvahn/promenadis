@@ -47,7 +47,8 @@ code redemption, replacement-email verification through Mailpit, a minimum
 ends and the owner, team and previous address are notified. First-event
 review, routing, public delivery, and publication lifecycle transitions are
 still unimplemented. Account deletion (blockers, seven-day disabled window,
-undo, hourly erasure) is implemented locally.
+undo, hourly erasure) and optional TOTP two-step sign-in are implemented
+locally; restart Supabase after pulling so the TOTP config applies.
 
 Browser-session hardening (2026-09-15): local sign-in now uses an opaque
 HttpOnly, SameSite cookie through the existing private backend. Supabase tokens

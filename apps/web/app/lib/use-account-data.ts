@@ -37,6 +37,10 @@ export function useAccountData() {
       setLoadFailed(false);
     } catch (error) {
       // A disabled account can only review or cancel its deletion in Settings.
+      if (error instanceof PromenadisApiError && error.code === "mfa_required") {
+        await navigate("/sign-in?step=mfa", { replace: true });
+        return;
+      }
       if (error instanceof PromenadisApiError && error.code === "account_deletion_pending") {
         setDeletionPending(true);
         if (pathname !== "/settings") await navigate("/settings", { replace: true });

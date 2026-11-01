@@ -4,6 +4,7 @@ import {
   browserOtpStartSchema,
   browserOtpVerifySchema,
   browserSessionResponseSchema,
+  totpVerifyRequestSchema,
 } from "../../../packages/contracts/src/schemas.ts";
 
 const sessionCookie = "promenadis-session";
@@ -392,6 +393,70 @@ export function createBrowserSessionGateway(config: {
       }
       if (request.headers.get("x-account-id") !== session.user.id)
         throw new SessionError("account_changed", 409);
+      if (request.method === "POST" && path === "/auth/mfa/verify") {
+        // TOTP step-up (sign-in or first setup). The upgraded aal2 tokens keep the
+        // same Auth session and replace the vault copy; the browser never sees them.
+        const input = totpVerifyRequestSchema.safeParse(await config.readBody(request));
+        if (!input.success) throw new SessionError("invalid_request", 400);
+        const asUser = async (factorPath: string, body: unknown) => {
+          const response = await fetch(`${config.url}/auth/v1/factors/${factorPath}`, {
+            method: "POST",
+            headers: {
+              apikey: config.publicKey,
+              authorization: `Bearer ${session.tokens.accessToken}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(body),
+          });
+          return response.ok ? ((await response.json()) as Record<string, unknown>) : null;
+        };
+        let factorId = input.data.factorId;
+        if (!factorId) {
+          const { data } = await admin.auth.getUser(session.tokens.accessToken);
+          factorId = data.user?.factors?.find(
+            (factor) => factor.factor_type === "totp" && factor.status === "verified",
+          )?.id;
+        }
+        if (!factorId) throw new SessionError("mfa_unavailable", 409);
+        const challenge = await asUser(`${factorId}/challenge`, {});
+        const verified =
+          typeof challenge?.id === "string"
+            ? await asUser(`${factorId}/verify`, {
+                challenge_id: challenge.id,
+                code: input.data.code,
+              })
+            : null;
+        if (
+          typeof verified?.access_token !== "string" ||
+          typeof verified.refresh_token !== "string" ||
+          jwtSessionId(verified.access_token) !== jwtSessionId(session.tokens.accessToken)
+        ) {
+          throw new SessionError("mfa_failed", 400);
+        }
+        const lease = crypto.randomUUID();
+        await take(secret, "authenticated", lease);
+        const expiresIn = typeof verified.expires_in === "number" ? verified.expires_in : 3600;
+        const released = await release(secret, "authenticated", lease, {
+          accessToken: verified.access_token,
+          refreshToken: verified.refresh_token,
+          expiresAt:
+            typeof verified.expires_at === "number"
+              ? verified.expires_at
+              : Math.floor(Date.now() / 1000) + expiresIn,
+        });
+        if (!released) throw new SessionError("unauthorized", 401);
+        await rpc("record_account_mfa_event_command", {
+          p_action: "account.mfa_totp_verified",
+          p_actor_id: session.user.id,
+          p_correlation_id: correlationId,
+        });
+        return respond(
+          browserSessionResponseSchema.parse({
+            schemaVersion: "1.0",
+            session: { user: session.user },
+          }),
+        );
+      }
       // Never trust a browser-supplied bearer token alongside the cookie.
       const authenticatedHeaders = new Headers(request.headers);
       authenticatedHeaders.set("authorization", `Bearer ${session.tokens.accessToken}`);

@@ -36,6 +36,14 @@ additional_redirect_urls = ["http://127.0.0.1:5173/auth/callback"]
 jwt_expiry = 3600
 enable_signup = true
 
+# Optional TOTP second factor. Phone/WebAuthn factors stay off.
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 [auth.email]
 enable_signup = true
 double_confirm_changes = true

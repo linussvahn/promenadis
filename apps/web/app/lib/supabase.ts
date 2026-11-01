@@ -81,6 +81,14 @@ export function getBrowserAuthClient(expectedAccountId?: string | null) {
         if (!result.error) notifySessionChanged();
         return result;
       },
+      // Second step for an account with TOTP, at sign-in or when first set up.
+      verifyTotp: async (input: { code: string; factorId?: string }) => {
+        const current = await sessionResult("session");
+        const accountId = current.data.session?.user.id ?? expectedAccountId;
+        const result = await authRequest("mfa/verify", input, accountId);
+        if (!result.error) notifySessionChanged();
+        return result;
+      },
       signOut: async () => {
         const result = await authRequest("sign-out", {}, expectedAccountId);
         notifySessionChanged();

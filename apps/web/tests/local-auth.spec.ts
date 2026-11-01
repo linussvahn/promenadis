@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { type APIRequestContext, type Page, expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
@@ -62,6 +62,21 @@ function localSql(input: string) {
     ],
     { input, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], timeout: 10_000 },
   ).trim();
+}
+
+// RFC 6238 TOTP for synthetic factors only (SHA-1, 30 s, 6 digits).
+function totp(secret: string, offsetSteps = 0) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const character of secret.replace(/=+$/u, "")) {
+    bits += alphabet.indexOf(character).toString(2).padStart(5, "0");
+  }
+  const key = Buffer.from(bits.match(/.{8}/gu)?.map((byte) => Number.parseInt(byte, 2)) ?? []);
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000) + offsetSteps));
+  const digest = createHmac("sha1", key).update(counter).digest();
+  const offset = (digest.at(-1) ?? 0) & 0xf;
+  return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
 
 async function deleteSyntheticAccount(email: string) {
@@ -360,6 +375,93 @@ test("account deletion is blocked by owned events, disables the account and can 
     expect(undone.status()).toBe(200);
     expect((await undone.json()).pending).toBe(false);
     expect((await request.get(`${base}/dashboard`, { headers })).status()).toBe(200);
+  } finally {
+    await deleteSyntheticAccount(email);
+  }
+});
+
+test("optional TOTP gates every sign-in until the second step and can be turned off", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const email = `totp-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const newClient = () =>
+    createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  const { error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password,
+  });
+  if (createError) throw createError;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const headersFor = (token: string | undefined) => ({
+    apikey: publicKey,
+    authorization: `Bearer ${token}`,
+    origin: "http://127.0.0.1:5173",
+  });
+  try {
+    const owner = newClient();
+    const first = await owner.auth.signInWithPassword({ email, password });
+    if (first.error) throw first.error;
+    let headers = headersFor(first.data.session?.access_token);
+    const enrolled = await request.post(`${base}/account/mfa/totp`, { headers, data: {} });
+    expect(enrolled.status()).toBe(201);
+    const { factorId, secret } = await enrolled.json();
+    // Unverified setup does not gate anything yet.
+    expect((await request.get(`${base}/dashboard`, { headers })).status()).toBe(200);
+    const confirmed = await owner.auth.mfa.challengeAndVerify({ factorId, code: totp(secret) });
+    expect(confirmed.error).toBeNull();
+    headers = headersFor(confirmed.data?.access_token);
+    expect(await (await request.get(`${base}/account/mfa`, { headers })).json()).toMatchObject({
+      assuranceLevel: "aal2",
+      totpEnabled: true,
+    });
+
+    // A new email sign-in is aal1: only the MFA status is reachable.
+    const other = newClient();
+    const second = await other.auth.signInWithPassword({ email, password });
+    const aal1 = headersFor(second.data.session?.access_token);
+    const gated = await request.get(`${base}/dashboard`, { headers: aal1 });
+    expect(gated.status()).toBe(403);
+    expect((await gated.json()).code).toBe("mfa_required");
+    expect((await request.get(`${base}/account/mfa`, { headers: aal1 })).status()).toBe(200);
+    expect(
+      (await request.post(`${base}/account/mfa/totp/remove`, { headers: aal1, data: {} })).status(),
+    ).toBe(403);
+
+    // Cookie sign-in through the app: email code, then the TOTP step.
+    await page.goto("/sign-in");
+    await page.getByRole("textbox", { name: "E-postadress" }).fill(email);
+    await page.getByRole("button", { name: "Skicka kod" }).click();
+    const message = await latestMessage(request, email);
+    const code = message.Text.match(/(?:^|[^0-9])([0-9]{6})(?:[^0-9]|$)/u)?.[1];
+    await page.getByRole("textbox", { name: "Engångskod" }).fill(code ?? "");
+    await page.getByRole("button", { name: "Verifiera kod" }).click();
+    await expect(page).toHaveURL(/\/sign-in\?step=mfa$/u);
+    await page.getByLabel("Sexsiffrig kod från appen").fill("000000");
+    await page.getByRole("button", { name: "Fortsätt" }).click();
+    await expect(page.getByText(/Koden stämde inte/u)).toBeVisible();
+    await page.getByLabel("Sexsiffrig kod från appen").fill(totp(secret));
+    await page.getByRole("button", { name: "Fortsätt" }).click();
+    await expect(page).toHaveURL(/\/dashboard$/u);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mina evenemang");
+
+    const removed = await request.post(`${base}/account/mfa/totp/remove`, { headers, data: {} });
+    expect(removed.status()).toBe(200);
+    const third = await newClient().auth.signInWithPassword({ email, password });
+    expect(
+      (
+        await request.get(`${base}/dashboard`, {
+          headers: headersFor(third.data.session?.access_token),
+        })
+      ).status(),
+    ).toBe(200);
   } finally {
     await deleteSyntheticAccount(email);
   }

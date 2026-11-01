@@ -463,6 +463,23 @@ commit and push each, ask only on real blockers. Order: account deletion
 (done), optional owner TOTP, then platform-admin elevation plus first-event
 review.
 
+### Optional TOTP (2026-11-01)
+
+- `supabase/config.toml` enables Auth TOTP (restart Supabase after pulling).
+  BFF: `GET /account/mfa`, `POST /account/mfa/totp` (enroll, recent auth,
+  replaces abandoned setups, raw SVG QR wrapped as base64 data URI ~280 KB),
+  `POST /account/mfa/totp/remove` (recent auth + aal2). Factor calls run as the
+  user against Auth's own API. Gateway `POST /api/auth/mfa/verify` verifies a
+  code and swaps the vault tokens for the aal2 ones (same Auth session).
+- Gate: verified factor + aal1 -> 403 `mfa_required` on everything except
+  `GET /account/mfa`; the web app routes that to `/sign-in?step=mfa`.
+  Domain: `assuranceLevel` from the verified JWT; `totp` AMR counts as fresh
+  authentication. Audit via `record_account_mfa_event_command`.
+- Verified: e2e (enroll, aal1 gate, wrong then right code in the app, removal),
+  component tests, pgTAP 220, full verify, all local-auth/smoke e2e.
+- Not done: TOTP as an account-recovery factor (spec says "additional recovery
+  method"), a smaller client-rendered QR, TOTP reuse/rate limits beyond Auth's.
+
 ### Account deletion (2026-11-01)
 
 - `20261101000900_account_deletion.sql`: blockers (owned non-finished events,

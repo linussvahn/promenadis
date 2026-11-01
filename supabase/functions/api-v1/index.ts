@@ -5,6 +5,8 @@ import {
   acceptEventTeamInviteRequestSchema,
   accountProfileSchema,
   accountDeletionStatusSchema,
+  mfaStatusSchema,
+  totpEnrollmentSchema,
   accountRecoveryClaimSchema,
   accountRecoveryCompletionSchema,
   accountRecoveryStatusSchema,
@@ -110,8 +112,26 @@ function routePath(request: Request): string {
 }
 
 interface AuthenticatedActor {
+  readonly assuranceLevel: "aal1" | "aal2";
   readonly authenticatedAt: string | null;
   readonly id: string;
+  readonly token: string;
+  readonly totpFactors: ReadonlyArray<{ readonly id: string; readonly verified: boolean }>;
+}
+
+// Auth's own user API: factor operations run as the user, never as service role.
+async function authAsUser(token: string, path: string, method: string, body?: unknown) {
+  const response = await fetch(`${supabaseUrl}/auth/v1${path}`, {
+    method,
+    headers: {
+      apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const data = await response.json().catch(() => null);
+  return { ok: response.ok, status: response.status, data };
 }
 
 async function authenticatedActor(request: Request): Promise<AuthenticatedActor | null> {
@@ -132,7 +152,16 @@ async function authenticatedActor(request: Request): Promise<AuthenticatedActor 
   // A lookup outage must not turn into an authorization success.
   if (sessionError) throw new Error("session_validation_unavailable");
   if (live !== true) return null;
-  return { authenticatedAt: session.authenticatedAt, id: data.user.id };
+  const totpFactors = (data.user.factors ?? [])
+    .filter((factor) => factor.factor_type === "totp")
+    .map((factor) => ({ id: factor.id, verified: factor.status === "verified" }));
+  return {
+    assuranceLevel: session.assuranceLevel,
+    authenticatedAt: session.authenticatedAt,
+    id: data.user.id,
+    token,
+    totpFactors,
+  };
 }
 
 async function requestBody(request: Request): Promise<unknown> {
@@ -631,6 +660,115 @@ Deno.serve(async (request) => {
       return apiError("unauthorized", "Authentication is required.", 401, correlationId, origin);
     }
     const actorId = actor.id;
+
+    // With a verified TOTP factor, nothing but the MFA status is reachable
+    // until this session completes the second step (aal2).
+    const totpEnabled = actor.totpFactors.some((factor) => factor.verified);
+    const mfaStatus = () =>
+      mfaStatusSchema.parse({ assuranceLevel: actor.assuranceLevel, totpEnabled });
+    if (totpEnabled && actor.assuranceLevel !== "aal2" && route !== "/account/mfa") {
+      operation = "account.mfa_required";
+      status = "denied";
+      return apiError(
+        "mfa_required",
+        "Complete two-step verification first.",
+        403,
+        correlationId,
+        origin,
+      );
+    }
+    if (request.method === "GET" && route === "/account/mfa") {
+      operation = "account.mfa_status_read";
+      status = "succeeded";
+      return json(mfaStatus(), 200, correlationId, origin);
+    }
+    if (request.method === "POST" && route.startsWith("/account/mfa/totp")) {
+      const { error: recentError } = await admin.rpc("assert_recent_authentication_command", {
+        p_authenticated_at: actor.authenticatedAt,
+      });
+      if (recentError) {
+        status = "denied";
+        return apiError(
+          "recent_auth_required",
+          "Sign in again before changing two-step verification.",
+          403,
+          correlationId,
+          origin,
+        );
+      }
+    }
+    if (request.method === "POST" && route === "/account/mfa/totp") {
+      operation = "account.mfa_totp_enroll";
+      if (totpEnabled) {
+        status = "denied";
+        return apiError(
+          "totp_already_enabled",
+          "Two-step verification is already on.",
+          409,
+          correlationId,
+          origin,
+        );
+      }
+      // An abandoned setup is replaced rather than accumulating factors.
+      for (const factor of actor.totpFactors) {
+        await authAsUser(actor.token, `/factors/${factor.id}`, "DELETE");
+      }
+      const enrolled = await authAsUser(actor.token, "/factors", "POST", {
+        factor_type: "totp",
+        friendly_name: `Promenadis ${crypto.randomUUID().slice(0, 8)}`,
+        issuer: "Promenadis",
+      });
+      if (!enrolled.ok) throw new Error("mfa_enrollment_failed");
+      // Some Auth versions return raw SVG; an <img> data URI never runs scripts.
+      const qr = enrolled.data?.totp?.qr_code;
+      const parsed = totpEnrollmentSchema.safeParse({
+        factorId: enrolled.data?.id,
+        qrCode:
+          typeof qr === "string" && !qr.startsWith("data:")
+            ? `data:image/svg+xml;base64,${btoa(qr)}`
+            : qr,
+        secret: enrolled.data?.totp?.secret,
+        uri: enrolled.data?.totp?.uri,
+      });
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      const { error: auditError } = await admin.rpc("record_account_mfa_event_command", {
+        p_action: "account.mfa_totp_enrollment_started",
+        p_actor_id: actorId,
+        p_correlation_id: correlationId,
+      });
+      if (auditError) throw auditError;
+      status = "succeeded";
+      return json(parsed.data, 201, correlationId, origin);
+    }
+    if (request.method === "POST" && route === "/account/mfa/totp/remove") {
+      operation = "account.mfa_totp_remove";
+      const verified = actor.totpFactors.find((factor) => factor.verified);
+      if (!verified) {
+        status = "denied";
+        return apiError(
+          "totp_not_enabled",
+          "Two-step verification is off.",
+          409,
+          correlationId,
+          origin,
+        );
+      }
+      const removed = await authAsUser(actor.token, `/factors/${verified.id}`, "DELETE");
+      if (!removed.ok) throw new Error("mfa_removal_failed");
+      const { error: auditError } = await admin.rpc("record_account_mfa_event_command", {
+        p_action: "account.mfa_totp_removed",
+        p_actor_id: actorId,
+        p_correlation_id: correlationId,
+      });
+      if (auditError) throw auditError;
+      status = "succeeded";
+      return json(
+        mfaStatusSchema.parse({ assuranceLevel: actor.assuranceLevel, totpEnabled: false }),
+        200,
+        correlationId,
+        origin,
+      );
+    }
 
     // A pending deletion disables the account: only its status and cancellation remain.
     const deletionRoute = route === "/account/deletion" || route === "/account/deletion/cancel";

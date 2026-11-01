@@ -4,6 +4,8 @@ import {
   type AttestEventPublicationRequest,
   type RequestAccountDeletionRequest,
   accountDeletionStatusSchema,
+  mfaStatusSchema,
+  totpEnrollmentSchema,
   accountRecoveryClaimSchema,
   accountRecoveryCompletionSchema,
   accountRecoveryStatusSchema,
@@ -278,6 +280,21 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     enrollRecoveryCode(accessToken: string, input: EnrollRecoveryCodeRequest) {
       return request("/account/recovery-code", accessToken, recoveryCodeEnrollmentResponseSchema, {
         body: input,
+        method: "POST",
+      });
+    },
+    getMfaStatus(accessToken: string) {
+      return request("/account/mfa", accessToken, mfaStatusSchema);
+    },
+    enrollTotp(accessToken: string) {
+      return request("/account/mfa/totp", accessToken, totpEnrollmentSchema, {
+        body: {},
+        method: "POST",
+      });
+    },
+    removeTotp(accessToken: string) {
+      return request("/account/mfa/totp/remove", accessToken, mfaStatusSchema, {
+        body: {},
         method: "POST",
       });
     },

@@ -158,7 +158,13 @@ passing isolated Chromium tests is not evidence of its browser-specific cause.
   organizer-owner-only and require authentication no older than 15 minutes.
   Acceptance requires the intended signed-in account's verified email.
   Individual organizer identities cannot have managers.
-- Let normal account owners opt into TOTP MFA.
+- Let normal account owners opt into TOTP MFA. Implemented locally 2026-11-01
+  with Supabase Auth factors: setup and removal need recent authentication
+  (removal also aal2); once a verified factor exists, every sign-in reaches
+  only the MFA status until the session is upgraded to aal2 by a TOTP code,
+  verified through the session gateway so upgraded tokens stay server-side. A
+  TOTP step counts as fresh authentication for step-up. Changes are audited
+  without factor details.
 - Require TOTP MFA for every platform administrator.
 - Store recovery codes hashed and display them once.
 
