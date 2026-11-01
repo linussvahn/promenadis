@@ -253,7 +253,7 @@ test("a ready recovery changes the sign-in email, ends old sessions and notifies
       where source_id='${claim.id}' and template_key='account_recovery_started';`);
 
     await page.goto(link ?? "");
-    await page.getByRole("button", { name: "Verifiera ny e-postadress" }).click();
+    await expect(page.getByRole("button", { name: "Verifiera ny e-postadress" })).toHaveCount(0);
     await page.getByRole("button", { name: "Slutför återställning" }).click();
     await expect(page.getByText(/Återställningen är klar/u)).toBeVisible();
     await expect(page.getByRole("link", { name: "Logga in" })).toBeVisible();

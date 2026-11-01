@@ -335,6 +335,7 @@ const sv = {
   "accountRecovery.waitHelp":
     "Öppna länken i e-postmeddelandet igen när väntetiden är slut för att slutföra återställningen.",
   "accountRecovery.readyTitle": "Klar att slutföras",
+  "accountRecovery.checking": "Kontrollerar återställningslänken …",
   "accountRecovery.completeHelp":
     "Kontots inloggningsadress byts till den verifierade nya adressen. Alla befintliga inloggningar avslutas, även på andra enheter.",
   "accountRecovery.complete": "Slutför återställning",
@@ -775,6 +776,7 @@ const en = {
   "accountRecovery.waitHelp":
     "Open the link in the email again after the waiting period ends to finish recovery.",
   "accountRecovery.readyTitle": "Ready to finish",
+  "accountRecovery.checking": "Checking the recovery link …",
   "accountRecovery.completeHelp":
     "The account sign-in email changes to the verified replacement address. Every existing sign-in ends, including on other devices.",
   "accountRecovery.complete": "Finish recovery",

@@ -164,6 +164,13 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         input,
       );
     },
+    readAccountRecoveryClaim(claimId: string, input: AccountRecoveryTokenRequest) {
+      return publicRequest(
+        `/account-recovery/${claimId}/status`,
+        accountRecoveryClaimSchema,
+        input,
+      );
+    },
     confirmAccountRecoveryEmail(claimId: string, input: AccountRecoveryTokenRequest) {
       return publicRequest(
         `/account-recovery/${claimId}/verify`,

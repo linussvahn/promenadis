@@ -13,6 +13,7 @@ export function RecoverAccount() {
   const [status, setStatus] = useState("");
   const [link, setLink] = useState<{ claimId: string; verificationToken: string } | null>(null);
   const [completion, setCompletion] = useState<"completed" | "finishing" | null>(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     // Fragments never reach the server. Keep the secret only in component memory.
@@ -32,6 +33,29 @@ export function RecoverAccount() {
     window.addEventListener("hashchange", readLink);
     return () => window.removeEventListener("hashchange", readLink);
   }, []);
+
+  useEffect(() => {
+    // A reopened link for an already verified request goes straight to the
+    // wait or finish step. Reading never verifies or consumes the code.
+    const api = getPromenadisApiClient();
+    if (!api || !link) return;
+    let current = true;
+    setChecking(true);
+    api
+      .readAccountRecoveryClaim(link.claimId, { verificationToken: link.verificationToken })
+      .then((summary) => {
+        if (current && summary.emailVerified) setClaim(summary);
+      })
+      .catch(() => {
+        if (current) setStatus(translate(locale, "accountRecovery.unavailable"));
+      })
+      .finally(() => {
+        if (current) setChecking(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [link, locale]);
 
   const confirm = async () => {
     const api = getPromenadisApiClient();
@@ -133,6 +157,8 @@ export function RecoverAccount() {
           <p className="notice notice-error" role="alert">
             {translate(locale, "auth.configMissing")}
           </p>
+        ) : checking ? (
+          <p className="form-status">{translate(locale, "accountRecovery.checking")}</p>
         ) : completion === "completed" ? (
           <section className="panel form-panel">
             <a className="primary-button" href="/sign-in">

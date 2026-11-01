@@ -493,7 +493,7 @@ Deno.serve(async (request) => {
     }
 
     const publicRecoveryRoute = route.match(
-      /^\/account-recovery\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(verify|complete)$/iu,
+      /^\/account-recovery\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(verify|status|complete)$/iu,
     );
     if (request.method === "POST" && publicRecoveryRoute) {
       const input = accountRecoveryTokenRequestSchema.safeParse(await requestBody(request));
@@ -512,6 +512,28 @@ Deno.serve(async (request) => {
         const { data, error } = await admin.rpc("confirm_account_recovery_email_command", {
           p_claim_id: publicRecoveryRoute[1],
           p_correlation_id: correlationId,
+          p_verification_token: input.data.verificationToken,
+        });
+        if (error) {
+          status = "denied";
+          return apiError(
+            "claim_unavailable",
+            "This recovery link is invalid or expired.",
+            410,
+            correlationId,
+            origin,
+          );
+        }
+        const parsed = accountRecoveryClaimSchema.safeParse(data);
+        if (!parsed.success) throw new Error("invalid_internal_response");
+        status = "succeeded";
+        return json(parsed.data, 200, correlationId, origin);
+      }
+      if (publicRecoveryRoute[2] === "status") {
+        // Read-only: lets a reopened link skip repeat verification.
+        operation = "account.recovery_claim_read";
+        const { data, error } = await admin.rpc("read_account_recovery_claim_command", {
+          p_claim_id: publicRecoveryRoute[1],
           p_verification_token: input.data.verificationToken,
         });
         if (error) {

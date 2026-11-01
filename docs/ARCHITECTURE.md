@@ -920,6 +920,8 @@ outcomes are never ambiguous. Applied changes revoke all Auth and browser
 sessions, queue completion notices and erase the claim; unchanged expired
 leases become `not_applied`. The claim cannot be deleted mid-dispatch, and
 email-free 24-hour tombstones keep fencing. The local BFF route
+`POST /account-recovery/{id}/status` is a token-proved read-only claim lookup
+so a reopened link skips repeat verification;
 `POST /account-recovery/{id}/complete` (token-proved, anonymous) runs prepare
 -> begin -> admin email update -> finish and answers `completed` or
 `finishing` (202, still undecided); it never trusts the provider response.

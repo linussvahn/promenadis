@@ -1,12 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecoverAccount } from "./recover-account";
 
 const mocks = vi.hoisted(() => ({
   completeAccountRecovery: vi.fn(),
   confirmAccountRecoveryEmail: vi.fn(),
   initiateAccountRecovery: vi.fn(),
+  readAccountRecoveryClaim: vi.fn(),
 }));
 vi.mock("../lib/supabase", () => ({
   getPromenadisApiClient: () => mocks,
@@ -17,6 +18,16 @@ vi.mock("../lib/locale", () => ({
 }));
 const id = "01992026-0909-7200-8000-000000000101";
 const token = "x".repeat(43);
+const verifiedReady = {
+  id,
+  emailVerified: true,
+  initiatedAt: "2020-09-08T10:00:00Z",
+  readyAt: "2020-09-09T10:00:00Z",
+  expiresAt: "2099-09-15T10:00:00Z",
+};
+beforeEach(() => {
+  mocks.readAccountRecoveryClaim.mockResolvedValue({ ...verifiedReady, emailVerified: false });
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -118,6 +129,28 @@ describe("RecoverAccount", () => {
     fireEvent.click(screen.getByRole("button", { name: "Finish recovery" }));
     await screen.findByText(/Recovery cannot be finished now/u);
     expect(screen.queryByText(/Recovery is complete/u)).not.toBeInTheDocument();
+  });
+  it("goes straight to the finish step when a verified link is reopened", async () => {
+    window.history.replaceState(null, "", `/recover-account#claim=${id}&token=${token}`);
+    mocks.readAccountRecoveryClaim.mockResolvedValue(verifiedReady);
+    render(<RecoverAccount />);
+    await screen.findByRole("button", { name: "Finish recovery" });
+    expect(mocks.readAccountRecoveryClaim).toHaveBeenCalledWith(id, { verificationToken: token });
+    expect(mocks.confirmAccountRecoveryEmail).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "Verify replacement email" }),
+    ).not.toBeInTheDocument();
+  });
+  it("shows the waiting step for a reopened verified link before the deadline", async () => {
+    window.history.replaceState(null, "", `/recover-account#claim=${id}&token=${token}`);
+    mocks.readAccountRecoveryClaim.mockResolvedValue({
+      ...verifiedReady,
+      readyAt: "2099-09-09T10:00:00Z",
+    });
+    render(<RecoverAccount />);
+    await screen.findByText("Waiting period in progress");
+    expect(screen.queryByRole("button", { name: "Finish recovery" })).not.toBeInTheDocument();
+    expect(mocks.confirmAccountRecoveryEmail).not.toHaveBeenCalled();
   });
   it("has no detectable automated accessibility violations", async () => {
     const { container } = render(<RecoverAccount />);

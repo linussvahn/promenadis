@@ -1429,6 +1429,10 @@ export type Database = {
         Returns: number
       }
       purge_expired_organizer_invites_command: { Args: never; Returns: number }
+      read_account_recovery_claim_command: {
+        Args: { p_claim_id: string; p_verification_token: string }
+        Returns: Json
+      }
       reconcile_account_recovery_dispatches_command: {
         Args: never
         Returns: number

@@ -486,10 +486,12 @@ Treat those documents as canonical rather than relying on chat memory.
   passed 3/3 alone (profile field empty); looks flaky, not investigated.
   Playwright's web server runs the app's own `dev` script, which skips the
   env sync: on a fresh clone run `pnpm dev` (or the sync script) once first.
-- UX wart: reopening the link shows "Verify replacement email" again (verify
-  is idempotent); its help text about consuming the code is misleading on the
-  second visit. Next: a token-proved read of the claim state, then the
-  remaining Milestone 1 list below.
+- Fixed the reopened-link UX: `POST /account-recovery/{id}/status` (local,
+  token-proved, read-only `read_account_recovery_claim_command`: no code
+  consumption, no timestamps, no audit) lets the page skip straight to the
+  wait or finish step for an already verified request. Unverified links still
+  require the explicit verify click. pgTAP 200, component and e2e coverage.
+  Next: the remaining Milestone 1 list below.
 
 ### Recovery Auth dispatch fence (2026-11-01)
 
