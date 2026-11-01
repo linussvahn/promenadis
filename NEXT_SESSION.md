@@ -456,6 +456,50 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Recovery Auth dispatch fence (2026-11-01)
+
+- Verified from the installed auth-js 2.115 and the Supabase Auth source: the
+  admin `PUT /admin/users/{id}` email update runs in one Auth database
+  transaction, clears pending tokens, sends no mail and revokes NO sessions;
+  there is no admin revoke-by-user-id endpoint (only JWT-scoped logout). A
+  duplicate destination fails on Auth's unique index with a generic error.
+- Because Auth writes to the same Postgres, the fence lives in the database:
+  `promenadis_fence_recovery_email_change` (BEFORE UPDATE OF email on
+  `auth.users`) permits the change only to the claim's verified destination
+  while a live two-minute dispatch lease exists. Late/in-flight Auth requests
+  after lease expiry or resolution fail inside Auth's own transaction. The
+  outcome is therefore never ambiguous: resolution reads `auth.users` after
+  locking the dispatch row (lock order code -> claim -> dispatch; the trigger
+  only takes the dispatch row, so no deadlock with Auth).
+- `begin_account_recovery_dispatch_command` rechecks every gate (shared
+  `lock_eligible_recovery_claim`, also now used by preparation) and requires a
+  prior preparation. `finish_...` / per-minute cron `reconcile_...` resolve:
+  applied -> delete Auth sessions (refresh tokens cascade) and browser-session
+  vault rows, queue `account_recovery_completed` notices, audit, erase claim;
+  unchanged after lease expiry -> `not_applied`, claim kept for retry/cancel.
+- Claim deletion is blocked while dispatching (cancel, rotation, expiry purge
+  and account deletion fail closed for at most the two-minute lease; purge
+  skips such claims). Resolved dispatch rows hold no email/token and remain as
+  24-hour tombstones that keep rejecting late Auth requests, then are purged.
+- Verified: 452 database assertions (29 new), DB rebuilt from zero, SQL lint,
+  type drift, full `pnpm verify` (100 tests + build), `test:local-slice`,
+  session-security, notifications, preparation race, and the new
+  `pnpm test:local-recovery-dispatch` against real local Auth (in-flight Auth
+  update held behind the dispatch lock past lease expiry is rejected; leased
+  update applies; old refresh token and old email sign-in fail; new email
+  signs in as the same account). Added to database CI.
+- Local environment note: this session ran Supabase on Podman (a `docker`
+  shim plus `DOCKER_HOST` to the Podman socket, 6 GiB VM). `supabase start`
+  needs an existing `supabase/snippets` directory. The database was fresh, so
+  earlier local accounts/events from the previous machine are not present.
+- Still NOT enabled: no BFF/HTTP completion route calls Auth (the completion
+  path still returns 503) and there is no UI. Next: wire the Edge BFF
+  completion route as begin -> `admin.updateUserById(email, email_confirm)`
+  -> finish, reporting "finishing" while undecided; add the browser flow and
+  an e2e test; decide whether a completion notice to the old address is
+  required (the original email is erased with the claim today). Then continue
+  the Milestone 1 list below.
+
 ### Usage checkpoint (2026-11-01)
 
 - Paused before starting external Auth dispatch at 75% of the five-hour usage

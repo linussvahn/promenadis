@@ -911,6 +911,16 @@ integration of this evidence with safe Auth mutation remain required before
 account recovery completion can be enabled. A stable job header
 does not establish exactly-once mail delivery.
 
+Recovery Auth dispatch (2026-11-01): Supabase Auth shares the database, so a
+trigger on `auth.users` fences email changes. Only a live two-minute dispatch
+lease, opened after every recovery gate is rechecked under locks, permits the
+change, and only to the verified destination. Late Auth requests are rejected
+inside Auth's transaction; resolution reads authoritative Auth state, so
+outcomes are never ambiguous. Applied changes revoke all Auth and browser
+sessions, queue completion notices and erase the claim; unchanged expired
+leases become `not_applied`. The claim cannot be deleted mid-dispatch, and
+email-free 24-hour tombstones keep fencing. No BFF route calls Auth yet.
+
 Recovery preparation is currently an internal idempotent database step only:
 proof, delay, code version, notice acceptance and email eligibility are rechecked
 under the recovery-code/claim locks. The private preparation references the claim

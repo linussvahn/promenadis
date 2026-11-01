@@ -36,6 +36,7 @@
     "test:e2e:local-auth": "pnpm --filter @promenadis/web test:e2e:local-auth",
     "test:local-slice": "pnpm --filter @promenadis/web test:local-slice",
     "test:local-session-security": "pnpm --filter @promenadis/web test:local-session-security",
+    "test:local-recovery-dispatch": "pnpm --filter @promenadis/web test:local-recovery-dispatch",
     "typecheck": "pnpm -r --if-present typecheck",
     "verify": "pnpm format && pnpm lint && pnpm security:scan && pnpm contracts:check && pnpm typecheck && pnpm test && pnpm build"
   },

@@ -183,6 +183,9 @@ Auth rebinding stays disabled until these notices are delivered before the
 change and session revocation, cancellation races, and ambiguous provider
 outcomes have a tested, retry-safe completion protocol. The local anonymous
 budget is not a substitute for production abuse controls.
+As of 2026-11-01 the database fence, lease, reconciliation and session
+revocation for that protocol exist and are tested against real local Auth;
+the completion route remains disabled until the BFF/browser flow is wired.
 
 Promenadis does not manually guess identity from submitted documents, social
 profiles, or an emailed narrative. Without a valid recovery factor or

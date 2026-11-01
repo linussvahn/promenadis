@@ -60,7 +60,9 @@ session's verified sign-in evidence, not the account-wide last sign-in time.
 Signing in on another device or refreshing a token cannot freshen an older
 session. The BFF also rejects revoked direct bearer sessions. Recovery
 completion remains disabled pending delivered security notices and a safe
-email-change/revocation workflow.
+email-change/revocation workflow. The database dispatch fence, reconciliation
+and session revocation for that workflow now exist and pass against real local
+Auth (`pnpm test:local-recovery-dispatch`); no route invokes them yet.
 
 ## Canonical product and implementation documents
 

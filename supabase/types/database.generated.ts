@@ -81,6 +81,39 @@ export type Database = {
         }
         Relationships: []
       }
+      account_recovery_dispatches: {
+        Row: {
+          account_id: string
+          claim_id: string
+          id: string
+          lease_until: string
+          operation_id: string
+          resolved_at: string | null
+          started_at: string
+          state: string
+        }
+        Insert: {
+          account_id: string
+          claim_id: string
+          id?: string
+          lease_until: string
+          operation_id: string
+          resolved_at?: string | null
+          started_at?: string
+          state?: string
+        }
+        Update: {
+          account_id?: string
+          claim_id?: string
+          id?: string
+          lease_until?: string
+          operation_id?: string
+          resolved_at?: string | null
+          started_at?: string
+          state?: string
+        }
+        Relationships: []
+      }
       account_recovery_preparations: {
         Row: {
           claim_id: string
@@ -334,6 +367,28 @@ export type Database = {
         Args: { p_event_id: string; p_include_invite_emails: boolean }
         Returns: Json
       }
+      lock_eligible_recovery_claim: {
+        Args: { p_claim_id: string; p_verification_token: string }
+        Returns: {
+          account_id: string
+          code_version: number
+          email_verified_at: string | null
+          expires_at: string
+          id: string
+          initiated_at: string
+          new_email: string
+          original_email: string | null
+          ready_at: string
+          required_notice_count: number
+          verification_token_hash: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "account_recovery_claims"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       mask_email: { Args: { p_email: string }; Returns: string }
       organizer_team_summary: {
         Args: {
@@ -350,6 +405,10 @@ export type Database = {
       require_recent_authentication: {
         Args: { p_authenticated_at: string }
         Returns: undefined
+      }
+      resolve_recovery_dispatch: {
+        Args: { p_correlation_id: string; p_dispatch_id: string }
+        Returns: string
       }
     }
     Enums: {
@@ -1046,6 +1105,14 @@ export type Database = {
         }
         Returns: string
       }
+      begin_account_recovery_dispatch_command: {
+        Args: {
+          p_claim_id: string
+          p_correlation_id: string
+          p_verification_token: string
+        }
+        Returns: Json
+      }
       cancel_account_recovery_claim_command: {
         Args: {
           p_actor_id: string
@@ -1205,6 +1272,10 @@ export type Database = {
         }
         Returns: Json
       }
+      finish_account_recovery_dispatch_command: {
+        Args: { p_correlation_id: string; p_dispatch_id: string }
+        Returns: string
+      }
       finish_security_notification_job: {
         Args: { p_delivered: boolean; p_job_id: string; p_lease_id: string }
         Returns: boolean
@@ -1325,6 +1396,10 @@ export type Database = {
         Returns: number
       }
       purge_expired_organizer_invites_command: { Args: never; Returns: number }
+      reconcile_account_recovery_dispatches_command: {
+        Args: never
+        Returns: number
+      }
       release_browser_session_command: {
         Args: { p_hash: string; p_lease: string; p_payload: string }
         Returns: boolean
