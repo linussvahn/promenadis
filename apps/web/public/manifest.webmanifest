@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Promenadis",
+  "short_name": "Promenadis",
+  "description": "Planera och upptäck lokala promenader mellan evenemangsstopp.",
+  "lang": "sv-SE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5efe2",
+  "theme_color": "#f5efe2",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="sv">
+  <body style="margin: 0; background: #f5efe2; color: #20322b; font-family: Arial, sans-serif">
+    <main style="max-width: 36rem; margin: 0 auto; padding: 2rem">
+      <p style="font-size: 0.85rem; font-weight: 700; letter-spacing: 0.08em">PROMENADIS</p>
+      <h1 style="font-family: Georgia, serif; font-weight: 500">Din inloggningskod</h1>
+      <p>Skriv in koden på sidan där du började inloggningen:</p>
+      <p
+        id="one-time-code"
+        style="font-size: 2rem; font-weight: 700; letter-spacing: 0.2em"
+      >
+        {{ .Token }}
+      </p>
+      <p>Du kan också öppna länken i samma webbläsare där du bad om koden.</p>
+      <p>
+        <a
+          href="{{ .ConfirmationURL }}"
+          style="display: inline-block; padding: 0.8rem 1rem; border-radius: 0.5rem; background: #20322b; color: white; font-weight: 700"
+        >Logga in i Promenadis</a>
+      </p>
+      <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #c9c4b9" />
+      <h2 style="font-family: Georgia, serif; font-weight: 500">Your sign-in code</h2>
+      <p>Enter the code on the page where you started signing in. Alternatively, open the link in that same browser.</p>
+      <p>This local development message expires after 15 minutes and can be used only once.</p>
+    </main>
+  </body>
+</html>

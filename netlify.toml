@@ -1,0 +1,30 @@
+[build]
+command = "pnpm build"
+publish = "apps/web/build/client"
+
+[build.environment]
+NODE_VERSION = "24.14.0"
+PNPM_VERSION = "11.19.0"
+
+[[headers]]
+for = "/*"
+
+  [headers.values]
+  Permissions-Policy = "geolocation=(self), camera=(), microphone=()"
+  Referrer-Policy = "strict-origin-when-cross-origin"
+  X-Content-Type-Options = "nosniff"
+  X-Frame-Options = "DENY"
+
+[[headers]]
+for = "/sw.js"
+
+  [headers.values]
+  Cache-Control = "no-cache"
+  Service-Worker-Allowed = "/"
+
+[[headers]]
+for = "/manifest.webmanifest"
+
+  [headers.values]
+  Cache-Control = "public, max-age=3600"
+  Content-Type = "application/manifest+json"

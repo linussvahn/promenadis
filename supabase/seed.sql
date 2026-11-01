@@ -1,0 +1,2 @@
+-- Deterministic synthetic fixtures only. Milestone 0 intentionally has no
+-- account, event, or residential-location data.

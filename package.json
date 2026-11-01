@@ -1,0 +1,47 @@
+{
+  "name": "promenadis",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24.14.0 <25",
+    "pnpm": ">=11.19.0 <12"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "check": "biome check .",
+    "contracts:check": "pnpm --filter @promenadis/contracts contracts:check",
+    "contracts:generate": "pnpm --filter @promenadis/contracts contracts:generate",
+    "db:lint": "supabase db lint --local --schema public,app_private --level warning --fail-on warning",
+    "db:reset": "supabase db reset --local",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:test": "supabase test db",
+    "db:test:preserve": "node scripts/test-db-preserving-local-data.mjs",
+    "db:types": "supabase gen types typescript --local --schema public,app_private > supabase/types/database.generated.ts",
+    "db:types:check": "node scripts/check-generated-db-types.mjs",
+    "db:verify": "pnpm db:reset && pnpm db:lint && pnpm db:test && pnpm db:types:check",
+    "dev": "node scripts/sync-local-public-env.mjs && pnpm --filter @promenadis/web dev",
+    "dev:web": "pnpm --filter @promenadis/web dev",
+    "format": "biome format --no-errors-on-unmatched .",
+    "format:write": "biome format --no-errors-on-unmatched --write .",
+    "lint": "biome lint --no-errors-on-unmatched .",
+    "security:scan": "node scripts/scan-secrets.mjs",
+    "test": "pnpm -r --if-present test",
+    "test:e2e": "pnpm --filter @promenadis/web test:e2e",
+    "test:e2e:local-auth": "pnpm --filter @promenadis/web test:e2e:local-auth",
+    "test:local-slice": "pnpm --filter @promenadis/web test:local-slice",
+    "test:local-session-security": "pnpm --filter @promenadis/web test:local-session-security",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "verify": "pnpm format && pnpm lint && pnpm security:scan && pnpm contracts:check && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.12",
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.4.1",
+    "supabase": "2.116.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.0"
+  }
+}

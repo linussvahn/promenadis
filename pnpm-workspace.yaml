@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  "@biomejs/biome": true
+  esbuild: true
+  supabase: true
+
+minimumReleaseAge: 1440
+
+minimumReleaseAgeExclude:
+  - "@promenadis/*"

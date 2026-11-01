@@ -1,0 +1,37 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(17);
+select ok(not has_function_privilege('anon','public.claim_security_notification_jobs(integer)','EXECUTE'),'anonymous claim denied');
+select ok(not has_function_privilege('authenticated','public.finish_security_notification_job(uuid,uuid,boolean)','EXECUTE'),'browser acknowledgement denied');
+insert into auth.users(id,email,created_at,updated_at)
+values ('01992026-0907-7000-8000-000000000001','notification@example.invalid',now(),now());
+insert into app_private.notification_jobs(id,correlation_id,source_id,recipient_account_id,template_key)
+values ('01992026-0907-7000-8000-000000000002',extensions.gen_random_uuid(),extensions.gen_random_uuid(),'01992026-0907-7000-8000-000000000001','account_recovery_started');
+create temporary table claimed as select * from public.claim_security_notification_jobs(1);
+select is((select count(*) from claimed),1::bigint,'pending job claimed');
+select is((select count(*) from public.claim_security_notification_jobs(1)),0::bigint,'live lease excludes another worker');
+select is(public.finish_security_notification_job((select job_id from claimed),extensions.gen_random_uuid(),true),false,'wrong lease rejected');
+select is(public.finish_security_notification_job((select job_id from claimed),(select lease_id from claimed),false),true,'failure schedules retry');
+select is((select count(*) from public.claim_security_notification_jobs(1)),0::bigint,'backoff prevents immediate retry');
+update app_private.notification_jobs set available_at=now()-interval '1 second';
+create temporary table retried as select * from public.claim_security_notification_jobs(1);
+select is(public.finish_security_notification_job((select job_id from claimed),(select lease_id from claimed),true),false,'previous worker cannot acknowledge new lease');
+select is(public.finish_security_notification_job((select job_id from retried),(select lease_id from retried),true),true,'current worker acknowledges');
+select is((select count(*) from public.claim_security_notification_jobs(1)),0::bigint,'completed job not redelivered');
+update app_private.notification_jobs set completed_at=null,attempt_count=5,available_at=now()-interval '1 second';
+select is((select count(*) from public.claim_security_notification_jobs(1)),0::bigint,'retry budget enforced');
+update app_private.notification_jobs set attempt_count=0,created_at=now()-interval '2 days',expires_at=now()-interval '1 day';
+select is((select count(*) from public.claim_security_notification_jobs(1)),0::bigint,'expired job excluded');
+update app_private.notification_jobs set expires_at=now()+interval '1 day',cancelled_at=now();
+select is((select count(*) from public.claim_security_notification_jobs(1)),0::bigint,'cancelled job excluded');
+update app_private.notification_jobs set cancelled_at=null;
+create temporary table abandoned as select * from public.claim_security_notification_jobs(1);
+update app_private.notification_jobs set delivery_lease_until=now()-interval '1 second';
+select is(public.finish_security_notification_job((select job_id from abandoned),(select lease_id from abandoned),true),false,'expired lease cannot acknowledge');
+create temporary table reclaimed as select * from public.claim_security_notification_jobs(1);
+select is((select count(*) from reclaimed),1::bigint,'abandoned job reclaimed');
+select isnt((select lease_id from reclaimed),(select lease_id from abandoned),'reclaim rotates lease');
+update app_private.notification_jobs set cancelled_at=now();
+select is(public.finish_security_notification_job((select job_id from reclaimed),(select lease_id from reclaimed),true),false,'cancellation fences acknowledgement');
+select * from finish();
+rollback;

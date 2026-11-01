@@ -1,0 +1,642 @@
+import { z } from "zod";
+
+const isoInstant = z.iso.datetime({ offset: true });
+const opaqueUuid = z.uuid();
+const sha256 = z.string().regex(/^[a-f0-9]{64}$/u);
+
+export const apiErrorSchema = z.strictObject({
+  code: z.string().min(1).max(80),
+  correlationId: opaqueUuid,
+  message: z.string().min(1).max(240),
+  schemaVersion: z.literal("1.0"),
+});
+
+export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export const browserSessionResponseSchema = z.strictObject({
+  schemaVersion: z.literal("1.0"),
+  session: z
+    .strictObject({
+      user: z.strictObject({ id: opaqueUuid, email: z.email() }),
+    })
+    .nullable(),
+});
+export type BrowserSession = z.infer<typeof browserSessionResponseSchema>["session"];
+export const browserOtpStartSchema = z.strictObject({ email: z.email().max(320) });
+export const browserOtpVerifySchema = z.strictObject({
+  email: z.email().max(320),
+  token: z.string().regex(/^[0-9]{6}$/u),
+});
+export const browserCallbackSchema = z.strictObject({ code: z.string().min(1).max(2048) });
+export const browserAuthSuccessSchema = z.strictObject({
+  ok: z.literal(true),
+  schemaVersion: z.literal("1.0"),
+});
+
+export const readinessResponseSchema = z.strictObject({
+  generatedAt: isoInstant,
+  revision: z.string().regex(/^[a-zA-Z0-9._-]{1,80}$/u),
+  schemaVersion: z.literal("1.0"),
+  status: z.enum(["ok", "degraded"]),
+});
+
+export type ReadinessResponse = z.infer<typeof readinessResponseSchema>;
+
+export const preferredLocaleSchema = z.enum(["sv", "en"]);
+export const organizerTypeSchema = z.enum([
+  "individual",
+  "informal_group",
+  "association",
+  "company",
+]);
+export const eventVisibilitySchema = z.enum(["public", "unlisted"]);
+export const eventStateSchema = z.enum([
+  "draft",
+  "published",
+  "active",
+  "postponed",
+  "ended",
+  "cancelled",
+  "archived",
+]);
+export const eventTeamRoleSchema = z.enum(["owner", "co_host", "moderator"]);
+export const invitedEventTeamRoleSchema = z.enum(["co_host", "moderator"]);
+
+export type EventTeamRole = z.infer<typeof eventTeamRoleSchema>;
+export type InvitedEventTeamRole = z.infer<typeof invitedEventTeamRoleSchema>;
+
+export const accountProfileSchema = z.strictObject({
+  accountId: opaqueUuid,
+  displayName: z.string().trim().min(1).max(80).nullable(),
+  preferredLocale: preferredLocaleSchema,
+});
+
+export type AccountProfile = z.infer<typeof accountProfileSchema>;
+
+export const accountRecoveryStatusSchema = z.strictObject({
+  active: z.boolean(),
+  issuedAt: isoInstant.nullable(),
+  pendingClaim: z
+    .strictObject({
+      emailVerified: z.boolean(),
+      expiresAt: isoInstant,
+      id: opaqueUuid,
+      initiatedAt: isoInstant,
+      newEmailMasked: z.string().min(5).max(320),
+      readyAt: isoInstant,
+    })
+    .nullable()
+    .optional(),
+  rotatedAt: isoInstant.nullable(),
+  version: z.number().int().nonnegative(),
+});
+
+export type AccountRecoveryStatus = z.infer<typeof accountRecoveryStatusSchema>;
+
+export const recoveryCodeEnrollmentResponseSchema = accountRecoveryStatusSchema.extend({
+  code: z.string().regex(/^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){4}$/u),
+});
+
+export type RecoveryCodeEnrollmentResponse = z.infer<typeof recoveryCodeEnrollmentResponseSchema>;
+
+export const accountRecoveryClaimSchema = z.strictObject({
+  emailVerified: z.boolean(),
+  expiresAt: isoInstant,
+  id: opaqueUuid,
+  initiatedAt: isoInstant,
+  readyAt: isoInstant,
+});
+
+export type AccountRecoveryClaim = z.infer<typeof accountRecoveryClaimSchema>;
+
+export const initiateAccountRecoveryRequestSchema = z.strictObject({
+  currentEmail: z.email().trim().max(320),
+  newEmail: z.email().trim().max(320),
+  recoveryCode: z.string().regex(/^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){4}$/u),
+});
+
+export const initiateAccountRecoveryResponseSchema = accountRecoveryClaimSchema.extend({
+  delivery: z.literal("captured_locally"),
+});
+
+export const accountRecoveryTokenRequestSchema = z.strictObject({
+  verificationToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
+});
+
+export type InitiateAccountRecoveryRequest = z.infer<typeof initiateAccountRecoveryRequestSchema>;
+export type AccountRecoveryTokenRequest = z.infer<typeof accountRecoveryTokenRequestSchema>;
+
+export const organizerProfileSummarySchema = z.strictObject({
+  displayName: z.string().trim().min(1).max(100),
+  id: opaqueUuid,
+  locality: z.string().trim().min(1).max(100).nullable(),
+  organizerType: organizerTypeSchema,
+  role: z.enum(["owner", "manager"]),
+  website: z.url().startsWith("https://").max(500).nullable(),
+});
+
+export type OrganizerProfileSummary = z.infer<typeof organizerProfileSummarySchema>;
+
+export const eventIntervalSummarySchema = z.strictObject({
+  endsAt: isoInstant,
+  id: opaqueUuid,
+  startsAt: isoInstant,
+});
+
+export type EventIntervalSummary = z.infer<typeof eventIntervalSummarySchema>;
+
+export const boundaryPointSchema = z.tuple([
+  z.number().finite().min(-180).max(180),
+  z.number().finite().min(-90).max(90),
+]);
+
+export type BoundaryPoint = z.infer<typeof boundaryPointSchema>;
+
+export const eventBoundarySummarySchema = z.strictObject({
+  areaSquareKilometers: z.number().finite().positive().max(25),
+  displayLabel: z.string().trim().min(1).max(120).nullable(),
+  ring: z.array(boundaryPointSchema).min(4).max(51),
+  spanKilometers: z.number().finite().positive().max(10),
+  version: z.number().int().positive(),
+  warnings: z.array(z.enum(["area_near_limit", "span_near_limit"])).max(2),
+});
+
+export type EventBoundarySummary = z.infer<typeof eventBoundarySummarySchema>;
+
+export const eventRegistrationSummarySchema = z.strictObject({
+  allowDuringEvent: z.boolean(),
+  closesAt: isoInstant,
+  opensAt: isoInstant,
+  version: z.number().int().positive(),
+});
+
+export type EventRegistrationSummary = z.infer<typeof eventRegistrationSummarySchema>;
+
+export const eventControlSummarySchema = z.strictObject({
+  id: opaqueUuid,
+  state: eventStateSchema,
+  version: z.number().int().positive(),
+  visibility: eventVisibilitySchema,
+});
+
+export type EventControlSummary = z.infer<typeof eventControlSummarySchema>;
+
+export const eventTeamMemberSummarySchema = z.strictObject({
+  canReceiveOwnership: z.boolean().optional(),
+  displayName: z.string().trim().min(1).max(80),
+  id: opaqueUuid,
+  role: eventTeamRoleSchema,
+});
+
+export type EventTeamMemberSummary = z.infer<typeof eventTeamMemberSummarySchema>;
+
+export const pendingEventTeamInviteSummarySchema = z.strictObject({
+  email: z.email().max(320),
+  expiresAt: isoInstant,
+  id: opaqueUuid,
+  role: invitedEventTeamRoleSchema,
+});
+
+export type PendingEventTeamInviteSummary = z.infer<typeof pendingEventTeamInviteSummarySchema>;
+
+export const pendingEventOwnershipTransferSummarySchema = z.strictObject({
+  expiresAt: isoInstant,
+  id: opaqueUuid,
+  organizerWillChange: z.boolean().optional(),
+  targetOrganizerDisplayName: z.string().trim().min(1).max(100).optional(),
+  toDisplayName: z.string().trim().min(1).max(80),
+  toMembershipId: opaqueUuid,
+});
+
+export type PendingEventOwnershipTransferSummary = z.infer<
+  typeof pendingEventOwnershipTransferSummarySchema
+>;
+
+export const ownershipTransferOptionSchema = z.strictObject({
+  organizerDisplayName: z.string().trim().min(1).max(100),
+  organizerProfileId: opaqueUuid,
+  organizerWillChange: z.boolean(),
+  recipientDisplayName: z.string().trim().min(1).max(80),
+  toMembershipId: opaqueUuid,
+});
+
+export type OwnershipTransferOption = z.infer<typeof ownershipTransferOptionSchema>;
+
+export const emergencySuccessorSummarySchema = z.strictObject({
+  designatedAt: isoInstant,
+  organizerDisplayName: z.string().trim().min(1).max(100),
+  recipientDisplayName: z.string().trim().min(1).max(80),
+  successorMembershipId: opaqueUuid,
+  targetOrganizerProfileId: opaqueUuid,
+});
+
+export const emergencySuccessorOptionSchema = z.strictObject({
+  organizerDisplayName: z.string().trim().min(1).max(100),
+  organizerProfileId: opaqueUuid,
+  recipientDisplayName: z.string().trim().min(1).max(80),
+  successorMembershipId: opaqueUuid,
+});
+
+export const pendingEmergencySuccessorClaimSchema = z.strictObject({
+  expiresAt: isoInstant,
+  id: opaqueUuid,
+  initiatedAt: isoInstant,
+  readyAt: isoInstant,
+  successorDisplayName: z.string().trim().min(1).max(80),
+  successorMembershipId: opaqueUuid,
+  targetOrganizerDisplayName: z.string().trim().min(1).max(100),
+});
+
+export type PendingEmergencySuccessorClaim = z.infer<typeof pendingEmergencySuccessorClaimSchema>;
+
+export const eventTeamSummarySchema = z.strictObject({
+  currentMembershipId: opaqueUuid.optional(),
+  emergencySuccessor: emergencySuccessorSummarySchema.nullable().optional(),
+  eventId: opaqueUuid,
+  members: z.array(eventTeamMemberSummarySchema),
+  ownershipTransferOptions: z.array(ownershipTransferOptionSchema).optional(),
+  pendingEmergencyClaim: pendingEmergencySuccessorClaimSchema.nullable().optional(),
+  pendingInvites: z.array(pendingEventTeamInviteSummarySchema),
+  pendingTransfer: pendingEventOwnershipTransferSummarySchema.nullable().optional(),
+  successorOptions: z.array(emergencySuccessorOptionSchema).optional(),
+  teamVersion: z.number().int().positive(),
+});
+
+export type EventTeamSummary = z.infer<typeof eventTeamSummarySchema>;
+
+export const incomingEventTeamInviteSummarySchema = z.strictObject({
+  eventId: opaqueUuid,
+  eventTitle: z.string().trim().min(1).max(120),
+  expiresAt: isoInstant,
+  id: opaqueUuid,
+  organizerDisplayName: z.string().trim().min(1).max(100),
+  role: invitedEventTeamRoleSchema,
+});
+
+export type IncomingEventTeamInviteSummary = z.infer<typeof incomingEventTeamInviteSummarySchema>;
+
+export const draftEventSummarySchema = z.strictObject({
+  boundary: eventBoundarySummarySchema.nullable(),
+  description: z.string().max(2000),
+  id: opaqueUuid,
+  intervals: z.array(eventIntervalSummarySchema),
+  organizerDisplayName: z.string().trim().min(1).max(100),
+  organizerProfileId: opaqueUuid,
+  registration: eventRegistrationSummarySchema.nullable(),
+  role: z.enum(["owner", "co_host", "moderator"]),
+  state: eventStateSchema,
+  timezone: z.string().trim().min(1).max(100),
+  title: z.string().trim().min(1).max(120),
+  version: z.number().int().positive(),
+  visibility: eventVisibilitySchema,
+});
+
+export type DraftEventSummary = z.infer<typeof draftEventSummarySchema>;
+
+export const identityDashboardSchema = z.strictObject({
+  events: z.array(draftEventSummarySchema),
+  organizers: z.array(organizerProfileSummarySchema),
+  profile: accountProfileSchema,
+  schemaVersion: z.literal("1.0"),
+});
+
+export type IdentityDashboard = z.infer<typeof identityDashboardSchema>;
+
+export const incomingEventTeamInvitesSchema = z.array(incomingEventTeamInviteSummarySchema);
+
+export const updateProfileRequestSchema = z.strictObject({
+  displayName: z.string().trim().max(80),
+  preferredLocale: preferredLocaleSchema,
+});
+
+export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
+
+export const createOrganizerProfileRequestSchema = z.strictObject({
+  displayName: z.string().trim().min(1).max(100),
+  locality: z.string().trim().max(100),
+  organizerType: organizerTypeSchema,
+  website: z.union([z.literal(""), z.url().startsWith("https://").max(500)]),
+});
+
+export type CreateOrganizerProfileRequest = z.infer<typeof createOrganizerProfileRequestSchema>;
+
+export const createDraftEventRequestSchema = z
+  .strictObject({
+    description: z.string().trim().max(2000),
+    endsAt: isoInstant,
+    organizerProfileId: opaqueUuid.nullable(),
+    publicOrganizerName: z.string().trim().max(100),
+    startsAt: isoInstant,
+    timezone: z.string().trim().min(1).max(100),
+    title: z.string().trim().min(1).max(120),
+    visibility: eventVisibilitySchema,
+  })
+  .refine((value) => new Date(value.endsAt) > new Date(value.startsAt), {
+    message: "Event end must be after its start",
+    path: ["endsAt"],
+  })
+  .refine((value) => value.organizerProfileId !== null || value.publicOrganizerName.length > 0, {
+    message: "Public organizer name is required when no organizer is selected",
+    path: ["publicOrganizerName"],
+  });
+
+export type CreateDraftEventRequest = z.infer<typeof createDraftEventRequestSchema>;
+
+export const saveEventBoundaryRequestSchema = z
+  .strictObject({
+    displayLabel: z.string().trim().max(120),
+    expectedVersion: z.number().int().positive().nullable(),
+    ring: z.array(boundaryPointSchema).min(3).max(50),
+  })
+  .refine((value) => new Set(value.ring.map((point) => point.join(","))).size >= 3, {
+    message: "A boundary needs at least three distinct points",
+    path: ["ring"],
+  })
+  .refine(
+    (value) => {
+      const first = value.ring[0];
+      const last = value.ring.at(-1);
+      return !first || !last || first[0] !== last[0] || first[1] !== last[1];
+    },
+    { message: "The boundary ring must be open in API requests", path: ["ring"] },
+  );
+
+export type SaveEventBoundaryRequest = z.infer<typeof saveEventBoundaryRequestSchema>;
+
+export const saveEventRegistrationRequestSchema = z
+  .strictObject({
+    allowDuringEvent: z.boolean(),
+    closesAt: isoInstant,
+    expectedVersion: z.number().int().positive().nullable(),
+    opensAt: isoInstant,
+  })
+  .refine((value) => new Date(value.closesAt) > new Date(value.opensAt), {
+    message: "Registration close must be after registration open",
+    path: ["closesAt"],
+  });
+
+export type SaveEventRegistrationRequest = z.infer<typeof saveEventRegistrationRequestSchema>;
+
+export const updateDraftEventVisibilityRequestSchema = z.strictObject({
+  expectedVersion: z.number().int().positive(),
+  visibility: eventVisibilitySchema,
+});
+
+export type UpdateDraftEventVisibilityRequest = z.infer<
+  typeof updateDraftEventVisibilityRequestSchema
+>;
+
+export const deleteDraftEventRequestSchema = z.strictObject({
+  confirmTitle: z.string().trim().min(1).max(120),
+  expectedVersion: z.number().int().positive(),
+});
+
+export type DeleteDraftEventRequest = z.infer<typeof deleteDraftEventRequestSchema>;
+
+export const inviteEventTeamMemberRequestSchema = z.strictObject({
+  email: z.email().trim().max(320),
+  expectedTeamVersion: z.number().int().positive(),
+  role: invitedEventTeamRoleSchema,
+});
+
+export type InviteEventTeamMemberRequest = z.infer<typeof inviteEventTeamMemberRequestSchema>;
+
+export const acceptEventTeamInviteRequestSchema = z.strictObject({
+  displayName: z.string().trim().min(1).max(80),
+});
+
+export type AcceptEventTeamInviteRequest = z.infer<typeof acceptEventTeamInviteRequestSchema>;
+
+export const eventTeamVersionRequestSchema = z.strictObject({
+  expectedTeamVersion: z.number().int().positive(),
+});
+
+export type EventTeamVersionRequest = z.infer<typeof eventTeamVersionRequestSchema>;
+
+export const enrollRecoveryCodeRequestSchema = z.strictObject({
+  expectedVersion: z.number().int().nonnegative(),
+});
+
+export type EnrollRecoveryCodeRequest = z.infer<typeof enrollRecoveryCodeRequestSchema>;
+
+export const setEmergencySuccessorRequestSchema = z.strictObject({
+  expectedTeamVersion: z.number().int().positive(),
+  successorMembershipId: opaqueUuid,
+  targetOrganizerProfileId: opaqueUuid,
+});
+
+export type SetEmergencySuccessorRequest = z.infer<typeof setEmergencySuccessorRequestSchema>;
+
+export const publicationReadinessBlockerSchema = z.enum([
+  "event_not_draft",
+  "owner_email_unverified",
+  "recovery_code_missing",
+  "boundary_missing",
+  "registration_missing",
+  "publication_attestation_missing",
+  "first_event_review_pending",
+  "routing_not_ready",
+  "public_delivery_not_ready",
+]);
+
+export const publicationReadinessRecommendationSchema = z.enum([
+  "totp_recommended",
+  "emergency_successor_recommended",
+]);
+
+export const eventPublicationReadinessSchema = z.strictObject({
+  blockers: z.array(publicationReadinessBlockerSchema),
+  eventId: opaqueUuid,
+  eventVersion: z.number().int().positive(),
+  readyToPublish: z.boolean(),
+  recommendations: z.array(publicationReadinessRecommendationSchema),
+});
+
+export type EventPublicationReadiness = z.infer<typeof eventPublicationReadinessSchema>;
+
+export const attestEventPublicationRequestSchema = z.strictObject({
+  expectedBoundaryVersion: z.number().int().positive(),
+  expectedEventVersion: z.number().int().positive(),
+  expectedRegistrationVersion: z.number().int().positive(),
+  locationAuthorityConfirmed: z.literal(true),
+  visibilityUnderstood: z.literal(true),
+});
+
+export type AttestEventPublicationRequest = z.infer<typeof attestEventPublicationRequestSchema>;
+
+export const initiateEventOwnershipTransferRequestSchema = z.strictObject({
+  expectedTeamVersion: z.number().int().positive(),
+  targetOrganizerProfileId: opaqueUuid,
+  toMembershipId: opaqueUuid,
+});
+
+export type InitiateEventOwnershipTransferRequest = z.infer<
+  typeof initiateEventOwnershipTransferRequestSchema
+>;
+
+export const organizerTeamMemberSummarySchema = z.strictObject({
+  displayName: z.string().trim().min(1).max(80),
+  id: opaqueUuid,
+  role: z.enum(["owner", "manager"]),
+});
+
+export const pendingOrganizerInviteSummarySchema = z.strictObject({
+  email: z.email().max(320),
+  expiresAt: isoInstant,
+  id: opaqueUuid,
+});
+
+export const organizerTeamSummarySchema = z.strictObject({
+  currentMembershipId: opaqueUuid,
+  members: z.array(organizerTeamMemberSummarySchema),
+  organizerProfileId: opaqueUuid,
+  pendingInvites: z.array(pendingOrganizerInviteSummarySchema),
+  teamVersion: z.number().int().positive(),
+});
+
+export type OrganizerTeamSummary = z.infer<typeof organizerTeamSummarySchema>;
+
+export const incomingOrganizerInviteSummarySchema = z.strictObject({
+  expiresAt: isoInstant,
+  id: opaqueUuid,
+  organizerDisplayName: z.string().trim().min(1).max(100),
+  organizerProfileId: opaqueUuid,
+});
+
+export const incomingOrganizerInvitesSchema = z.array(incomingOrganizerInviteSummarySchema);
+export type IncomingOrganizerInviteSummary = z.infer<typeof incomingOrganizerInviteSummarySchema>;
+
+export const inviteOrganizerManagerRequestSchema = z.strictObject({
+  email: z.email().trim().max(320),
+  expectedTeamVersion: z.number().int().positive(),
+});
+
+export type InviteOrganizerManagerRequest = z.infer<typeof inviteOrganizerManagerRequestSchema>;
+
+export const updateEventTeamMemberRoleRequestSchema = z.strictObject({
+  expectedTeamVersion: z.number().int().positive(),
+  role: invitedEventTeamRoleSchema,
+});
+
+export type UpdateEventTeamMemberRoleRequest = z.infer<
+  typeof updateEventTeamMemberRoleRequestSchema
+>;
+
+export const commandResourceResponseSchema = z.strictObject({
+  id: opaqueUuid,
+  schemaVersion: z.literal("1.0"),
+});
+
+export type CommandResourceResponse = z.infer<typeof commandResourceResponseSchema>;
+
+const publicArtifactReferenceSchema = z.strictObject({
+  byteSize: z.number().int().nonnegative().max(2_000_000),
+  id: opaqueUuid,
+  sha256,
+});
+
+export const publicEventManifestSchema = z.strictObject({
+  eventId: opaqueUuid,
+  expiresAt: isoInstant,
+  generatedAt: isoInstant,
+  publicRevision: z.number().int().nonnegative(),
+  routingVersion: opaqueUuid.nullable(),
+  safetySequence: z.number().int().nonnegative(),
+  schemaVersion: z.literal("1.0"),
+  snapshot: publicArtifactReferenceSchema.nullable(),
+  state: z.enum(["published", "active", "postponed", "ended", "cancelled"]),
+});
+
+export type PublicEventManifest = z.infer<typeof publicEventManifestSchema>;
+
+export const safeOperationalEventSchema = z.strictObject({
+  correlationId: opaqueUuid,
+  deploymentRevision: z.string().min(1).max(80),
+  durationMs: z.number().int().nonnegative().max(600_000),
+  errorClass: z.string().min(1).max(80).optional(),
+  eventScopeId: opaqueUuid.optional(),
+  generatedAt: isoInstant,
+  operation: z.string().regex(/^[a-z][a-z0-9_.-]{0,79}$/u),
+  schemaVersion: z.literal("1.0"),
+  status: z.enum(["succeeded", "failed", "degraded", "denied"]),
+});
+
+export type SafeOperationalEvent = z.infer<typeof safeOperationalEventSchema>;
+
+export const queueEnvelopeSchema = z.strictObject({
+  correlationId: opaqueUuid,
+  createdAt: isoInstant,
+  id: opaqueUuid,
+  idempotencyKey: z.string().min(16).max(200),
+  schemaVersion: z.literal("1.0"),
+  type: z.enum([
+    "snapshot.publish",
+    "snapshot.invalidate",
+    "email.deliver",
+    "export.prepare",
+    "graph.launch",
+  ]),
+});
+
+export type QueueEnvelope = z.infer<typeof queueEnvelopeSchema>;
+
+export const boundarySchemas = {
+  BrowserSessionResponse: browserSessionResponseSchema,
+  BrowserOtpStart: browserOtpStartSchema,
+  BrowserOtpVerify: browserOtpVerifySchema,
+  BrowserCallback: browserCallbackSchema,
+  BrowserAuthSuccess: browserAuthSuccessSchema,
+  AcceptEventTeamInviteRequest: acceptEventTeamInviteRequestSchema,
+  AccountProfile: accountProfileSchema,
+  AccountRecoveryStatus: accountRecoveryStatusSchema,
+  AccountRecoveryClaim: accountRecoveryClaimSchema,
+  AccountRecoveryTokenRequest: accountRecoveryTokenRequestSchema,
+  ApiError: apiErrorSchema,
+  AttestEventPublicationRequest: attestEventPublicationRequestSchema,
+  BoundaryPoint: boundaryPointSchema,
+  CommandResourceResponse: commandResourceResponseSchema,
+  CreateDraftEventRequest: createDraftEventRequestSchema,
+  CreateOrganizerProfileRequest: createOrganizerProfileRequestSchema,
+  DeleteDraftEventRequest: deleteDraftEventRequestSchema,
+  DraftEventSummary: draftEventSummarySchema,
+  EventBoundarySummary: eventBoundarySummarySchema,
+  EventControlSummary: eventControlSummarySchema,
+  EventIntervalSummary: eventIntervalSummarySchema,
+  EventPublicationReadiness: eventPublicationReadinessSchema,
+  EventRegistrationSummary: eventRegistrationSummarySchema,
+  EventState: eventStateSchema,
+  EventTeamMemberSummary: eventTeamMemberSummarySchema,
+  EventTeamRole: eventTeamRoleSchema,
+  EventTeamSummary: eventTeamSummarySchema,
+  EventTeamVersionRequest: eventTeamVersionRequestSchema,
+  EnrollRecoveryCodeRequest: enrollRecoveryCodeRequestSchema,
+  IdentityDashboard: identityDashboardSchema,
+  InitiateAccountRecoveryRequest: initiateAccountRecoveryRequestSchema,
+  InitiateAccountRecoveryResponse: initiateAccountRecoveryResponseSchema,
+  IncomingEventTeamInviteSummary: incomingEventTeamInviteSummarySchema,
+  IncomingOrganizerInviteSummary: incomingOrganizerInviteSummarySchema,
+  InitiateEventOwnershipTransferRequest: initiateEventOwnershipTransferRequestSchema,
+  InviteOrganizerManagerRequest: inviteOrganizerManagerRequestSchema,
+  InviteEventTeamMemberRequest: inviteEventTeamMemberRequestSchema,
+  OrganizerProfileSummary: organizerProfileSummarySchema,
+  OrganizerTeamMemberSummary: organizerTeamMemberSummarySchema,
+  OrganizerTeamSummary: organizerTeamSummarySchema,
+  OwnershipTransferOption: ownershipTransferOptionSchema,
+  PendingEventTeamInviteSummary: pendingEventTeamInviteSummarySchema,
+  PendingEventOwnershipTransferSummary: pendingEventOwnershipTransferSummarySchema,
+  PendingEmergencySuccessorClaim: pendingEmergencySuccessorClaimSchema,
+  PendingOrganizerInviteSummary: pendingOrganizerInviteSummarySchema,
+  PublicationReadinessBlocker: publicationReadinessBlockerSchema,
+  PublicationReadinessRecommendation: publicationReadinessRecommendationSchema,
+  PublicEventManifest: publicEventManifestSchema,
+  QueueEnvelope: queueEnvelopeSchema,
+  ReadinessResponse: readinessResponseSchema,
+  RecoveryCodeEnrollmentResponse: recoveryCodeEnrollmentResponseSchema,
+  SafeOperationalEvent: safeOperationalEventSchema,
+  SaveEventBoundaryRequest: saveEventBoundaryRequestSchema,
+  SaveEventRegistrationRequest: saveEventRegistrationRequestSchema,
+  SetEmergencySuccessorRequest: setEmergencySuccessorRequestSchema,
+  UpdateEventTeamMemberRoleRequest: updateEventTeamMemberRoleRequestSchema,
+  UpdateProfileRequest: updateProfileRequestSchema,
+  UpdateDraftEventVisibilityRequest: updateDraftEventVisibilityRequestSchema,
+} as const;

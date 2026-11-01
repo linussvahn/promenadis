@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Promenadis</title>
+  <rect width="512" height="512" rx="128" fill="#20322b"/>
+  <path d="M144 390V122h121c67 0 111 36 111 97 0 63-46 101-116 101h-45v70h-71Zm71-130h40c31 0 49-14 49-39 0-24-18-37-49-37h-40v76Z" fill="#f5efe2"/>
+  <circle cx="370" cy="374" r="34" fill="#f1c477"/>
+</svg>
