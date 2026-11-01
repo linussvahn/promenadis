@@ -156,8 +156,11 @@ actions require approval by a different administrator before taking effect.
   after replacement-email verification, not when an unverified request is
   created. The signed-in owner may cancel a pending request; replacing the
   recovery code also cancels it. Neither cancellation nor expiry makes a
-  consumed code reusable. The current local preview stops before changing the
-  account email; this does not waive the notification or safe-completion gates.
+  consumed code reusable. After the wait, the emailed link offers an explicit
+  "finish recovery" step that changes the sign-in email to the verified address
+  and ends every existing sign-in on all devices. The owner, the event team and
+  the previous sign-in address are then notified. This works only in the local
+  preview; hosted recovery remains disabled.
 - Without a valid recovery factor or a predesignated successor, Promenadis does
   not perform ad-hoc account recovery or ownership transfer based on submitted
   identity documents or operator judgment. Existing co-host permissions continue

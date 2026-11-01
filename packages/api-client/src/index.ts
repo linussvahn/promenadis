@@ -3,6 +3,7 @@ import {
   type AccountRecoveryTokenRequest,
   type AttestEventPublicationRequest,
   accountRecoveryClaimSchema,
+  accountRecoveryCompletionSchema,
   accountRecoveryStatusSchema,
   apiErrorSchema,
   type CreateDraftEventRequest,
@@ -154,6 +155,13 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         accessToken,
         accountRecoveryStatusSchema,
         { method: "POST" },
+      );
+    },
+    completeAccountRecovery(claimId: string, input: AccountRecoveryTokenRequest) {
+      return publicRequest(
+        `/account-recovery/${claimId}/complete`,
+        accountRecoveryCompletionSchema,
+        input,
       );
     },
     confirmAccountRecoveryEmail(claimId: string, input: AccountRecoveryTokenRequest) {

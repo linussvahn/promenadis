@@ -5,6 +5,7 @@ import {
   acceptEventTeamInviteRequestSchema,
   accountProfileSchema,
   accountRecoveryClaimSchema,
+  accountRecoveryCompletionSchema,
   accountRecoveryStatusSchema,
   accountRecoveryTokenRequestSchema,
   attestEventPublicationRequestSchema,
@@ -393,7 +394,7 @@ Deno.serve(async (request) => {
     }
 
     if (route === "/account-recovery" || route.startsWith("/account-recovery/")) {
-      // Explicit fail-closed boundary: remote delivery and Auth completion are not ready.
+      // Explicit fail-closed boundary: remote delivery and hosted recovery are not ready.
       if (new URL(supabaseUrl).hostname !== "kong") {
         status = "denied";
         return apiError(
@@ -404,12 +405,12 @@ Deno.serve(async (request) => {
           origin,
         );
       }
-      if (request.method !== "POST" || route.endsWith("/complete")) {
+      if (request.method !== "POST") {
         status = "denied";
         return apiError(
           "recovery_unavailable",
-          "Account email changes are not enabled.",
-          503,
+          "Use POST for account recovery.",
+          405,
           correlationId,
           origin,
         );
@@ -492,7 +493,7 @@ Deno.serve(async (request) => {
     }
 
     const publicRecoveryRoute = route.match(
-      /^\/account-recovery\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(verify)$/iu,
+      /^\/account-recovery\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(verify|complete)$/iu,
     );
     if (request.method === "POST" && publicRecoveryRoute) {
       const input = accountRecoveryTokenRequestSchema.safeParse(await requestBody(request));
@@ -528,6 +529,75 @@ Deno.serve(async (request) => {
         status = "succeeded";
         return json(parsed.data, 200, correlationId, origin);
       }
+      operation = "account.recovery_complete";
+      const unavailable = () =>
+        apiError(
+          "claim_unavailable",
+          "This recovery request cannot be completed now.",
+          409,
+          correlationId,
+          origin,
+        );
+      const finishing = () =>
+        json(
+          accountRecoveryCompletionSchema.parse({ state: "finishing" }),
+          202,
+          correlationId,
+          origin,
+        );
+      const proof = {
+        p_claim_id: publicRecoveryRoute[1],
+        p_correlation_id: correlationId,
+        p_verification_token: input.data.verificationToken,
+      };
+      // Preparation and dispatch each recheck delay, proof, notices and identity.
+      const { error: prepareError } = await admin.rpc("prepare_account_recovery_command", proof);
+      if (prepareError) {
+        status = "denied";
+        return unavailable();
+      }
+      const { data: dispatch, error: dispatchError } = await admin.rpc(
+        "begin_account_recovery_dispatch_command",
+        proof,
+      );
+      if (dispatchError) {
+        const busy = dispatchError.message === "Recovery dispatch in progress";
+        status = busy ? "degraded" : "denied";
+        return busy ? finishing() : unavailable();
+      }
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+      if (
+        typeof dispatch?.dispatchId !== "string" ||
+        !uuid.test(dispatch.dispatchId) ||
+        typeof dispatch.accountId !== "string" ||
+        !uuid.test(dispatch.accountId) ||
+        typeof dispatch.newEmail !== "string"
+      ) {
+        throw new Error("invalid_internal_response");
+      }
+      // The provider response is deliberately not trusted: the email change is
+      // fenced by the dispatch lease in the database and its outcome is read
+      // back from Auth's own tables, so a lost or failed response cannot
+      // mislead completion or trigger a blind resend.
+      await admin.auth.admin
+        .updateUserById(dispatch.accountId, { email: dispatch.newEmail, email_confirm: true })
+        .catch(() => undefined);
+      const { data: outcome, error: finishError } = await admin.rpc(
+        "finish_account_recovery_dispatch_command",
+        { p_correlation_id: correlationId, p_dispatch_id: dispatch.dispatchId },
+      );
+      if (finishError) throw finishError;
+      if (outcome === "applied") {
+        status = "succeeded";
+        return json(
+          accountRecoveryCompletionSchema.parse({ state: "completed" }),
+          200,
+          correlationId,
+          origin,
+        );
+      }
+      status = outcome === "dispatching" ? "degraded" : "denied";
+      return outcome === "dispatching" ? finishing() : unavailable();
     }
 
     const actor = await authenticatedActor(request);

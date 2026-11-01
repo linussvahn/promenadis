@@ -306,7 +306,7 @@ const sv = {
   "accountRecovery.back": "Till inloggningen",
   "accountRecovery.title": "Återställ ägarkonto",
   "accountRecovery.preview":
-    "Lokal förhandsversion: du kan verifiera en ny e-postadress och avbryta begäran i Inställningar. Kontots e-postadress ändras inte ännu.",
+    "Lokal förhandsversion: e-post fångas i lokala Mailpit. När väntetiden är slut kan du byta kontots inloggningsadress från länken i e-postmeddelandet.",
   "accountRecovery.confirm": "Verifiera ny e-postadress",
   "accountRecovery.confirmHelp":
     "Verifiera bara om du själv begärde återställningen. Detta använder återställningskoden och startar minst 24 timmars väntetid.",
@@ -332,6 +332,19 @@ const sv = {
   "accountRecovery.waitTitle": "Väntetiden pågår",
   "accountRecovery.readyAt": "Väntetiden löper tidigast ut:",
   "accountRecovery.expiresAt": "Går ut:",
+  "accountRecovery.waitHelp":
+    "Öppna länken i e-postmeddelandet igen när väntetiden är slut för att slutföra återställningen.",
+  "accountRecovery.readyTitle": "Klar att slutföras",
+  "accountRecovery.completeHelp":
+    "Kontots inloggningsadress byts till den verifierade nya adressen. Alla befintliga inloggningar avslutas, även på andra enheter.",
+  "accountRecovery.complete": "Slutför återställning",
+  "accountRecovery.completed":
+    "Återställningen är klar. Logga in med din nya e-postadress och skapa en ny återställningskod.",
+  "accountRecovery.signIn": "Logga in",
+  "accountRecovery.finishing":
+    "Återställningen slutförs. Försök logga in med din nya e-postadress om några minuter.",
+  "accountRecovery.completeUnavailable":
+    "Återställningen kan inte slutföras nu. Om den redan är klar kan du logga in med din nya e-postadress.",
   "organizerTeam.title": "Personer som hanterar arrangören",
   "organizerTeam.role.owner": "Ägare",
   "organizerTeam.role.manager": "Hanterare",
@@ -733,7 +746,7 @@ const en = {
   "accountRecovery.back": "Back to sign in",
   "accountRecovery.title": "Recover an owner account",
   "accountRecovery.preview":
-    "Local preview: you can verify a replacement email and cancel the request in Settings. The account email cannot be changed yet.",
+    "Local preview: email is captured in local Mailpit. After the waiting period, you can change the account sign-in email from the emailed link.",
   "accountRecovery.confirm": "Verify replacement email",
   "accountRecovery.confirmHelp":
     "Only verify if you requested recovery. This consumes your recovery code and starts a minimum 24-hour waiting period.",
@@ -759,6 +772,19 @@ const en = {
   "accountRecovery.waitTitle": "Waiting period in progress",
   "accountRecovery.readyAt": "Waiting period ends no earlier than:",
   "accountRecovery.expiresAt": "Expires:",
+  "accountRecovery.waitHelp":
+    "Open the link in the email again after the waiting period ends to finish recovery.",
+  "accountRecovery.readyTitle": "Ready to finish",
+  "accountRecovery.completeHelp":
+    "The account sign-in email changes to the verified replacement address. Every existing sign-in ends, including on other devices.",
+  "accountRecovery.complete": "Finish recovery",
+  "accountRecovery.completed":
+    "Recovery is complete. Sign in with your new email address and create a new recovery code.",
+  "accountRecovery.signIn": "Sign in",
+  "accountRecovery.finishing":
+    "Recovery is finishing. Try signing in with your new email address in a few minutes.",
+  "accountRecovery.completeUnavailable":
+    "Recovery cannot be finished now. If it already finished, sign in with your new email address.",
   "organizerTeam.title": "People who manage this organizer",
   "organizerTeam.role.owner": "Owner",
   "organizerTeam.role.manager": "Manager",

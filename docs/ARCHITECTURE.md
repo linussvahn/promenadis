@@ -919,7 +919,12 @@ inside Auth's transaction; resolution reads authoritative Auth state, so
 outcomes are never ambiguous. Applied changes revoke all Auth and browser
 sessions, queue completion notices and erase the claim; unchanged expired
 leases become `not_applied`. The claim cannot be deleted mid-dispatch, and
-email-free 24-hour tombstones keep fencing. No BFF route calls Auth yet.
+email-free 24-hour tombstones keep fencing. The local BFF route
+`POST /account-recovery/{id}/complete` (token-proved, anonymous) runs prepare
+-> begin -> admin email update -> finish and answers `completed` or
+`finishing` (202, still undecided); it never trusts the provider response.
+Completion also queues a link-free notice to the previous address from a
+private 72-hour binding. Hosted recovery routes still fail closed.
 
 Recovery preparation is currently an internal idempotent database step only:
 proof, delay, code version, notice acceptance and email eligibility are rechecked

@@ -41,6 +41,29 @@ async function latestMessage(request: APIRequestContext, email: string) {
   return (await response.json()) as { HTML: string; Text: string };
 }
 
+// Local fixture control only: ages a synthetic claim and marks its notices
+// accepted so the full 24-hour flow can run without waiting.
+function localSql(input: string) {
+  return execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      "supabase_db_promenadis",
+      "psql",
+      "-X",
+      "-Atq",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+    ],
+    { input, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], timeout: 10_000 },
+  ).trim();
+}
+
 async function deleteSyntheticAccount(email: string) {
   if (!admin) return;
   const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -52,7 +75,7 @@ async function deleteSyntheticAccount(email: string) {
   }
 }
 
-test("recovery requires the emailed token and explicit confirmation; Auth changes stay disabled", async ({
+test("recovery requires the emailed token, explicit confirmation and the full wait", async ({
   page,
   request,
 }) => {
@@ -142,7 +165,7 @@ test("recovery requires the emailed token and explicit confirmation; Auth change
       headers,
       data: { verificationToken: token },
     });
-    expect(completion.status()).toBe(503);
+    expect(completion.status()).toBe(409);
     expect((await admin.auth.admin.getUserById(accountId)).data.user?.email).toBe(email);
     const cancelled = await request.post(`${base}/account/recovery-claims/${claim.id}/cancel`, {
       headers,
@@ -155,6 +178,111 @@ test("recovery requires the emailed token and explicit confirmation; Auth change
     });
     expect(replay.status()).toBe(410);
   } finally {
+    await deleteSyntheticAccount(email);
+  }
+});
+
+test("a ready recovery changes the sign-in email, ends old sessions and notifies the old address", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const email = `complete-${randomUUID()}@example.invalid`;
+  const newEmail = `complete-new-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const client = createClient(localStatus.API_URL, publicKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password,
+  });
+  if (createError) throw createError;
+  const accountId = created.user.id;
+  try {
+    const { data: signedIn, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    const headers = {
+      apikey: publicKey,
+      authorization: `Bearer ${signedIn.session?.access_token}`,
+      origin: "http://127.0.0.1:5173",
+    };
+    const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+    const event = await request.post(`${base}/events`, {
+      headers,
+      data: {
+        description: "Synthetic recovery completion fixture",
+        endsAt: "2031-09-10T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic completion owner",
+        startsAt: "2031-09-10T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic completion walk",
+        visibility: "unlisted",
+      },
+    });
+    expect(event.status()).toBe(201);
+    const enrollment = await request.post(`${base}/account/recovery-code`, {
+      headers,
+      data: { expectedVersion: 0 },
+    });
+    const recoveryCode = (await enrollment.json()).code as string;
+    const started = await request.post(`${base}/account-recovery`, {
+      headers: { apikey: publicKey, origin: "http://127.0.0.1:5173" },
+      data: { currentEmail: email, newEmail, recoveryCode },
+    });
+    expect(started.status()).toBe(201);
+    const claim = await started.json();
+    const message = await latestMessage(request, newEmail);
+    const link = message.Text.match(/http:\/\/127\.0\.0\.1:5173\/recover-account#[^\s]+/u)?.[0];
+    expect(link).toBeTruthy();
+
+    await page.goto(link ?? "");
+    await page.getByRole("button", { name: "Verifiera ny e-postadress" }).click();
+    await expect(page.getByText("Väntetiden pågår")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Slutför återställning" })).toHaveCount(0);
+
+    localSql(`update app_private.account_recovery_claims
+      set initiated_at=now()-interval '2 days', email_verified_at=now()-interval '2 days'+interval '1 minute',
+        ready_at=now()-interval '1 hour', expires_at=now()+interval '4 days'
+      where id='${claim.id}' and account_id='${accountId}';
+      update app_private.notification_jobs set completed_at=now()
+      where source_id='${claim.id}' and template_key='account_recovery_started';`);
+
+    await page.goto(link ?? "");
+    await page.getByRole("button", { name: "Verifiera ny e-postadress" }).click();
+    await page.getByRole("button", { name: "Slutför återställning" }).click();
+    await expect(page.getByText(/Återställningen är klar/u)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Logga in" })).toBeVisible();
+
+    expect((await admin.auth.admin.getUserById(accountId)).data.user?.email).toBe(newEmail);
+    const stale = await request.get(`${base}/account/recovery-code`, { headers });
+    expect(stale.status()).toBe(401);
+    const refreshed = await client.auth.refreshSession({
+      refresh_token: signedIn.session?.refresh_token ?? "",
+    });
+    expect(refreshed.error).not.toBeNull();
+    expect((await client.auth.signInWithPassword({ email, password })).error).not.toBeNull();
+    const replacement = await client.auth.signInWithPassword({ email: newEmail, password });
+    expect(replacement.data.user?.id).toBe(accountId);
+
+    try {
+      execFileSync("node", ["scripts/deliver-local-security-notifications.mjs"], {
+        cwd: repositoryRoot,
+        stdio: "ignore",
+      });
+    } catch {
+      // Unrelated leftover jobs may be skipped; the assertions below decide.
+    }
+    const notice = await latestMessage(request, email);
+    expect(notice.Text).toMatch(/can no longer be used to sign in|kan inte längre användas/u);
+    expect(notice.Text).not.toContain(newEmail);
+    expect(localSql("select count(*) from app_private.recovery_previous_email_notices;")).toBe("0");
+  } finally {
+    await deleteSyntheticAccount(newEmail);
     await deleteSyntheticAccount(email);
   }
 });

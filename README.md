@@ -42,10 +42,11 @@ pre-approved organizer identity. Structured notification intents are retained
 in a private local outbox, but external delivery is not connected. The readiness
 view deliberately remains fail-closed. The local recovery preview now supports
 code redemption, replacement-email verification through Mailpit, a minimum
-24-hour wait from verification, and owner cancellation in Settings. It does not
-change the Auth email or restore account access. Safe Auth rebinding/session
-revocation, old-email/team delivery, first-event review, routing, public delivery, and publication
-lifecycle transitions are still unimplemented.
+24-hour wait from verification, owner cancellation in Settings, and (from
+2026-11-01) explicit completion: the sign-in email changes, every old session
+ends and the owner, team and previous address are notified. First-event
+review, routing, public delivery, and publication lifecycle transitions are
+still unimplemented.
 
 Browser-session hardening (2026-09-15): local sign-in now uses an opaque
 HttpOnly, SameSite cookie through the existing private backend. Supabase tokens
@@ -58,11 +59,9 @@ remains disabled pending HTTPS routing and dedicated encryption-key management.
 Session freshness (2026-11-01): sensitive actions now use the requesting
 session's verified sign-in evidence, not the account-wide last sign-in time.
 Signing in on another device or refreshing a token cannot freshen an older
-session. The BFF also rejects revoked direct bearer sessions. Recovery
-completion remains disabled pending delivered security notices and a safe
-email-change/revocation workflow. The database dispatch fence, reconciliation
-and session revocation for that workflow now exist and pass against real local
-Auth (`pnpm test:local-recovery-dispatch`); no route invokes them yet.
+session. The BFF also rejects revoked direct bearer sessions. Local recovery
+completion runs through a database-fenced Auth dispatch
+(`pnpm test:local-recovery-dispatch`); hosted recovery remains disabled.
 
 ## Canonical product and implementation documents
 

@@ -12,6 +12,7 @@ export function RecoverAccount() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [link, setLink] = useState<{ claimId: string; verificationToken: string } | null>(null);
+  const [completion, setCompletion] = useState<"completed" | "finishing" | null>(null);
 
   useEffect(() => {
     // Fragments never reach the server. Keep the secret only in component memory.
@@ -22,6 +23,7 @@ export function RecoverAccount() {
       if (claimId && verificationToken) {
         setLink({ claimId, verificationToken });
         setClaim(null);
+        setCompletion(null);
         setStatus("");
         window.history.replaceState(window.history.state, "", window.location.pathname);
       }
@@ -45,6 +47,30 @@ export function RecoverAccount() {
       setStatus(translate(locale, "accountRecovery.verified"));
     } catch {
       setStatus(translate(locale, "accountRecovery.unavailable"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const complete = async () => {
+    const api = getPromenadisApiClient();
+    if (!api || !link) return;
+    setBusy(true);
+    setStatus("");
+    try {
+      const result = await api.completeAccountRecovery(link.claimId, {
+        verificationToken: link.verificationToken,
+      });
+      setCompletion(result.state);
+      if (result.state === "completed") setLink(null);
+      setStatus(
+        translate(
+          locale,
+          result.state === "completed" ? "accountRecovery.completed" : "accountRecovery.finishing",
+        ),
+      );
+    } catch {
+      setStatus(translate(locale, "accountRecovery.completeUnavailable"));
     } finally {
       setBusy(false);
     }
@@ -107,9 +133,29 @@ export function RecoverAccount() {
           <p className="notice notice-error" role="alert">
             {translate(locale, "auth.configMissing")}
           </p>
+        ) : completion === "completed" ? (
+          <section className="panel form-panel">
+            <a className="primary-button" href="/sign-in">
+              {translate(locale, "accountRecovery.signIn")}
+            </a>
+          </section>
+        ) : claim && link && Date.parse(claim.readyAt) <= Date.now() ? (
+          <section className="panel form-panel">
+            <h2>{translate(locale, "accountRecovery.readyTitle")}</h2>
+            <p>{translate(locale, "accountRecovery.completeHelp")}</p>
+            <button
+              className="primary-button"
+              disabled={busy}
+              onClick={() => void complete()}
+              type="button"
+            >
+              {translate(locale, "accountRecovery.complete")}
+            </button>
+          </section>
         ) : claim ? (
           <section className="panel form-panel">
             <h2>{translate(locale, "accountRecovery.waitTitle")}</h2>
+            <p>{translate(locale, "accountRecovery.waitHelp")}</p>
             <p>
               {translate(locale, "accountRecovery.readyAt")}{" "}
               {formatDateTime(locale, claim.readyAt, "Europe/Stockholm")}

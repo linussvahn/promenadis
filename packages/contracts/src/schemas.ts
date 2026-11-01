@@ -123,6 +123,13 @@ export const accountRecoveryTokenRequestSchema = z.strictObject({
   verificationToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
 });
 
+// Never echoes the replacement address: the browser already knows it, and the
+// response must stay safe to log as a state transition.
+export const accountRecoveryCompletionSchema = z.strictObject({
+  state: z.enum(["completed", "finishing"]),
+});
+
+export type AccountRecoveryCompletion = z.infer<typeof accountRecoveryCompletionSchema>;
 export type InitiateAccountRecoveryRequest = z.infer<typeof initiateAccountRecoveryRequestSchema>;
 export type AccountRecoveryTokenRequest = z.infer<typeof accountRecoveryTokenRequestSchema>;
 
@@ -590,6 +597,7 @@ export const boundarySchemas = {
   AccountProfile: accountProfileSchema,
   AccountRecoveryStatus: accountRecoveryStatusSchema,
   AccountRecoveryClaim: accountRecoveryClaimSchema,
+  AccountRecoveryCompletion: accountRecoveryCompletionSchema,
   AccountRecoveryTokenRequest: accountRecoveryTokenRequestSchema,
   ApiError: apiErrorSchema,
   AttestEventPublicationRequest: attestEventPublicationRequestSchema,

@@ -296,6 +296,22 @@
         ],
         "additionalProperties": false
       },
+      "AccountRecoveryCompletion": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "finishing"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "additionalProperties": false
+      },
       "AccountRecoveryTokenRequest": {
         "type": "object",
         "properties": {

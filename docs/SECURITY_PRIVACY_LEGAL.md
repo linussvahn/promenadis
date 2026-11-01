@@ -170,22 +170,27 @@ delay, notifications to the old email and event team, and an audit trail. A
 successor can receive event ownership but never access the old owner's account or
 private data.
 
-The local account-recovery verification slice is not a working account-access
-recovery mechanism yet. It binds requests to the recovery-code version, consumes
+Local account recovery now completes end to end (hosted recovery stays
+disabled). It binds requests to the recovery-code version, consumes
 the code only on explicit emailed-token verification, and starts the minimum
 24-hour wait then. Verification secrets are hashed at rest, omitted from
 initiation responses, and removed from the browser address bar after reading
 the email-link fragment. Pending replacement emails/hashes expire within seven
 days and are deleted by hourly maintenance, or immediately on cancellation or
 code rotation. No email/code/token is copied into audit summaries.
-Old-email/team notices remain private notification intents, not delivered mail.
-Auth rebinding stays disabled until these notices are delivered before the
-change and session revocation, cancellation races, and ambiguous provider
-outcomes have a tested, retry-safe completion protocol. The local anonymous
+Completion requires accepted delivery of the initial notices to the original
+address and event team. It runs through a database-fenced Auth dispatch:
+a trigger on `auth.users` permits the email change only under a live two-minute
+lease, so late or duplicate provider requests cannot land, and the outcome is
+read from Auth's own tables rather than the provider response. An applied
+change revokes every Auth session, refresh token and browser session.
+
+Decision 2026-11-01: after completion, the previous sign-in address receives a
+fixed notice that the address no longer signs in. It names no new address and
+carries no link. That address is kept only in a private binding for that one
+notice, erased on delivery acceptance or cancellation and never kept longer
+than 72 hours; it is not copied into the outbox row. The local anonymous
 budget is not a substitute for production abuse controls.
-As of 2026-11-01 the database fence, lease, reconciliation and session
-revocation for that protocol exist and are tested against real local Auth;
-the completion route remains disabled until the BFF/browser flow is wired.
 
 Promenadis does not manually guess identity from submitted documents, social
 profiles, or an emailed narrative. Without a valid recovery factor or

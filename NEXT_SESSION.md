@@ -456,6 +456,41 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Local recovery completion (2026-11-01)
+
+- User decision: after recovery completes, notify the previous sign-in address.
+  Implemented as `account_recovery_completed_previous_email`: fixed bilingual
+  text, no new address, no link. The address lives only in
+  `app_private.recovery_previous_email_notices` (job-bound, erased on
+  acceptance/cancellation, hourly purge, max 72 hours), queued by a BEFORE
+  DELETE trigger on the claim once its dispatch is `applied`.
+- `POST /account-recovery/{id}/complete` (local only, token-proved, inside the
+  existing anonymous budget): prepare -> begin dispatch -> admin
+  `updateUserById(email, email_confirm)` -> finish. 200 `completed`, 202
+  `finishing` (lease still undecided), 409 otherwise. The provider response
+  is ignored by design. Contract `AccountRecoveryCompletion`, client
+  `completeAccountRecovery`, bilingual UI: reopening the emailed link after
+  the wait shows "Finish recovery", then a sign-in link.
+- Bug found by the new e2e and fixed forward in `20261101000700`: the
+  completion-recipient UNION in `20261101000500` (already pushed) did not
+  dedupe because each row carried a different `clock_timestamp()`, so any
+  event owner crashed completion on the per-recipient unique key. pgTAP 190
+  now includes an event-owning account.
+- Verified: 465 database assertions (DB rebuilt from zero, lint, types), full
+  `pnpm verify` (108 tests + build), local slice, session-security,
+  notifications, preparation race, dispatch race, mobile smoke e2e, and all
+  local-auth e2e including the new full completion flow (Auth email changed,
+  stale bearer 401, old refresh/old email rejected, previous-address notice
+  in Mailpit without the new address, binding erased).
+- Known: "opaque sessions isolate accounts" e2e failed once in a full run and
+  passed 3/3 alone (profile field empty); looks flaky, not investigated.
+  Playwright's web server runs the app's own `dev` script, which skips the
+  env sync: on a fresh clone run `pnpm dev` (or the sync script) once first.
+- UX wart: reopening the link shows "Verify replacement email" again (verify
+  is idempotent); its help text about consuming the code is misleading on the
+  second visit. Next: a token-proved read of the claim state, then the
+  remaining Milestone 1 list below.
+
 ### Recovery Auth dispatch fence (2026-11-01)
 
 - Verified from the installed auth-js 2.115 and the Supabase Auth source: the
@@ -492,8 +527,8 @@ Treat those documents as canonical rather than relying on chat memory.
   shim plus `DOCKER_HOST` to the Podman socket, 6 GiB VM). `supabase start`
   needs an existing `supabase/snippets` directory. The database was fresh, so
   earlier local accounts/events from the previous machine are not present.
-- Still NOT enabled: no BFF/HTTP completion route calls Auth (the completion
-  path still returns 503) and there is no UI. Next: wire the Edge BFF
+- Superseded by "Local recovery completion" above: the route and UI now exist.
+  At the time: no BFF/HTTP completion route called Auth and there was no UI. Next: wire the Edge BFF
   completion route as begin -> `admin.updateUserById(email, email_confirm)`
   -> finish, reporting "finishing" while undecided; add the browser flow and
   an e2e test; decide whether a completion notice to the old address is

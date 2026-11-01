@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { RecoverAccount } from "./recover-account";
 
 const mocks = vi.hoisted(() => ({
+  completeAccountRecovery: vi.fn(),
   confirmAccountRecoveryEmail: vi.fn(),
   initiateAccountRecovery: vi.fn(),
 }));
@@ -47,9 +48,7 @@ describe("RecoverAccount", () => {
     expect(mocks.confirmAccountRecoveryEmail).toHaveBeenCalledWith(id, {
       verificationToken: token,
     });
-    expect(
-      screen.queryByRole("button", { name: "Complete account recovery" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Finish recovery" })).not.toBeInTheDocument();
   });
   it("starts recovery and clears the code after successful local delivery", async () => {
     mocks.initiateAccountRecovery.mockResolvedValue({ delivery: "captured_locally" });
@@ -79,7 +78,46 @@ describe("RecoverAccount", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Verify replacement email" }));
     await screen.findByText("The recovery link is invalid or has expired.");
     expect(screen.getByRole("button", { name: "Verify replacement email" })).toBeEnabled();
-    expect(screen.getByText(/account email cannot be changed yet/u)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Finish recovery" })).not.toBeInTheDocument();
+  });
+  it("finishes a ready recovery only on explicit request and points to sign-in", async () => {
+    window.history.replaceState(null, "", `/recover-account#claim=${id}&token=${token}`);
+    mocks.confirmAccountRecoveryEmail.mockResolvedValue({
+      id,
+      emailVerified: true,
+      initiatedAt: "2020-09-08T10:00:00Z",
+      readyAt: "2020-09-09T10:00:00Z",
+      expiresAt: "2099-09-15T10:00:00Z",
+    });
+    mocks.completeAccountRecovery.mockResolvedValue({ state: "completed" });
+    render(<RecoverAccount />);
+    fireEvent.click(await screen.findByRole("button", { name: "Verify replacement email" }));
+    const finish = await screen.findByRole("button", { name: "Finish recovery" });
+    expect(mocks.completeAccountRecovery).not.toHaveBeenCalled();
+    fireEvent.click(finish);
+    await screen.findByText(/Recovery is complete/u);
+    expect(mocks.completeAccountRecovery).toHaveBeenCalledWith(id, { verificationToken: token });
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in");
+  });
+  it("reports an undecided or refused completion without claiming success", async () => {
+    window.history.replaceState(null, "", `/recover-account#claim=${id}&token=${token}`);
+    mocks.confirmAccountRecoveryEmail.mockResolvedValue({
+      id,
+      emailVerified: true,
+      initiatedAt: "2020-09-08T10:00:00Z",
+      readyAt: "2020-09-09T10:00:00Z",
+      expiresAt: "2099-09-15T10:00:00Z",
+    });
+    mocks.completeAccountRecovery
+      .mockResolvedValueOnce({ state: "finishing" })
+      .mockRejectedValueOnce(new Error("unavailable"));
+    render(<RecoverAccount />);
+    fireEvent.click(await screen.findByRole("button", { name: "Verify replacement email" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Finish recovery" }));
+    await screen.findByText(/Recovery is finishing/u);
+    fireEvent.click(screen.getByRole("button", { name: "Finish recovery" }));
+    await screen.findByText(/Recovery cannot be finished now/u);
+    expect(screen.queryByText(/Recovery is complete/u)).not.toBeInTheDocument();
   });
   it("has no detectable automated accessibility violations", async () => {
     const { container } = render(<RecoverAccount />);

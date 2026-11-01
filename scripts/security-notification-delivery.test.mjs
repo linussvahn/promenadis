@@ -24,6 +24,13 @@ test("all security templates have fixed Swedish and English plain text", () => {
       assert.match(en.Text, /Local test/u);
     }
   }
+  const previous = securityNotice("account_recovery_completed_previous_email", "en");
+  assert.notEqual(
+    previous.Text,
+    securityNotice("account_recovery_completed_previous_email", "sv").Text,
+  );
+  assert.doesNotMatch(previous.Text, /https?:|@/u);
+  assert.match(previous.Text, /Local test/u);
   assert.throws(() => securityNotice("account_recovery_verify_new_email", "en"));
   assert.throws(() => securityNotice("custom_user_message", "en"));
 });

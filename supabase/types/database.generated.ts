@@ -331,6 +331,35 @@ export type Database = {
           },
         ]
       }
+      recovery_previous_email_notices: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          job_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at: string
+          job_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          job_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recovery_previous_email_notices_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "notification_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -402,6 +431,10 @@ export type Database = {
         Returns: undefined
       }
       purge_expired_browser_sessions: { Args: never; Returns: undefined }
+      purge_expired_recovery_previous_emails_command: {
+        Args: never
+        Returns: undefined
+      }
       require_recent_authentication: {
         Args: { p_authenticated_at: string }
         Returns: undefined

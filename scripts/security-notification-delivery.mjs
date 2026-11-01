@@ -8,7 +8,21 @@ const states = {
   expired: ["has expired", "har löpt ut"],
 };
 
+// Sent only to the address an account used before recovery changed it. It
+// names no new address and carries no link, so a stale inbox learns nothing.
+function previousEmailNotice(swedish) {
+  return {
+    Subject: swedish ? "Säkerhetsmeddelande från Promenadis" : "Promenadis security notice",
+    Text: swedish
+      ? "Inloggningsadressen för ett Promenadis-konto som använde den här e-postadressen har ändrats genom kontoåterställning. Den här adressen kan inte längre användas för att logga in.\n\nOm du inte begärde detta, kontakta ditt evenemangsteam eller Promenadis support direkt. Svara inte på det här meddelandet och dela aldrig inloggnings- eller återställningskoder.\n\nLokalt test: inget meddelande skickades utanför den lokala miljön."
+      : "The sign-in email of a Promenadis account that used this address was changed through account recovery. This address can no longer be used to sign in.\n\nIf you did not request this, contact your event team or Promenadis support directly. Do not reply to this message and never share sign-in or recovery codes.\n\nLocal test: no message was sent outside the local environment.",
+  };
+}
+
 export function securityNotice(template, locale) {
+  if (template === "account_recovery_completed_previous_email") {
+    return previousEmailNotice(locale === "sv");
+  }
   const match =
     /^(account_recovery|event_emergency_claim)_(started|ready|cancelled|completed|expired)$/u.exec(
       template,
@@ -31,8 +45,8 @@ export function securityNotice(template, locale) {
     ? "Öppna Promenadis direkt och kontrollera Inställningar och ditt evenemangsteam. Om du är berörd kontoägare och inte begärde detta, logga in och avbryt en eventuell pågående begäran. Dela aldrig inloggnings- eller återställningskoder."
     : "Open Promenadis directly and review Settings and your event team. If you are the affected account owner and did not request this, sign in and cancel any pending request. Never share sign-in or recovery codes.";
   const preview = swedish
-    ? "Lokalt test: kontoåterställning kan ännu inte ändra inloggningsadressen."
-    : "Local test: account recovery cannot yet change the sign-in email.";
+    ? "Lokalt test: inget meddelande skickades utanför den lokala miljön."
+    : "Local test: no message was sent outside the local environment.";
   return { Subject: subject, Text: `${topic} ${action}.\n\n${guidance}\n\n${preview}` };
 }
 
