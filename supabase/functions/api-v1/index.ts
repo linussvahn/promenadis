@@ -40,6 +40,9 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  accountNotificationsSchema,
+  markNotificationsReadRequestSchema,
+  notificationPreferencesSchema,
   addRoutingOverrideRequestSchema,
   eventRoutingSchema,
   earlyLocationVisibilitySchema,
@@ -3515,6 +3518,54 @@ Deno.serve(async (request) => {
         await admin.rpc("list_my_participations_command", { p_actor_id: actorId }),
         myParticipationsSchema,
       );
+    }
+
+    if (route === "/notifications" && request.method === "GET") {
+      operation = "account.notifications_read";
+      const { data, error } = await admin.rpc("list_account_notifications_command", {
+        p_actor_id: actorId,
+      });
+      if (error) throw error;
+      status = "succeeded";
+      return json(accountNotificationsSchema.parse(data), 200, correlationId, origin);
+    }
+    if (route === "/notifications/read" && request.method === "POST") {
+      operation = "account.notifications_mark_read";
+      const input = markNotificationsReadRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Check the request.", 400, correlationId, origin);
+      }
+      const { data, error } = await admin.rpc("mark_account_notifications_read_command", {
+        p_actor_id: actorId,
+        p_notification_id: input.data.notificationId ?? null,
+      });
+      if (error) throw error;
+      status = "succeeded";
+      return json(accountNotificationsSchema.parse(data), 200, correlationId, origin);
+    }
+    if (
+      route === "/account/notification-preferences" &&
+      (request.method === "GET" || request.method === "PUT")
+    ) {
+      operation = "account.notification_preferences";
+      const input =
+        request.method === "PUT"
+          ? notificationPreferencesSchema.safeParse(await requestBody(request))
+          : null;
+      if (input && !input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Check the request.", 400, correlationId, origin);
+      }
+      const { data, error } = input?.success
+        ? await admin.rpc("set_notification_preferences_command", {
+            p_actor_id: actorId,
+            p_event_reminders: input.data.eventReminders,
+          })
+        : await admin.rpc("get_notification_preferences_command", { p_actor_id: actorId });
+      if (error) throw error;
+      status = "succeeded";
+      return json(notificationPreferencesSchema.parse(data), 200, correlationId, origin);
     }
 
     const appealRoute = route.match(

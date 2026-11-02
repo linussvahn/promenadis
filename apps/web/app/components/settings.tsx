@@ -9,6 +9,7 @@ import { AccountShell } from "./account-shell";
 import { OrganizerProfileEditor } from "./organizer-profile-editor";
 import { OrganizerTeam } from "./organizer-team";
 import { OrganizerVerification } from "./organizer-verification";
+import { NotificationPreferences } from "./notification-preferences";
 import { RecoveryCode } from "./recovery-code";
 import { TwoStep } from "./two-step";
 
@@ -199,6 +200,7 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
             </details>
           </section>
           <RecoveryCode accessToken={accessToken} locale={locale} />
+          <NotificationPreferences accessToken={accessToken} locale={locale} />
           <TwoStep accessToken={accessToken} locale={locale} />
           <AccountDeletion accessToken={accessToken} locale={locale} onCancelled={loadDashboard} />
         </div>

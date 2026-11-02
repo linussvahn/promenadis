@@ -299,6 +299,27 @@ export type Database = {
         }
         Relationships: []
       }
+      email_suppressions: {
+        Row: {
+          created_at: string
+          email_hash: string
+          last_seen_at: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          email_hash: string
+          last_seen_at?: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          email_hash?: string
+          last_seen_at?: string
+          reason?: string
+        }
+        Relationships: []
+      }
       erasure_tombstones: {
         Row: {
           erased_at: string
@@ -437,6 +458,21 @@ export type Database = {
           event_id?: string
           id?: never
           requested_at?: string
+        }
+        Relationships: []
+      }
+      instance_secrets: {
+        Row: {
+          name: string
+          value: string
+        }
+        Insert: {
+          name: string
+          value: string
+        }
+        Update: {
+          name?: string
+          value?: string
         }
         Relationships: []
       }
@@ -688,6 +724,101 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_outbox: {
+        Row: {
+          attempt_count: number
+          available_at: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          dead_lettered_at: string | null
+          dedupe_key: string
+          event_id: string | null
+          expires_at: string
+          id: string
+          lease_id: string | null
+          lease_until: string | null
+          payload: Json | null
+          priority: string
+          recipient_account_id: string | null
+          recipient_report_id: string | null
+          recipient_seller_invite_id: string | null
+          recipient_team_invite_id: string | null
+          template: string
+        }
+        Insert: {
+          attempt_count?: number
+          available_at?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dead_lettered_at?: string | null
+          dedupe_key: string
+          event_id?: string | null
+          expires_at?: string
+          id?: string
+          lease_id?: string | null
+          lease_until?: string | null
+          payload?: Json | null
+          priority: string
+          recipient_account_id?: string | null
+          recipient_report_id?: string | null
+          recipient_seller_invite_id?: string | null
+          recipient_team_invite_id?: string | null
+          template: string
+        }
+        Update: {
+          attempt_count?: number
+          available_at?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dead_lettered_at?: string | null
+          dedupe_key?: string
+          event_id?: string | null
+          expires_at?: string
+          id?: string
+          lease_id?: string | null
+          lease_until?: string | null
+          payload?: Json | null
+          priority?: string
+          recipient_account_id?: string | null
+          recipient_report_id?: string | null
+          recipient_seller_invite_id?: string | null
+          recipient_team_invite_id?: string | null
+          template?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_outbox_recipient_report_id_fkey"
+            columns: ["recipient_report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          account_id: string
+          event_reminders: boolean
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          event_reminders?: boolean
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          event_reminders?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       organizer_verifications: {
         Row: {
@@ -1096,8 +1227,24 @@ export type Database = {
         Args: { p_account_id: string; p_code: string }
         Returns: boolean
       }
+      email_hash: { Args: { p_email: string }; Returns: string }
       enforce_event_retention_command: { Args: never; Returns: number }
+      enforce_notification_retention_command: { Args: never; Returns: number }
       enforce_routing_retention_command: { Args: never; Returns: number }
+      enqueue_event_reminders_command: { Args: never; Returns: number }
+      enqueue_notification: {
+        Args: {
+          p_account_id?: string
+          p_dedupe_key: string
+          p_event_id: string
+          p_priority?: string
+          p_report_id?: string
+          p_seller_invite_id?: string
+          p_team_invite_id?: string
+          p_template: string
+        }
+        Returns: undefined
+      }
       erase_due_accounts_command: { Args: never; Returns: number }
       erase_event_seller_data: { Args: { p_event_id: string }; Returns: number }
       event_boundary_summary: {
@@ -1340,6 +1487,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_notifications: {
+        Row: {
+          account_id: string
+          created_at: string
+          event_id: string | null
+          id: string
+          payload: Json
+          read_at: string | null
+          template: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          payload: Json
+          read_at?: string | null
+          template: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          payload?: Json
+          read_at?: string | null
+          template?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_notifications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "account_notifications_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_boundaries: {
         Row: {
           area_square_meters: number
@@ -3030,6 +3222,15 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_application_notifications: {
+        Args: { p_limit?: number }
+        Returns: {
+          job_id: string
+          lease_id: string
+          payload: Json
+          template: string
+        }[]
+      }
       claim_security_notification_jobs: {
         Args: { p_limit?: number }
         Returns: {
@@ -3261,6 +3462,10 @@ export type Database = {
         Args: { p_correlation_id: string; p_dispatch_id: string }
         Returns: string
       }
+      finish_application_notification: {
+        Args: { p_delivered: boolean; p_job_id: string; p_lease_id: string }
+        Returns: boolean
+      }
       finish_security_notification_job: {
         Args: { p_delivered: boolean; p_job_id: string; p_lease_id: string }
         Returns: boolean
@@ -3318,6 +3523,10 @@ export type Database = {
         Returns: Json
       }
       get_incoming_seller_invites_command: {
+        Args: { p_actor_id: string }
+        Returns: Json
+      }
+      get_notification_preferences_command: {
         Args: { p_actor_id: string }
         Returns: Json
       }
@@ -3414,6 +3623,10 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: { p_account_id: string }; Returns: boolean }
+      list_account_notifications_command: {
+        Args: { p_actor_id: string }
+        Returns: Json
+      }
       list_admin_approvals_command: {
         Args: { p_actor_id: string; p_auth_session_id: string }
         Returns: Json
@@ -3462,6 +3675,10 @@ export type Database = {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
       }
+      mark_account_notifications_read_command: {
+        Args: { p_actor_id: string; p_notification_id: string }
+        Returns: Json
+      }
       moderate_participation_command: {
         Args: {
           p_action: string
@@ -3473,6 +3690,7 @@ export type Database = {
         }
         Returns: Json
       }
+      notification_queue_health_command: { Args: never; Returns: Json }
       postpone_event_command: {
         Args: {
           p_actor_id: string
@@ -3558,6 +3776,10 @@ export type Database = {
       }
       record_account_mfa_event_command: {
         Args: { p_action: string; p_actor_id: string; p_correlation_id: string }
+        Returns: undefined
+      }
+      record_email_feedback_command: {
+        Args: { p_email: string; p_kind: string }
         Returns: undefined
       }
       release_browser_session_command: {
@@ -3648,6 +3870,10 @@ export type Database = {
       reserve_geocode_request_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: undefined
+      }
+      resolve_application_recipient: {
+        Args: { p_job_id: string; p_lease_id: string }
+        Returns: Json
       }
       resolve_public_report_subject_command: {
         Args: {
@@ -3757,6 +3983,10 @@ export type Database = {
           p_successor_membership_id: string
           p_target_organizer_profile_id: string
         }
+        Returns: Json
+      }
+      set_notification_preferences_command: {
+        Args: { p_actor_id: string; p_event_reminders: boolean }
         Returns: Json
       }
       set_seller_live_status_command: {

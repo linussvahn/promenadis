@@ -248,6 +248,18 @@ needed for the asset cache.
 
 ### Milestone 5 — operations
 
+Milestone 5 progress: slice 1 (application notices from fixed bilingual
+templates for seller decisions, address changes, cancellation, postponement
+and rescheduling, quarantine/restore, appeals, seller and team invitations,
+unlisted link rotation, reviewed reports and optional reminders; outbox with
+required-before-optional claiming, a 60-per-minute send cap, backoff and dead
+letters, send-time address resolution, HMAC suppression from bounces and
+complaints, 30-day in-app copies and preferences; local Mailpit worker
+`pnpm notifications:app`) is complete locally as of 2026-11-06: pgTAP 380,
+worker node tests, notification component tests and
+`pnpm test:local-notifications`; database verification 924/924. SES sending, SPF/DKIM/DMARC, SES feedback
+ingestion and inbound relay are hosted-alpha work.
+
 - SES Auth/application mail, relay, notifications, queues/retries, bounce/
   complaint/suppression handling, and required-versus-optional prioritization.
 - Limited CSV export and 24-hour object lifecycle.

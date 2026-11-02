@@ -456,6 +456,44 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Milestone 5 plan and slice 1 (2026-11-06)
+
+Plan: (1) application notices: outbox, templates, worker, suppression,
+in-app copies, preferences; (2) organizer contact relay and the limited CSV
+export with a 24-hour download; (3) first-party support/feedback forms and
+operations: sanitized health/heartbeats, incident switches and runbook,
+encrypted local backup with manifest, restore exercise and tombstone
+replay.
+
+Slice 1, `20261106000100_application_notifications.sql`:
+
+- `app_private.notification_outbox` (template, priority, one recipient
+  reference: account, seller invite, team invite or report; payload with
+  event title and state only; dedupe key; lease; backoff; dead letter after
+  six attempts), `public.account_notifications` (30-day in-app copy),
+  `app_private.notification_preferences` (reminders, off by default),
+  `app_private.email_suppressions` (HMAC keyed by
+  `app_private.instance_secrets.email_suppression_hmac`).
+- Triggers enqueue: participation decisions (approved, waitlisted,
+  rejected, revoked, suspended, reinstated, address change approved),
+  event cancelled/postponed/rescheduled, quarantine/restore, appeal decided,
+  seller and team invitations, unlisted link rotation, closed report cases
+  (reporters learn only "reviewed"). Host-written reasons never enter mail.
+  `enqueue_event_reminders_command` (hourly) queues optional reminders
+  20–26 h before the start for opted-in approved sellers.
+- Worker API: `claim_application_notifications` (required first, 60 per
+  minute), `resolve_application_recipient` (cancels for gone, suppressed or
+  opted-out), `finish_application_notification`,
+  `record_email_feedback_command` (bounce/complaint),
+  `notification_queue_health_command` (counts only). Retention job hourly.
+- Scripts: `scripts/application-notification-delivery.mjs` (templates,
+  batch), `deliver-local-application-notifications.mjs` (`pnpm
+  notifications:app`, Mailpit), `test-local-application-notifications.mjs`
+  (part of `pnpm test:local-notifications`).
+- BFF/web: `GET /notifications`, `POST /notifications/read`,
+  `GET/PUT /account/notification-preferences`; dashboard "Notices" list and
+  a reminders setting.
+
 ### Milestone 4 complete locally (2026-11-05)
 
 All three slices are built, tested and pushed. Left for later: real iPhone

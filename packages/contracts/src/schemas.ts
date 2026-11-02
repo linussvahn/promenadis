@@ -1700,7 +1700,50 @@ export const routingPackageSchema = z.strictObject({
 });
 export type RoutingPackageContract = z.infer<typeof routingPackageSchema>;
 
+export const notificationTemplateSchema = z.enum([
+  "seller_approved",
+  "seller_waitlisted",
+  "seller_rejected",
+  "seller_revoked",
+  "seller_suspended",
+  "seller_reinstated",
+  "address_change_approved",
+  "event_cancelled",
+  "event_postponed",
+  "event_rescheduled",
+  "location_quarantined",
+  "location_restored",
+  "appeal_decided",
+  "seller_invited",
+  "team_invited",
+  "unlisted_link_rotated",
+  "report_reviewed",
+  "event_reminder",
+]);
+export type NotificationTemplate = z.infer<typeof notificationTemplateSchema>;
+
+export const accountNotificationsSchema = z.array(
+  z.strictObject({
+    createdAt: isoInstant,
+    eventId: opaqueUuid.nullable(),
+    eventTitle: z.string().max(160).nullable(),
+    id: opaqueUuid,
+    read: z.boolean(),
+    template: notificationTemplateSchema,
+  }),
+);
+export type AccountNotifications = z.infer<typeof accountNotificationsSchema>;
+
+export const markNotificationsReadRequestSchema = z.strictObject({
+  notificationId: opaqueUuid.optional(),
+});
+export const notificationPreferencesSchema = z.strictObject({ eventReminders: z.boolean() });
+export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
+
 export const boundarySchemas = {
+  AccountNotifications: accountNotificationsSchema,
+  MarkNotificationsReadRequest: markNotificationsReadRequestSchema,
+  NotificationPreferences: notificationPreferencesSchema,
   RoutingPackage: routingPackageSchema,
   AddRoutingOverrideRequest: addRoutingOverrideRequestSchema,
   EventRouting: eventRoutingSchema,

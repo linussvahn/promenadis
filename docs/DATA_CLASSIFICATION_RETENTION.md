@@ -91,6 +91,10 @@ No data is retained merely because it might become useful later.
 | Ordinary auth/security events | C3 | Security operations only | 30 days unless attached to active incident | Partition/TTL deletion; case promotion copies only minimal evidence |
 | Allowlisted operational logs/alert records | C3/P0 metrics | Operators only; external monitor receives generic status | 30 days raw | Provider/app TTL; no bodies, addresses, coordinates, email, UGC, tokens, full URLs |
 | Public non-personal status history | P0 | Public status page | 12 months | Status-provider lifecycle |
+| Application notice (`app_private.notification_outbox`) | C1 | Worker only; recipient by account, invitation or report reference; address resolved at send time | Payload (event title/state) cleared on delivery; row and delivery metadata deleted after 30 days; unsent jobs expire after 7 days | Hourly retention job |
+| In-app notice (`account_notifications`) | C1 | The account | 30 days | Hourly retention job |
+| Email suppression (HMAC of the normalized address, reason) | C1 pseudonymous | Service only | While an account, invitation or report still uses the address; deleted 30 days after the last such reference | Hourly retention job; key in `app_private.instance_secrets` |
+| Reminder preference | C1 | The account | Account lifetime | Deleted with the profile |
 | Notification job | C1 | Worker/authorized user status | Delete completed job promptly; unresolved jobs no later than 30 days | Account-referenced structured intent without a copied email address; ack/cleanup worker |
 | Notification delivery metadata/in-app content | C1/C3 | Own recipient/operations | 30 days unless attached to unresolved case | Scheduled deletion; no message-body copies in logs |
 | Organizer-relay body | C1/C3 | Thread participants/authorized abuse handling | 30 days after delivery | Body TTL |

@@ -34,6 +34,8 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  accountNotificationsSchema,
+  notificationPreferencesSchema,
   type AddRoutingOverrideRequest,
   eventRoutingSchema,
   routingPackageSchema,
@@ -523,6 +525,33 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         accessToken,
         eventRoutingSchema,
         { method: "DELETE" },
+      );
+    },
+    listNotifications(accessToken: string) {
+      return request("/notifications", accessToken, accountNotificationsSchema);
+    },
+    markNotificationsRead(accessToken: string, notificationId?: string) {
+      return request("/notifications/read", accessToken, accountNotificationsSchema, {
+        body: notificationId ? { notificationId } : {},
+        method: "POST",
+      });
+    },
+    getNotificationPreferences(accessToken: string) {
+      return request(
+        "/account/notification-preferences",
+        accessToken,
+        notificationPreferencesSchema,
+      );
+    },
+    setNotificationPreferences(accessToken: string, eventReminders: boolean) {
+      return request(
+        "/account/notification-preferences",
+        accessToken,
+        notificationPreferencesSchema,
+        {
+          body: { eventReminders },
+          method: "PUT",
+        },
       );
     },
     getPublicSitemap() {
