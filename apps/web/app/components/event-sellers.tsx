@@ -12,6 +12,7 @@ import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { EventCases } from "./event-cases";
+import { SellerInvites } from "./seller-invites";
 import { EventTaxonomyEditor } from "./event-taxonomy-editor";
 
 const errorKeys = {
@@ -147,6 +148,10 @@ export function EventSellers({
         <input id="seller-join-link" readOnly value={joinUrl} />
         <p className="field-help">{translate(locale, "sellers.joinLinkHelp")}</p>
       </section>
+
+      {canManage ? (
+        <SellerInvites call={call} eventId={event.id} locale={locale} timezone={event.timezone} />
+      ) : null}
 
       <EventCases
         call={call}

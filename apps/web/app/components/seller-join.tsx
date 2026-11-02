@@ -2,7 +2,7 @@ import { PromenadisApiError } from "@promenadis/api-client";
 import type { EventForSeller } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
@@ -24,6 +24,8 @@ const errorKeys = {
 
 export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
   const { eventId = "" } = useParams();
+  const [searchParams] = useSearchParams();
+  const inviteId = searchParams.get("invite");
   const { accessToken, dashboard } = useAccountData();
   const [event, setEvent] = useState<EventForSeller | null>(null);
   const [failed, setFailed] = useState(false);
@@ -59,6 +61,16 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
     const client = await call();
     if (!client) return;
     await client.api.applyToEvent(client.token, eventId, {
+      ...input,
+      displayName: String(form.get("displayName") ?? ""),
+    });
+    await load();
+  };
+
+  const acceptInvite = async (input: SellerAddressInput, form: FormData) => {
+    const client = await call();
+    if (!client || !inviteId) return;
+    await client.api.acceptSellerInvite(client.token, inviteId, {
       ...input,
       displayName: String(form.get("displayName") ?? ""),
     });
@@ -224,9 +236,11 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
           timezone={event.timezone}
         />
       ) : null}
-      {participation ? null : event.registrationOpen ? (
+      {participation ? null : inviteId || event.registrationOpen ? (
         <section aria-labelledby="apply-heading" className="panel">
-          <h2 id="apply-heading">{translate(locale, "seller.applyTitle")}</h2>
+          <h2 id="apply-heading">
+            {translate(locale, inviteId ? "sellerInvite.acceptTitle" : "seller.applyTitle")}
+          </h2>
           <p>{translate(locale, "seller.applyIntro")}</p>
           {event.placesFull ? (
             <p className="notice">{translate(locale, "seller.placesFull")}</p>
@@ -237,8 +251,8 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
             eventId={eventId}
             idPrefix="seller"
             locale={locale}
-            onSubmit={apply}
-            submitLabel={translate(locale, "seller.submit")}
+            onSubmit={inviteId ? acceptInvite : apply}
+            submitLabel={translate(locale, inviteId ? "sellerInvite.accept" : "seller.submit")}
           >
             <label htmlFor="seller-display-name">{translate(locale, "seller.publicName")}</label>
             <input

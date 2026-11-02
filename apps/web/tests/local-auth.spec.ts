@@ -1365,6 +1365,165 @@ test("anonymous reports quarantine one location until the team decides", async (
   }
 });
 
+test("invited sellers, appeals to an elevated admin and platform restrictions", async ({
+  request,
+}) => {
+  test.setTimeout(120_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const [ownerEmail, sellerEmail, adminEmail] = ["owner", "seller", "admin"].map(
+    (role) => `appeal-${role}-${randomUUID()}@example.invalid`,
+  );
+  const password = `Local-test-${randomUUID()}`;
+  const signIn = async (email: string) => {
+    const client = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return { client, token: data.session?.access_token };
+  };
+  const headersFor = (token: string | undefined) => ({
+    apikey: publicKey,
+    authorization: `Bearer ${token}`,
+    origin: "http://127.0.0.1:5173",
+  });
+  for (const email of [ownerEmail, sellerEmail, adminEmail]) {
+    const { error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
+    if (error) throw error;
+  }
+  try {
+    const owner = headersFor((await signIn(ownerEmail)).token);
+    const seller = headersFor((await signIn(sellerEmail)).token);
+    const created = await request.post(`${base}/events`, {
+      headers: owner,
+      data: {
+        description: "Synthetic invitations",
+        endsAt: "2031-09-19T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic invite owner",
+        startsAt: "2031-09-19T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic invite market",
+        visibility: "unlisted",
+      },
+    });
+    const eventId = (await created.json()).id as string;
+    const ownerId = localSql(`select id from auth.users where email='${ownerEmail}';`);
+    localSql(`select public.upsert_draft_event_boundary_command('${ownerId}','${eventId}',null,'Synthetic area',
+        '{"type":"Polygon","coordinates":[[[18.06,59.33],[18.064,59.33],[18.064,59.333],[18.06,59.333],[18.06,59.33]]]}'::jsonb,
+        gen_random_uuid());
+      update public.events set admission_mode='invite_only' where id='${eventId}';`);
+    const invite = async () => {
+      const invited = await request.post(`${base}/events/${eventId}/seller-invites`, {
+        headers: owner,
+        data: { email: sellerEmail.toUpperCase() },
+      });
+      expect(await invited.json()).toHaveLength(1);
+      const incoming = await (
+        await request.get(`${base}/seller-invites`, { headers: seller })
+      ).json();
+      expect(incoming[0]).toMatchObject({ eventTitle: "Synthetic invite market" });
+      return (
+        await request.post(`${base}/seller-invites/${incoming[0].id}/accept`, {
+          headers: seller,
+          data: {
+            addressLine: "Testgatan 11",
+            displayName: "Synthetic invited seller",
+            latitude: 59.331,
+            locality: "",
+            longitude: 18.0615,
+            placement: "manual",
+            postalCode: "",
+            rightToUseAttested: true,
+            sharesEntrance: null,
+          },
+        })
+      ).json();
+    };
+    const accepted = await invite();
+    expect(accepted).toMatchObject({ state: "approved" });
+
+    const revoked = await request.post(`${base}/participations/${accepted.id}/decision`, {
+      headers: owner,
+      data: { decision: "revoke", expectedVersion: accepted.version, reason: "Did not show up" },
+    });
+    expect(await revoked.json()).toMatchObject({ location: null, state: "revoked" });
+    const decisions = await (await request.get(`${base}/moderation`, { headers: seller })).json();
+    const appealed = await request.post(`${base}/moderation/${decisions[0].id}/appeal`, {
+      headers: seller,
+      data: { statement: "I was there all day, ask the neighbours." },
+    });
+    expect((await appealed.json())[0].appeal).toMatchObject({ state: "pending" });
+
+    // Admin: TOTP, operator grant and a fresh code for admin mode.
+    const adminSession = await signIn(adminEmail);
+    const enrolled = await (
+      await request.post(`${base}/account/mfa/totp`, {
+        headers: headersFor(adminSession.token),
+        data: {},
+      })
+    ).json();
+    const upgraded = await adminSession.client.auth.mfa.challengeAndVerify({
+      factorId: enrolled.factorId,
+      code: totp(enrolled.secret),
+    });
+    const adminHeaders = headersFor(upgraded.data?.access_token);
+    execFileSync("node", ["scripts/grant-local-admin.mjs", adminEmail], {
+      cwd: repositoryRoot,
+      stdio: "ignore",
+    });
+    await request.post(`${base}/admin/elevation`, {
+      headers: adminHeaders,
+      data: { code: totp(enrolled.secret) },
+    });
+    const appeals = await (
+      await request.get(`${base}/admin/appeals`, { headers: adminHeaders })
+    ).json();
+    const mine = appeals.find(
+      (item: { eventTitle: string }) => item.eventTitle === "Synthetic invite market",
+    );
+    expect(mine).toMatchObject({ action: "revoke", ownDecision: false });
+    const reversed = await request.post(`${base}/admin/appeals/${mine.id}/decision`, {
+      headers: adminHeaders,
+      data: { decision: "reverse", reason: "Neighbours confirmed" },
+    });
+    expect(reversed.status()).toBe(200);
+    const after = await (await request.get(`${base}/moderation`, { headers: seller })).json();
+    expect(after[0].appeal).toMatchObject({ independent: true, state: "reversed" });
+    expect(await invite()).toMatchObject({ state: "approved" });
+
+    const found = await (
+      await request.post(`${base}/admin/accounts/lookup`, {
+        headers: adminHeaders,
+        data: { email: sellerEmail, reason: "Repeated complaints" },
+      })
+    ).json();
+    expect(found.restriction).toBeNull();
+    const restricted = await (
+      await request.post(`${base}/admin/accounts/${found.accountId}/restrict`, {
+        headers: adminHeaders,
+        data: { reason: "Fraud across events" },
+      })
+    ).json();
+    const view = await (
+      await request.get(`${base}/events/${eventId}/seller-view`, { headers: seller })
+    ).json();
+    expect(view.participation.state).toBe("suspended");
+    const lifted = await request.post(
+      `${base}/admin/restrictions/${restricted.restriction.id}/lift`,
+      {
+        headers: adminHeaders,
+        data: { reason: "Resolved with the seller" },
+      },
+    );
+    expect(await lifted.json()).toEqual({ pendingApproval: false });
+  } finally {
+    for (const email of [adminEmail, sellerEmail, ownerEmail]) await deleteSyntheticAccount(email);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {

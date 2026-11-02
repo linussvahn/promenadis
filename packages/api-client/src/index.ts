@@ -6,6 +6,14 @@ import {
   type DecideFirstEventReviewRequest,
   type CancelEventRequest,
   type ApplyToEventRequest,
+  adminAccountSchema,
+  adminApprovalsSchema,
+  adminCasesSchema,
+  appealQueueSchema,
+  incomingSellerInvitesSchema,
+  reportContactSchema,
+  restrictionLiftResultSchema,
+  sellerInvitesSchema,
   type ModerateParticipationRequest,
   type SubmitReportRequest,
   moderationCasesSchema,
@@ -446,6 +454,87 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     },
     listMyModeration(accessToken: string) {
       return request("/moderation", accessToken, myModerationSchema);
+    },
+    submitAppeal(accessToken: string, actionId: string, statement: string) {
+      return request(`/moderation/${actionId}/appeal`, accessToken, myModerationSchema, {
+        body: { statement },
+        method: "POST",
+      });
+    },
+    listAppeals(accessToken: string) {
+      return request("/admin/appeals", accessToken, appealQueueSchema);
+    },
+    decideAppeal(
+      accessToken: string,
+      appealId: string,
+      input: { decision: "uphold" | "reverse"; reason: string },
+    ) {
+      return request(`/admin/appeals/${appealId}/decision`, accessToken, appealQueueSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    findAccount(accessToken: string, input: { email: string; reason: string }) {
+      return request("/admin/accounts/lookup", accessToken, adminAccountSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    restrictAccount(accessToken: string, accountId: string, reason: string) {
+      return request(`/admin/accounts/${accountId}/restrict`, accessToken, adminAccountSchema, {
+        body: { reason },
+        method: "POST",
+      });
+    },
+    liftRestriction(accessToken: string, restrictionId: string, reason: string) {
+      return request(
+        `/admin/restrictions/${restrictionId}/lift`,
+        accessToken,
+        restrictionLiftResultSchema,
+        { body: { reason }, method: "POST" },
+      );
+    },
+    listAdminApprovals(accessToken: string) {
+      return request("/admin/approvals", accessToken, adminApprovalsSchema);
+    },
+    decideAdminApproval(accessToken: string, approvalId: string, approve: boolean) {
+      return request(`/admin/approvals/${approvalId}/decision`, accessToken, adminApprovalsSchema, {
+        body: { approve },
+        method: "POST",
+      });
+    },
+    listAdminCases(accessToken: string) {
+      return request("/admin/cases", accessToken, adminCasesSchema);
+    },
+    readReportContact(accessToken: string, reportId: string, reason: string) {
+      return request(`/admin/reports/${reportId}/contact`, accessToken, reportContactSchema, {
+        body: { reason },
+        method: "POST",
+      });
+    },
+    listSellerInvites(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/seller-invites`, accessToken, sellerInvitesSchema);
+    },
+    inviteSeller(accessToken: string, eventId: string, email: string) {
+      return request(`/events/${eventId}/seller-invites`, accessToken, sellerInvitesSchema, {
+        body: { email },
+        method: "POST",
+      });
+    },
+    cancelSellerInvite(accessToken: string, inviteId: string) {
+      return request(`/seller-invites/${inviteId}`, accessToken, sellerInvitesSchema, {
+        body: {},
+        method: "DELETE",
+      });
+    },
+    listIncomingSellerInvites(accessToken: string) {
+      return request("/seller-invites", accessToken, incomingSellerInvitesSchema);
+    },
+    acceptSellerInvite(accessToken: string, inviteId: string, input: ApplyToEventRequest) {
+      return request(`/seller-invites/${inviteId}/accept`, accessToken, sellerParticipationSchema, {
+        body: input,
+        method: "POST",
+      });
     },
     listMyParticipations(accessToken: string) {
       return request("/participations", accessToken, myParticipationsSchema);

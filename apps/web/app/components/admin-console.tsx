@@ -10,6 +10,7 @@ import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
 import { AdminEventIntervention } from "./admin-event-intervention";
+import { AdminModeration } from "./admin-moderation";
 
 export function AdminConsole() {
   return <AccountShell>{({ locale }) => <AdminContent locale={locale} />}</AccountShell>;
@@ -317,6 +318,7 @@ export function AdminContent({ locale }: { readonly locale: Locale }) {
             ))}
           </section>
           <AdminEventIntervention call={call} locale={locale} />
+          <AdminModeration call={call} locale={locale} />
         </>
       )}
       <p aria-live="polite" className="form-status">

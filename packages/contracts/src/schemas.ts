@@ -1034,6 +1034,13 @@ export const myModerationSchema = z.array(
       "suspend",
       "revoke",
     ]),
+    appeal: z
+      .strictObject({
+        decisionReason: z.string().max(500).nullable(),
+        independent: z.boolean().nullable(),
+        state: z.enum(["pending", "upheld", "reversed"]),
+      })
+      .nullable(),
     createdAt: isoInstant,
     eventId: opaqueUuid,
     eventTitle: z.string().max(120),
@@ -1043,6 +1050,113 @@ export const myModerationSchema = z.array(
 );
 
 export type MyModerationAction = z.infer<typeof myModerationSchema>[number];
+
+export const submitAppealRequestSchema = z.strictObject({
+  statement: z.string().trim().min(10).max(1000),
+});
+
+export const appealQueueSchema = z.array(
+  z.strictObject({
+    action: z.string().max(40),
+    actionAt: isoInstant,
+    actionReason: z.string().max(500).nullable(),
+    createdAt: isoInstant,
+    eventTitle: z.string().max(120),
+    id: opaqueUuid,
+    ownDecision: z.boolean(),
+    statement: z.string().max(1000),
+  }),
+);
+
+export type AppealQueueItem = z.infer<typeof appealQueueSchema>[number];
+
+export const decideAppealRequestSchema = z.strictObject({
+  decision: z.enum(["uphold", "reverse"]),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const adminFindAccountRequestSchema = z.strictObject({
+  email: z.email().trim().max(320),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const adminAccountSchema = z.strictObject({
+  accountId: opaqueUuid,
+  displayName: z.string().max(80).nullable(),
+  restriction: z
+    .strictObject({
+      createdAt: isoInstant,
+      id: opaqueUuid,
+      pendingLift: z.boolean(),
+      reason: z.string().max(500),
+    })
+    .nullable(),
+});
+
+export type AdminAccount = z.infer<typeof adminAccountSchema>;
+
+export const adminReasonRequestSchema = z.strictObject({
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const restrictionLiftResultSchema = z.strictObject({ pendingApproval: z.boolean() });
+
+export const adminApprovalsSchema = z.array(
+  z.strictObject({
+    actionType: z.enum(["lift_platform_restriction"]),
+    createdAt: isoInstant,
+    id: opaqueUuid,
+    ownRequest: z.boolean(),
+    reason: z.string().max(500),
+  }),
+);
+
+export type AdminApproval = z.infer<typeof adminApprovalsSchema>[number];
+
+export const decideAdminApprovalRequestSchema = z.strictObject({ approve: z.boolean() });
+
+export const adminCasesSchema = z.array(
+  z.strictObject({
+    eventTitle: z.string().max(120),
+    id: opaqueUuid,
+    openedAt: isoInstant,
+    quarantined: z.boolean(),
+    reports: z.array(
+      z.strictObject({
+        createdAt: isoInstant,
+        details: z.string().max(1000),
+        hasContact: z.boolean(),
+        id: opaqueUuid,
+        reason: reportReasonSchema,
+      }),
+    ),
+    subjectType: z.enum(["location", "participation", "item"]),
+  }),
+);
+
+export type AdminCase = z.infer<typeof adminCasesSchema>[number];
+
+export const reportContactSchema = z.strictObject({ contact: z.string().max(200).nullable() });
+
+export const inviteSellerRequestSchema = z.strictObject({ email: z.email().trim().max(320) });
+
+export const sellerInvitesSchema = z.array(
+  z.strictObject({ email: z.string().max(320), expiresAt: isoInstant, id: opaqueUuid }),
+);
+
+export type SellerInvite = z.infer<typeof sellerInvitesSchema>[number];
+
+export const incomingSellerInvitesSchema = z.array(
+  z.strictObject({
+    eventId: opaqueUuid,
+    eventTitle: z.string().max(120),
+    expiresAt: isoInstant,
+    id: opaqueUuid,
+    organizerDisplayName: z.string().max(100),
+  }),
+);
+
+export type IncomingSellerInvite = z.infer<typeof incomingSellerInvitesSchema>[number];
 
 export const adminStatusSchema = z.strictObject({
   elevated: z.boolean(),
@@ -1274,6 +1388,20 @@ export const boundarySchemas = {
   EventForSeller: eventForSellerSchema,
   ApplyToEventRequest: applyToEventRequestSchema,
   SubmitReportRequest: submitReportRequestSchema,
+  SubmitAppealRequest: submitAppealRequestSchema,
+  AppealQueue: appealQueueSchema,
+  DecideAppealRequest: decideAppealRequestSchema,
+  AdminFindAccountRequest: adminFindAccountRequestSchema,
+  AdminAccount: adminAccountSchema,
+  AdminReasonRequest: adminReasonRequestSchema,
+  RestrictionLiftResult: restrictionLiftResultSchema,
+  AdminApprovals: adminApprovalsSchema,
+  DecideAdminApprovalRequest: decideAdminApprovalRequestSchema,
+  AdminCases: adminCasesSchema,
+  ReportContact: reportContactSchema,
+  InviteSellerRequest: inviteSellerRequestSchema,
+  SellerInvites: sellerInvitesSchema,
+  IncomingSellerInvites: incomingSellerInvitesSchema,
   ReportReceived: reportReceivedSchema,
   ModerationCases: moderationCasesSchema,
   ReviewCaseRequest: reviewCaseRequestSchema,

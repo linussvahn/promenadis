@@ -10,6 +10,20 @@ import {
   adminElevationRequestSchema,
   adminEventInterventionRequestSchema,
   applyToEventRequestSchema,
+  adminAccountSchema,
+  adminApprovalsSchema,
+  adminCasesSchema,
+  adminFindAccountRequestSchema,
+  adminReasonRequestSchema,
+  appealQueueSchema,
+  decideAdminApprovalRequestSchema,
+  decideAppealRequestSchema,
+  incomingSellerInvitesSchema,
+  inviteSellerRequestSchema,
+  reportContactSchema,
+  restrictionLiftResultSchema,
+  sellerInvitesSchema,
+  submitAppealRequestSchema,
   moderateParticipationRequestSchema,
   moderationCasesSchema,
   myModerationSchema,
@@ -1976,6 +1990,186 @@ Deno.serve(async (request) => {
         status = "succeeded";
         return json(parsed.data, 200, correlationId, origin);
       }
+      const adminErrors = new Map<string, [string, string, number]>([
+        ["Admin elevation required", ["elevation_required", "Enter admin mode first.", 403]],
+        ["Appeal unavailable", ["review_unavailable", "This appeal is no longer pending.", 409]],
+        [
+          "Invalid appeal decision",
+          ["invalid_request", "Choose a decision and give a reason.", 400],
+        ],
+        [
+          "Different reviewer required",
+          ["different_reviewer_required", "Another administrator must review this.", 409],
+        ],
+        [
+          "Platform restriction applies",
+          ["platform_restricted", "Lift the platform restriction first.", 409],
+        ],
+        ["Reason required", ["reason_required", "Give a reason.", 400]],
+        ["Account not found", ["not_found", "No account with that email.", 404]],
+        ["Cannot restrict own account", ["forbidden", "You cannot restrict yourself.", 403]],
+        ["Already restricted", ["invalid_state", "The account is already restricted.", 409]],
+        ["Restriction not found", ["not_found", "No active restriction.", 404]],
+        [
+          "Approval unavailable",
+          ["review_unavailable", "This approval is no longer pending.", 409],
+        ],
+        [
+          "Different approver required",
+          ["different_approver_required", "Another administrator must approve this.", 409],
+        ],
+        ["Report not found", ["not_found", "Report not found.", 404]],
+      ]);
+      const adminResult = <T>(
+        result: { data: unknown; error: { message: string } | null },
+        schema: { safeParse: (value: unknown) => { success: boolean; data?: T } },
+      ) => {
+        if (result.error) {
+          const mapped = adminErrors.get(result.error.message);
+          if (!mapped) throw result.error;
+          return denied(mapped[0], mapped[1], mapped[2]);
+        }
+        const parsed = schema.safeParse(result.data);
+        if (!parsed.success) throw new Error("invalid_internal_response");
+        status = "succeeded";
+        return json(parsed.data, 200, correlationId, origin);
+      };
+      const adminArgs = { p_actor_id: actorId, p_auth_session_id: actor.sessionId };
+      if (request.method === "GET" && route === "/admin/appeals") {
+        operation = "admin.appeal_queue_read";
+        return adminResult(
+          await admin.rpc("list_appeals_command", {
+            ...adminArgs,
+            p_correlation_id: correlationId,
+          }),
+          appealQueueSchema,
+        );
+      }
+      const appealDecision = route.match(
+        /^\/admin\/appeals\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/decision$/iu,
+      );
+      if (request.method === "POST" && appealDecision) {
+        operation = "admin.appeal_decide";
+        const input = decideAppealRequestSchema.safeParse(await requestBody(request));
+        if (!input.success)
+          return denied("invalid_request", "Choose a decision and give a reason.", 400);
+        const decided = await admin.rpc("decide_appeal_command", {
+          ...adminArgs,
+          p_appeal_id: appealDecision[1],
+          p_correlation_id: correlationId,
+          p_decision: input.data.decision,
+          p_reason: input.data.reason,
+        });
+        if (decided.error) return adminResult(decided, appealQueueSchema);
+        return adminResult(
+          await admin.rpc("list_appeals_command", {
+            ...adminArgs,
+            p_correlation_id: correlationId,
+          }),
+          appealQueueSchema,
+        );
+      }
+      if (request.method === "POST" && route === "/admin/accounts/lookup") {
+        operation = "admin.account_lookup";
+        const input = adminFindAccountRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) return denied("invalid_request", "Give an email and a reason.", 400);
+        return adminResult(
+          await admin.rpc("admin_find_account_command", {
+            ...adminArgs,
+            p_correlation_id: correlationId,
+            p_email: input.data.email,
+            p_reason: input.data.reason,
+          }),
+          adminAccountSchema,
+        );
+      }
+      const restrictRoute = route.match(
+        /^\/admin\/accounts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/restrict$/iu,
+      );
+      if (request.method === "POST" && restrictRoute) {
+        operation = "admin.account_restrict";
+        const input = adminReasonRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) return denied("reason_required", "Give a reason.", 400);
+        return adminResult(
+          await admin.rpc("restrict_account_command", {
+            ...adminArgs,
+            p_account_id: restrictRoute[1],
+            p_correlation_id: correlationId,
+            p_reason: input.data.reason,
+          }),
+          adminAccountSchema,
+        );
+      }
+      const liftRoute = route.match(
+        /^\/admin\/restrictions\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/lift$/iu,
+      );
+      if (request.method === "POST" && liftRoute) {
+        operation = "admin.restriction_lift";
+        const input = adminReasonRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) return denied("reason_required", "Give a reason.", 400);
+        return adminResult(
+          await admin.rpc("request_restriction_lift_command", {
+            ...adminArgs,
+            p_correlation_id: correlationId,
+            p_reason: input.data.reason,
+            p_restriction_id: liftRoute[1],
+          }),
+          restrictionLiftResultSchema,
+        );
+      }
+      if (request.method === "GET" && route === "/admin/approvals") {
+        operation = "admin.approvals_read";
+        return adminResult(
+          await admin.rpc("list_admin_approvals_command", adminArgs),
+          adminApprovalsSchema,
+        );
+      }
+      const approvalRoute = route.match(
+        /^\/admin\/approvals\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/decision$/iu,
+      );
+      if (request.method === "POST" && approvalRoute) {
+        operation = "admin.approval_decide";
+        const input = decideAdminApprovalRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) return denied("invalid_request", "Approve or reject.", 400);
+        const decided = await admin.rpc("decide_admin_approval_command", {
+          ...adminArgs,
+          p_approval_id: approvalRoute[1],
+          p_approve: input.data.approve,
+          p_correlation_id: correlationId,
+        });
+        if (decided.error) return adminResult(decided, adminApprovalsSchema);
+        return adminResult(
+          await admin.rpc("list_admin_approvals_command", adminArgs),
+          adminApprovalsSchema,
+        );
+      }
+      if (request.method === "GET" && route === "/admin/cases") {
+        operation = "admin.case_queue_read";
+        return adminResult(
+          await admin.rpc("admin_list_cases_command", {
+            ...adminArgs,
+            p_correlation_id: correlationId,
+          }),
+          adminCasesSchema,
+        );
+      }
+      const contactRoute = route.match(
+        /^\/admin\/reports\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/contact$/iu,
+      );
+      if (request.method === "POST" && contactRoute) {
+        operation = "admin.report_contact_read";
+        const input = adminReasonRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) return denied("reason_required", "Give a reason.", 400);
+        return adminResult(
+          await admin.rpc("admin_read_report_contact_command", {
+            ...adminArgs,
+            p_correlation_id: correlationId,
+            p_reason: input.data.reason,
+            p_report_id: contactRoute[1],
+          }),
+          reportContactSchema,
+        );
+      }
       const decisionRoute = route.match(
         /^\/admin\/reviews\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/decision$/iu,
       );
@@ -2470,6 +2664,23 @@ Deno.serve(async (request) => {
         ],
       ],
       ["Invalid moderation action", ["invalid_request", "That action is not possible.", 400]],
+      ["Action not found", ["not_found", "Decision not found.", 404]],
+      [
+        "Appeal window closed",
+        ["appeal_window_closed", "The 30-day appeal window has closed.", 409],
+      ],
+      ["Already appealed", ["already_appealed", "You have already appealed this decision.", 409]],
+      [
+        "Invalid appeal",
+        ["invalid_request", "Explain the appeal in at least ten characters.", 400],
+      ],
+      [
+        "Actor cannot invite sellers",
+        ["forbidden", "Only the owner or a co-host can invite.", 403],
+      ],
+      ["Invalid invitation", ["invalid_request", "Enter a valid email address.", 400]],
+      ["Invitation limit reached", ["rate_limited", "Too many invitations for this event.", 429]],
+      ["Invitation not found", ["not_found", "The invitation is gone or expired.", 404]],
     ]);
     const sellerResult = <T>(
       result: { data: unknown; error: { message: string } | null },
@@ -2698,6 +2909,125 @@ Deno.serve(async (request) => {
       return sellerResult(
         await admin.rpc("list_my_participations_command", { p_actor_id: actorId }),
         myParticipationsSchema,
+      );
+    }
+
+    const appealRoute = route.match(
+      /^\/moderation\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/appeal$/iu,
+    );
+    if (request.method === "POST" && appealRoute) {
+      operation = "moderation.appeal";
+      const input = submitAppealRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError(
+          "invalid_request",
+          "Explain the appeal in at least ten characters.",
+          400,
+          correlationId,
+          origin,
+        );
+      }
+      return sellerResult(
+        await admin.rpc("submit_appeal_command", {
+          p_action_id: appealRoute[1],
+          p_actor_id: actorId,
+          p_correlation_id: correlationId,
+          p_statement: input.data.statement,
+        }),
+        myModerationSchema,
+      );
+    }
+
+    const eventInvitesRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/seller-invites$/iu,
+    );
+    if (eventInvitesRoute && (request.method === "GET" || request.method === "POST")) {
+      if (request.method === "GET") {
+        operation = "seller.invites_read";
+        return sellerResult(
+          await admin.rpc("list_seller_invites_command", {
+            p_actor_id: actorId,
+            p_event_id: eventInvitesRoute[1],
+          }),
+          sellerInvitesSchema,
+        );
+      }
+      operation = "seller.invite";
+      const input = inviteSellerRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError(
+          "invalid_request",
+          "Enter a valid email address.",
+          400,
+          correlationId,
+          origin,
+        );
+      }
+      return sellerResult(
+        await admin.rpc("invite_seller_command", {
+          p_actor_id: actorId,
+          p_correlation_id: correlationId,
+          p_email: input.data.email,
+          p_event_id: eventInvitesRoute[1],
+        }),
+        sellerInvitesSchema,
+      );
+    }
+
+    if (request.method === "GET" && route === "/seller-invites") {
+      operation = "seller.incoming_invites_read";
+      return sellerResult(
+        await admin.rpc("get_incoming_seller_invites_command", { p_actor_id: actorId }),
+        incomingSellerInvitesSchema,
+      );
+    }
+
+    const sellerInviteRoute = route.match(
+      /^\/seller-invites\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/accept)?$/iu,
+    );
+    if (sellerInviteRoute && request.method === "DELETE" && !sellerInviteRoute[2]) {
+      operation = "seller.invite_cancel";
+      return sellerResult(
+        await admin.rpc("cancel_seller_invite_command", {
+          p_actor_id: actorId,
+          p_correlation_id: correlationId,
+          p_invite_id: sellerInviteRoute[1],
+        }),
+        sellerInvitesSchema,
+      );
+    }
+    if (sellerInviteRoute && request.method === "POST" && sellerInviteRoute[2]) {
+      operation = "seller.invite_accept";
+      const input = applyToEventRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError(
+          "invalid_request",
+          "Check the application fields.",
+          400,
+          correlationId,
+          origin,
+        );
+      }
+      return sellerResult(
+        await admin.rpc("accept_seller_invite_command", {
+          p_actor_id: actorId,
+          p_address_line: input.data.addressLine,
+          p_correlation_id: correlationId,
+          p_display_name: input.data.displayName,
+          p_invite_id: sellerInviteRoute[1],
+          p_latitude: input.data.latitude,
+          p_locality: input.data.locality,
+          p_longitude: input.data.longitude,
+          p_placement: input.data.placement,
+          p_postal_code: input.data.postalCode,
+          p_right_to_use_attested: input.data.rightToUseAttested,
+          p_shares_entrance: input.data.sharesEntrance,
+        }),
+        sellerParticipationSchema,
+        201,
       );
     }
 

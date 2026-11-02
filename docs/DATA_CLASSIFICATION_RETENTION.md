@@ -49,6 +49,7 @@ No data is retained merely because it might become useful later.
 | Geocoder normalized result/provenance | C2 | Authorized location workflow | Same lifecycle as precise location unless non-personal provider metadata is separable | Delete address/geometry/provider result with location; retain only non-personal service metrics if justified |
 | Geocode cache (SHA-256 of normalized query, coordinates, provider) | C2 pseudonymous | Service only | At most 7 days | Hourly purge; no address text stored |
 | Geocode request budget rows (account, event, time) | C1 | Service only | At most 2 days | Hourly purge |
+| Pending seller invitation email | C1 | Event owner/co-host; intended verified account sees a field-scoped invitation DTO | At most seven days; earlier on acceptance or withdrawal | Transactional deletion on accept/withdraw; hourly expiry purge; audit never copies email |
 | Anonymous report rate buckets (HMAC of network prefix or subject, hour, count) | C1 pseudonymous | Service only | At most 2 hours after the window | Hourly purge; raw IP never stored |
 | Team pin correction (before/after point, distance, reason, actor) | C2 | Service only; audit keeps distance and action only | Same lifecycle as the location | Cascade-deleted with the location |
 | Seller title, description, tags, categories, items, accessibility facts | C1/P1 | Public only with valid participation/publication state | 14-day post-event grace | Unpublish immediately, delete listing rows on event-relative job |

@@ -143,8 +143,10 @@ Slice 3 (flea-market-v1 taxonomy, event category subset, seller listings,
 items, accessibility facts, availability, live status) is complete locally:
 pgTAP 300 and the e2e "hosts pick categories…". Slice 4a (anonymous reports,
 cases, location quarantine, team review and moderation) is complete locally:
-pgTAP 310 and the e2e "anonymous reports quarantine…". Appeals, platform
-suspension, seller invitations and event-relative retention remain.
+pgTAP 310 and the e2e "anonymous reports quarantine…". Slice 4b (appeals with
+reviewer separation, platform restrictions with a second-admin lift,
+reason-gated private reads, seller invitations) is complete locally: pgTAP 320
+and the e2e "invited sellers, appeals…". Event-relative retention remains.
 
 - Seller application, entitlement/waitlist/promotion, address/geocode/manual pin,
   shared-location merge/split, and address-change reapproval.

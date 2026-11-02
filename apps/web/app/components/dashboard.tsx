@@ -4,6 +4,8 @@ import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
 import { IncomingOrganizerInvites } from "./incoming-organizer-invites";
 import { IncomingTeamInvites } from "./incoming-team-invites";
+import { IncomingSellerInvites } from "./incoming-seller-invites";
+import { MyModeration } from "./my-moderation";
 import { MyParticipations } from "./my-participations";
 
 export function Dashboard() {
@@ -38,7 +40,9 @@ function DashboardContent({ locale }: { readonly locale: "sv" | "en" }) {
             locale={locale}
             onAccepted={loadDashboard}
           />
+          <IncomingSellerInvites accessToken={accessToken} locale={locale} />
           <MyParticipations accessToken={accessToken} locale={locale} />
+          <MyModeration accessToken={accessToken} locale={locale} />
         </>
       ) : null}
 

@@ -161,6 +161,42 @@ export type Database = {
           },
         ]
       }
+      admin_action_approvals: {
+        Row: {
+          action_type: string
+          created_at: string
+          decided_at: string | null
+          decided_by_account_id: string | null
+          id: string
+          initiated_by_account_id: string | null
+          reason: string
+          state: string
+          target_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by_account_id?: string | null
+          id?: string
+          initiated_by_account_id?: string | null
+          reason: string
+          state?: string
+          target_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by_account_id?: string | null
+          id?: string
+          initiated_by_account_id?: string | null
+          reason?: string
+          state?: string
+          target_id?: string
+        }
+        Relationships: []
+      }
       admin_elevation_sessions: {
         Row: {
           account_id: string
@@ -505,6 +541,53 @@ export type Database = {
           },
         ]
       }
+      moderation_appeals: {
+        Row: {
+          action_id: string
+          appellant_account_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by_account_id: string | null
+          decision_reason: string | null
+          id: string
+          independent: boolean | null
+          state: string
+          statement: string
+        }
+        Insert: {
+          action_id: string
+          appellant_account_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by_account_id?: string | null
+          decision_reason?: string | null
+          id?: string
+          independent?: boolean | null
+          state?: string
+          statement: string
+        }
+        Update: {
+          action_id?: string
+          appellant_account_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by_account_id?: string | null
+          decision_reason?: string | null
+          id?: string
+          independent?: boolean | null
+          state?: string
+          statement?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_appeals_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: true
+            referencedRelation: "moderation_actions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       moderation_cases: {
         Row: {
           closed_at: string | null
@@ -826,6 +909,10 @@ export type Database = {
       }
       account_recovery_status: { Args: { p_account_id: string }; Returns: Json }
       advance_event_lifecycle_command: { Args: never; Returns: number }
+      apply_restriction_lift: {
+        Args: { p_actor_id: string; p_restriction_id: string }
+        Returns: undefined
+      }
       base32_decode: { Args: { p_value: string }; Returns: string }
       close_participation: {
         Args: {
@@ -950,6 +1037,7 @@ export type Database = {
         Args: never
         Returns: undefined
       }
+      purge_expired_seller_invites_command: { Args: never; Returns: undefined }
       purge_geocode_records_command: { Args: never; Returns: undefined }
       purge_report_rate_buckets_command: { Args: never; Returns: undefined }
       record_moderation_action: {
@@ -1907,6 +1995,48 @@ export type Database = {
           },
         ]
       }
+      seller_invites: {
+        Row: {
+          created_at: string
+          email: string
+          event_id: string
+          expires_at: string
+          id: string
+          invited_by_account_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          event_id: string
+          expires_at?: string
+          id?: string
+          invited_by_account_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          event_id?: string
+          expires_at?: string
+          id?: string
+          invited_by_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_invites_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_invites_invited_by_account_id_fkey"
+            columns: ["invited_by_account_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["account_id"]
+          },
+        ]
+      }
       seller_listings: {
         Row: {
           description: string
@@ -2239,6 +2369,23 @@ export type Database = {
         }
         Returns: Json
       }
+      accept_seller_invite_command: {
+        Args: {
+          p_actor_id: string
+          p_address_line: string
+          p_correlation_id: string
+          p_display_name: string
+          p_invite_id: string
+          p_latitude: number
+          p_locality: string
+          p_longitude: number
+          p_placement: string
+          p_postal_code: string
+          p_right_to_use_attested: boolean
+          p_shares_entrance: boolean
+        }
+        Returns: Json
+      }
       account_deletion_pending: {
         Args: { p_account_id: string }
         Returns: boolean
@@ -2246,6 +2393,16 @@ export type Database = {
       account_recovery_notices_accepted: {
         Args: { p_claim_id: string }
         Returns: boolean
+      }
+      admin_find_account_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_email: string
+          p_reason: string
+        }
+        Returns: Json
       }
       admin_get_event_command: {
         Args: {
@@ -2266,6 +2423,24 @@ export type Database = {
           p_expected_event_version: number
           p_internal_reason: string
           p_public_reason: string
+        }
+        Returns: Json
+      }
+      admin_list_cases_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+        }
+        Returns: Json
+      }
+      admin_read_report_contact_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_reason: string
+          p_report_id: string
         }
         Returns: Json
       }
@@ -2381,6 +2556,14 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_seller_invite_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_invite_id: string
+        }
+        Returns: Json
+      }
       change_participation_address_command: {
         Args: {
           p_actor_id: string
@@ -2490,6 +2673,27 @@ export type Database = {
           p_visibility: string
         }
         Returns: string
+      }
+      decide_admin_approval_command: {
+        Args: {
+          p_actor_id: string
+          p_approval_id: string
+          p_approve: boolean
+          p_auth_session_id: string
+          p_correlation_id: string
+        }
+        Returns: undefined
+      }
+      decide_appeal_command: {
+        Args: {
+          p_actor_id: string
+          p_appeal_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_decision: string
+          p_reason: string
+        }
+        Returns: undefined
       }
       decide_first_event_review_command: {
         Args: {
@@ -2630,6 +2834,10 @@ export type Database = {
         Args: { p_actor_id: string }
         Returns: Json
       }
+      get_incoming_seller_invites_command: {
+        Args: { p_actor_id: string }
+        Returns: Json
+      }
       get_organizer_team_command: {
         Args: { p_actor_id: string; p_organizer_profile_id: string }
         Returns: Json
@@ -2709,11 +2917,32 @@ export type Database = {
         }
         Returns: Json
       }
+      invite_seller_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_email: string
+          p_event_id: string
+        }
+        Returns: Json
+      }
       is_active_auth_session: {
         Args: { p_account_id: string; p_session_id: string }
         Returns: boolean
       }
       is_platform_admin: { Args: { p_account_id: string }; Returns: boolean }
+      list_admin_approvals_command: {
+        Args: { p_actor_id: string; p_auth_session_id: string }
+        Returns: Json
+      }
+      list_appeals_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+        }
+        Returns: Json
+      }
       list_event_cases_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
@@ -2744,6 +2973,10 @@ export type Database = {
           p_auth_session_id: string
           p_correlation_id: string
         }
+        Returns: Json
+      }
+      list_seller_invites_command: {
+        Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
       }
       moderate_participation_command: {
@@ -2856,12 +3089,32 @@ export type Database = {
         }
         Returns: Json
       }
+      request_restriction_lift_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_reason: string
+          p_restriction_id: string
+        }
+        Returns: Json
+      }
       reserve_geocode_request_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: undefined
       }
       resolve_security_notification_recipient: {
         Args: { p_job_id: string; p_lease_id: string }
+        Returns: Json
+      }
+      restrict_account_command: {
+        Args: {
+          p_account_id: string
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_reason: string
+        }
         Returns: Json
       }
       review_event_location_command: {
@@ -2967,6 +3220,15 @@ export type Database = {
           p_query_hash: string
         }
         Returns: undefined
+      }
+      submit_appeal_command: {
+        Args: {
+          p_action_id: string
+          p_actor_id: string
+          p_correlation_id: string
+          p_statement: string
+        }
+        Returns: Json
       }
       submit_report_command: {
         Args: {

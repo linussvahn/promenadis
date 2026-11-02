@@ -467,10 +467,42 @@ Planned slices, each its own commit:
 3. (done) Taxonomy `flea-market-v1`, event taxonomy subset, seller listing content
    (title, description, categories, tags, items, accessibility facts),
    availability and live status.
-4. Reports, unauthorized-address quarantine, hide/suspend/revoke, appeals,
+4. (done) Reports, unauthorized-address quarantine, hide/suspend/revoke, appeals,
    invite-only seller invitations.
 5. Event-relative retention: non-public at end/cancel, 14-day erasure,
    tombstones, heartbeats; postponement and reschedule confirmation.
+
+Slice 4b, `20261103000500_appeals_platform_invites.sql`:
+
+- Appeals: `moderation_appeals` (one per action, 30-day window, statement
+  10-1000). Sellers appeal from "Decisions about you" on the dashboard.
+  Elevated admins decide (`list_appeals_command`, `decide_appeal_command`);
+  the original decision-maker cannot review while another admin exists, and a
+  solo-admin review is recorded `independent = false` and disclosed to the
+  seller. Reversal shows hidden text/items, reinstates a suspension (never
+  over a platform restriction), lifts a quarantine, or deletes the closed
+  participation of a removal so the seller can apply again (the address was
+  already erased). Host revocations are now recorded as appealable actions.
+- Platform restrictions: `restrict_account_command` (elevated, reason, not
+  self) suspends the account's approved participations and blocks new
+  applications (insert trigger). `request_restriction_lift_command` lifts
+  at once for a solo admin, otherwise creates a pending
+  `admin_action_approvals` row that a different elevated admin must approve
+  (`decide_admin_approval_command`).
+- Reason-gated private reads, all audited with the reason:
+  `admin_find_account_command` (by email), `admin_read_report_contact_command`;
+  `admin_list_cases_command` shows platform-wide open cases without contact.
+- Seller invitations for invite-only events: `seller_invites` (owner/co-host,
+  max 60 per event, 7-day expiry, hourly purge, email deleted on
+  acceptance); the invitee sees them on the dashboard and accepts on the
+  join page (`?invite=`), becoming approved while places remain, otherwise
+  waitlisted. Invitations never reserve a place.
+- Web: `MyModeration` and `IncomingSellerInvites` on the dashboard,
+  `SellerInvites` on the sellers page, `AdminModeration` (appeals, cases with
+  contact-by-reason, account restriction, approvals) on `/admin`.
+- Deferred: invitation and appeal emails (Milestone 5), watchlist entries.
+- Verified: pgTAP 320 (30; 774 total), 106 web tests, full verify, DB
+  rebuild, 17/17 local-auth e2e, 5 smoke, integration scripts.
 
 Slice 4a, `20261103000400_reports_moderation.sql`:
 
