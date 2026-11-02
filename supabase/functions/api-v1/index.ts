@@ -6,6 +6,9 @@ import {
   accountProfileSchema,
   accountDeletionStatusSchema,
   adminElevationRequestSchema,
+  cancelEventRequestSchema,
+  eventLifecycleResultSchema,
+  publishEventRequestSchema,
   adminStatusSchema,
   decideFirstEventReviewSchema,
   firstEventReviewQueueSchema,
@@ -1426,6 +1429,86 @@ Deno.serve(async (request) => {
         throw error;
       }
       const parsed = eventTeamSummarySchema.safeParse(data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
+
+    const lifecycleRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(publish|cancel|end-early)$/iu,
+    );
+    if (request.method === "POST" && lifecycleRoute) {
+      const [, eventId, action] = lifecycleRoute;
+      operation = `event.${action.replace("-", "_")}`;
+      const body = await requestBody(request);
+      const simple = publishEventRequestSchema.safeParse(body);
+      const cancel = action === "cancel" ? cancelEventRequestSchema.safeParse(body) : null;
+      if (action === "cancel" ? !cancel?.success : !simple.success) {
+        status = "denied";
+        return apiError("invalid_request", "Check the confirmation.", 400, correlationId, origin);
+      }
+      const { data, error } =
+        action === "publish"
+          ? await admin.rpc("publish_event_command", {
+              p_actor_id: actorId,
+              p_authenticated_at: actor.authenticatedAt,
+              p_correlation_id: correlationId,
+              p_event_id: eventId,
+              p_expected_event_version: simple.data?.expectedEventVersion,
+            })
+          : action === "cancel"
+            ? await admin.rpc("cancel_event_command", {
+                p_actor_id: actorId,
+                p_authenticated_at: actor.authenticatedAt,
+                p_confirmation_title: cancel?.data?.confirmTitle,
+                p_correlation_id: correlationId,
+                p_event_id: eventId,
+                p_expected_event_version: cancel?.data?.expectedEventVersion,
+                p_public_reason: cancel?.data?.publicReason,
+              })
+            : await admin.rpc("end_event_early_command", {
+                p_actor_id: actorId,
+                p_correlation_id: correlationId,
+                p_event_id: eventId,
+                p_expected_event_version: simple.data?.expectedEventVersion,
+              });
+      if (error) {
+        const mapped = new Map<string, [string, string, number]>([
+          ["Only the event owner can publish", ["forbidden", "Only the owner can publish.", 403]],
+          ["Only the event owner can cancel", ["forbidden", "Only the owner can cancel.", 403]],
+          [
+            "Only the owner or a co-host can end the event",
+            ["forbidden", "Only the owner or a co-host can end the event.", 403],
+          ],
+          ["Recent authentication required", ["recent_auth_required", "Sign in again first.", 403]],
+          ["Event version conflict", ["version_conflict", "The event changed. Reload.", 409]],
+          ["Event not ready to publish", ["not_ready", "The event is not ready to publish.", 409]],
+          ["Event already started", ["invalid_state", "The event has already started.", 409]],
+          [
+            "Only draft events can be published",
+            ["invalid_state", "Only drafts can be published.", 409],
+          ],
+          [
+            "Only published events can be cancelled",
+            ["invalid_state", "Only published events can be cancelled.", 409],
+          ],
+          [
+            "Only active events can end early",
+            ["invalid_state", "Only live events can end early.", 409],
+          ],
+          [
+            "Cancellation confirmation mismatch",
+            ["confirmation_mismatch", "Type the exact event title.", 400],
+          ],
+          ["Cancellation reason required", ["invalid_request", "Give a public reason.", 400]],
+        ]).get(error.message);
+        if (mapped) {
+          status = "denied";
+          return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+        }
+        throw error;
+      }
+      const parsed = eventLifecycleResultSchema.safeParse(data);
       if (!parsed.success) throw new Error("invalid_internal_response");
       status = "succeeded";
       return json(parsed.data, 200, correlationId, origin);

@@ -446,6 +446,23 @@ export const deleteDraftEventRequestSchema = z.strictObject({
 
 export type DeleteDraftEventRequest = z.infer<typeof deleteDraftEventRequestSchema>;
 
+export const publishEventRequestSchema = z.strictObject({
+  expectedEventVersion: z.number().int().positive(),
+});
+
+export const cancelEventRequestSchema = z.strictObject({
+  confirmTitle: z.string().trim().min(1).max(120),
+  expectedEventVersion: z.number().int().positive(),
+  publicReason: z.string().trim().min(3).max(500),
+});
+
+export type CancelEventRequest = z.infer<typeof cancelEventRequestSchema>;
+
+export const eventLifecycleResultSchema = z.strictObject({
+  state: eventStateSchema,
+  version: z.number().int().positive(),
+});
+
 export const inviteEventTeamMemberRequestSchema = z.strictObject({
   email: z.email().trim().max(320),
   expectedTeamVersion: z.number().int().positive(),
@@ -696,6 +713,9 @@ export const boundarySchemas = {
   AccountRecoveryStatus: accountRecoveryStatusSchema,
   AccountDeletionStatus: accountDeletionStatusSchema,
   MfaStatus: mfaStatusSchema,
+  PublishEventRequest: publishEventRequestSchema,
+  CancelEventRequest: cancelEventRequestSchema,
+  EventLifecycleResult: eventLifecycleResultSchema,
   FirstEventReviewStatus: firstEventReviewStatusSchema,
   RequestFirstEventReview: requestFirstEventReviewSchema,
   AdminStatus: adminStatusSchema,

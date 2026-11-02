@@ -494,6 +494,7 @@ export type Database = {
         Returns: Json
       }
       account_recovery_status: { Args: { p_account_id: string }; Returns: Json }
+      advance_event_lifecycle_command: { Args: never; Returns: number }
       erase_due_accounts_command: { Args: never; Returns: number }
       event_boundary_summary: {
         Args: {
@@ -551,6 +552,10 @@ export type Database = {
           p_include_invite_emails: boolean
           p_organizer_profile_id: string
         }
+        Returns: Json
+      }
+      publication_system_blockers: {
+        Args: { p_event_id: string }
         Returns: Json
       }
       purge_expired_account_recovery_claims_command: {
@@ -1013,7 +1018,9 @@ export type Database = {
           description: string
           id: string
           organizer_profile_id: string
+          public_notice: string | null
           state: string
+          state_changed_at: string
           team_version: number
           timezone: string
           title: string
@@ -1027,7 +1034,9 @@ export type Database = {
           description?: string
           id?: string
           organizer_profile_id: string
+          public_notice?: string | null
           state?: string
+          state_changed_at?: string
           team_version?: number
           timezone?: string
           title: string
@@ -1041,7 +1050,9 @@ export type Database = {
           description?: string
           id?: string
           organizer_profile_id?: string
+          public_notice?: string | null
           state?: string
+          state_changed_at?: string
           team_version?: number
           timezone?: string
           title?: string
@@ -1301,6 +1312,18 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_event_command: {
+        Args: {
+          p_actor_id: string
+          p_authenticated_at: string
+          p_confirmation_title: string
+          p_correlation_id: string
+          p_event_id: string
+          p_expected_event_version: number
+          p_public_reason: string
+        }
+        Returns: Json
+      }
       cancel_event_emergency_successor_claim_command: {
         Args: {
           p_actor_id: string
@@ -1457,6 +1480,15 @@ export type Database = {
         Args: { p_actor_id: string; p_correlation_id: string }
         Returns: Json
       }
+      end_event_early_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_event_id: string
+          p_expected_event_version: number
+        }
+        Returns: Json
+      }
       enroll_account_recovery_code_command: {
         Args: {
           p_actor_id: string
@@ -1601,6 +1633,16 @@ export type Database = {
           p_verification_token: string
         }
         Returns: string
+      }
+      publish_event_command: {
+        Args: {
+          p_actor_id: string
+          p_authenticated_at: string
+          p_correlation_id: string
+          p_event_id: string
+          p_expected_event_version: number
+        }
+        Returns: Json
       }
       purge_expired_emergency_successor_claims_command: {
         Args: never

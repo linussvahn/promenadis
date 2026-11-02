@@ -928,6 +928,17 @@ integration of this evidence with safe Auth mutation remain required before
 account recovery completion can be enabled. A stable job header
 does not establish exactly-once mail delivery.
 
+Event lifecycle (2026-11-02): a trigger on `events.state` enforces the legal
+transitions for every writer and stamps `state_changed_at`. Owners publish with
+recent authentication only when readiness is clear; the routing and
+public-delivery gates live in `app_private.publication_system_blockers` and stay
+closed until Milestones 3-4. Owners cancel published events (recent auth, exact
+title, public notice); owners and co-hosts end live events early without a
+re-authentication step (protective path). A per-minute job activates at the
+first interval start, ends at the last interval end, and archives 14 days
+after ending or cancellation. Postponement and seller unpublication arrive with
+Milestone 2 sellers.
+
 Recovery Auth dispatch (2026-11-01): Supabase Auth shares the database, so a
 trigger on `auth.users` fences email changes. Only a live two-minute dispatch
 lease, opened after every recovery gate is rechecked under locks, permits the

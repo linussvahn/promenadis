@@ -463,6 +463,29 @@ commit and push each, ask only on real blockers. Order: account deletion
 (done), optional owner TOTP, then platform-admin elevation plus first-event
 review.
 
+### Event lifecycle (2026-11-02)
+
+- `20261102000100_event_lifecycle.sql`: transition trigger (same table as the
+  domain rules; active cannot cancel), `state_changed_at`, `public_notice`,
+  `publication_system_blockers()` (routing/delivery, still closed),
+  `publish_event_command` (owner, recent auth, readiness clear, before start),
+  `cancel_event_command` (owner, recent auth, exact title, public reason; drops
+  pending transfers/invites), `end_event_early_command` (owner/co-host, no
+  step-up), per-minute `advance_event_lifecycle_command` (activate, end,
+  archive 14 days after end/cancel).
+- BFF `POST /events/{id}/publish|cancel|end-early`; web: Publish button when
+  ready, `EventLifecycle` panel (cancel danger zone, end-now button).
+- Spec conflict resolved: deletion text said "cancel published/active"; now
+  "end active events early" to match lifecycle + matrix.
+- Tests: pgTAP 240 (22, opens the system gates only inside the rolled-back
+  test), component tests, e2e (publish gated, cancel, live end-early). Fixtures
+  that need finished events must walk draft->published->active->ended.
+- Not done: postponement/rescheduling, cancellation/end notifications, public
+  cancellation page, registration enforcement by state (Milestone 2 sellers).
+
+Next: organizer verification state, TOTP as a recovery factor, then
+Milestone 2 (sellers and safety lifecycle).
+
 ### Admin elevation and first-event review (2026-11-01)
 
 - `20261101001100`: `platform_admins` (operator-granted only, via

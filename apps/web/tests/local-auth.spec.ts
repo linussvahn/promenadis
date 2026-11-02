@@ -352,8 +352,11 @@ test("account deletion is blocked by owned events, disables the account and can 
     });
     expect(refused.status()).toBe(409);
 
-    localSql(`update public.events set state='ended' where title='Synthetic deletion walk'
-      and created_by_account_id=(select id from auth.users where email='${email}');`);
+    // Walk the legal lifecycle; publication itself is still gated.
+    for (const state of ["published", "active", "ended"]) {
+      localSql(`update public.events set state='${state}' where title='Synthetic deletion walk'
+        and created_by_account_id=(select id from auth.users where email='${email}');`);
+    }
     const mismatch = await request.post(`${base}/account/deletion`, {
       headers,
       data: { confirmationEmail: "someone-else@example.invalid" },
@@ -594,6 +597,96 @@ test("first-event review needs an elevated admin with a fresh TOTP code", async 
   } finally {
     await deleteSyntheticAccount(adminEmail);
     await deleteSyntheticAccount(ownerEmail);
+  }
+});
+
+test("publication stays gated while owners cancel published events and co-hosts end live ones", async ({
+  request,
+}) => {
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const email = `lifecycle-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const { error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password,
+  });
+  if (createError) throw createError;
+  const client = createClient(localStatus.API_URL, publicKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data } = await client.auth.signInWithPassword({ email, password });
+  const headers = {
+    apikey: publicKey,
+    authorization: `Bearer ${data.session?.access_token}`,
+    origin: "http://127.0.0.1:5173",
+  };
+  const createEvent = async (title: string) => {
+    const response = await request.post(`${base}/events`, {
+      headers,
+      data: {
+        description: "Synthetic lifecycle fixture",
+        endsAt: "2031-09-13T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic lifecycle owner",
+        startsAt: "2031-09-13T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title,
+        visibility: "unlisted",
+      },
+    });
+    expect(response.status()).toBe(201);
+    return (await response.json()).id as string;
+  };
+  const version = (eventId: string) =>
+    Number(localSql(`select version from public.events where id='${eventId}';`));
+  try {
+    const first = await createEvent("Synthetic cancel walk");
+    const gated = await request.post(`${base}/events/${first}/publish`, {
+      headers,
+      data: { expectedEventVersion: version(first) },
+    });
+    expect(gated.status()).toBe(409);
+    expect((await gated.json()).code).toBe("not_ready");
+
+    // Fixture only: routing and delivery do not exist yet, so set the state directly.
+    localSql(`update public.events set state='published' where id='${first}';`);
+    const mismatch = await request.post(`${base}/events/${first}/cancel`, {
+      headers,
+      data: { confirmTitle: "Wrong", expectedEventVersion: version(first), publicReason: "Rain" },
+    });
+    expect(mismatch.status()).toBe(400);
+    const cancelled = await request.post(`${base}/events/${first}/cancel`, {
+      headers,
+      data: {
+        confirmTitle: "Synthetic cancel walk",
+        expectedEventVersion: version(first),
+        publicReason: "Storm warning",
+      },
+    });
+    expect(await cancelled.json()).toMatchObject({ state: "cancelled" });
+
+    const second = await createEvent("Synthetic live walk");
+    localSql(`update public.events set state='published' where id='${second}';
+      update public.events set state='active' where id='${second}';`);
+    const refused = await request.post(`${base}/events/${second}/cancel`, {
+      headers,
+      data: {
+        confirmTitle: "Synthetic live walk",
+        expectedEventVersion: version(second),
+        publicReason: "Rain",
+      },
+    });
+    expect(refused.status()).toBe(409);
+    const ended = await request.post(`${base}/events/${second}/end-early`, {
+      headers,
+      data: { expectedEventVersion: version(second) },
+    });
+    expect(await ended.json()).toMatchObject({ state: "ended" });
+  } finally {
+    await deleteSyntheticAccount(email);
   }
 });
 

@@ -5,6 +5,7 @@ import { AccountShell } from "./account-shell";
 import { BoundaryEditor } from "./boundary-editor";
 import { CreationProgress } from "./creation-progress";
 import { EventControls } from "./event-controls";
+import { EventLifecycle } from "./event-lifecycle";
 import { EventTeam } from "./event-team";
 import { PublicationReadiness } from "./publication-readiness";
 import { RegistrationEditor } from "./registration-editor";
@@ -225,7 +226,10 @@ function EventWorkspaceContent({
             }}
             onSaved={loadDashboard}
           />
-          {event.state === "draft" ? <PublicationReadiness event={event} locale={locale} /> : null}
+          <EventLifecycle event={event} locale={locale} onChanged={loadDashboard} />
+          {event.state === "draft" ? (
+            <PublicationReadiness event={event} locale={locale} onPublished={loadDashboard} />
+          ) : null}
           <EventTeam actorRole={event.role} eventId={event.id} locale={locale} />
         </section>
 

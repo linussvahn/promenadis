@@ -4,8 +4,10 @@ import {
   type AttestEventPublicationRequest,
   type RequestAccountDeletionRequest,
   type DecideFirstEventReviewRequest,
+  type CancelEventRequest,
   accountDeletionStatusSchema,
   adminStatusSchema,
+  eventLifecycleResultSchema,
   firstEventReviewQueueSchema,
   firstEventReviewStatusSchema,
   mfaStatusSchema,
@@ -272,6 +274,24 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     createOrganizer(accessToken: string, input: CreateOrganizerProfileRequest) {
       return request("/organizers", accessToken, commandResourceResponseSchema, {
         body: input,
+        method: "POST",
+      });
+    },
+    publishEvent(accessToken: string, eventId: string, expectedEventVersion: number) {
+      return request(`/events/${eventId}/publish`, accessToken, eventLifecycleResultSchema, {
+        body: { expectedEventVersion },
+        method: "POST",
+      });
+    },
+    cancelEvent(accessToken: string, eventId: string, input: CancelEventRequest) {
+      return request(`/events/${eventId}/cancel`, accessToken, eventLifecycleResultSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    endEventEarly(accessToken: string, eventId: string, expectedEventVersion: number) {
+      return request(`/events/${eventId}/end-early`, accessToken, eventLifecycleResultSchema, {
+        body: { expectedEventVersion },
         method: "POST",
       });
     },

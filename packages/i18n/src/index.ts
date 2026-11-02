@@ -341,6 +341,21 @@ const sv = {
   "accountRecovery.expiresAt": "Går ut:",
   "accountRecovery.waitHelp":
     "Öppna länken i e-postmeddelandet igen när väntetiden är slut för att slutföra återställningen.",
+  "lifecycle.title": "Evenemangets status",
+  "lifecycle.endHelp":
+    "Avsluta ett pågående evenemang direkt. Platser döljs och nya rutter stoppas.",
+  "lifecycle.end": "Avsluta evenemanget nu",
+  "lifecycle.ended": "Evenemanget är avslutat.",
+  "lifecycle.cancel": "Ställ in evenemanget",
+  "lifecycle.cancelHelp":
+    "Inställningen kan inte ångras. Anmälan stängs och en offentlig notis med din förklaring visas.",
+  "lifecycle.reason": "Offentlig förklaring",
+  "lifecycle.confirmCancel": "Ställ in evenemanget",
+  "lifecycle.cancelled": "Evenemanget är inställt.",
+  "lifecycle.recentAuth": "Logga ut och in igen innan du ställer in evenemanget.",
+  "lifecycle.error": "Evenemangets status kunde inte ändras.",
+  "publication.publish": "Publicera evenemanget",
+  "publication.published": "Evenemanget är publicerat.",
   "admin.title": "Plattformsadministration",
   "admin.notEligible": "Kontot är inte plattformsadministratör.",
   "admin.elevateHelp":
@@ -849,6 +864,20 @@ const en = {
   "accountRecovery.expiresAt": "Expires:",
   "accountRecovery.waitHelp":
     "Open the link in the email again after the waiting period ends to finish recovery.",
+  "lifecycle.title": "Event status",
+  "lifecycle.endHelp": "End a live event immediately. Locations are hidden and new routes stop.",
+  "lifecycle.end": "End the event now",
+  "lifecycle.ended": "The event has ended.",
+  "lifecycle.cancel": "Cancel the event",
+  "lifecycle.cancelHelp":
+    "Cancellation cannot be undone. Registration closes and a public notice with your explanation is shown.",
+  "lifecycle.reason": "Public explanation",
+  "lifecycle.confirmCancel": "Cancel the event",
+  "lifecycle.cancelled": "The event is cancelled.",
+  "lifecycle.recentAuth": "Sign out and in again before cancelling the event.",
+  "lifecycle.error": "The event status could not be changed.",
+  "publication.publish": "Publish the event",
+  "publication.published": "The event is published.",
   "admin.title": "Platform administration",
   "admin.notEligible": "This account is not a platform administrator.",
   "admin.elevateHelp":

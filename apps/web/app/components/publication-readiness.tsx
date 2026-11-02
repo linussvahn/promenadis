@@ -28,9 +28,11 @@ const recommendationKeys = {
 export function PublicationReadiness({
   event,
   locale,
+  onPublished,
 }: {
   readonly event: DraftEventSummary;
   readonly locale: Locale;
+  readonly onPublished?: () => Promise<void>;
 }) {
   const expectedAccountId = useExpectedAccountId();
   const [busy, setBusy] = useState(false);
@@ -157,6 +159,30 @@ export function PublicationReadiness({
     }
   };
 
+  const publish = async () => {
+    setBusy(true);
+    setStatus("");
+    try {
+      const authenticated = await authenticatedClient();
+      if (!authenticated) return;
+      await authenticated.api.publishEvent(authenticated.token, event.id, event.version);
+      setStatus(translate(locale, "publication.published"));
+      await onPublished?.();
+    } catch (error) {
+      setStatus(
+        translate(
+          locale,
+          error instanceof PromenadisApiError && error.code === "recent_auth_required"
+            ? "publication.recentAuth"
+            : "publication.error",
+        ),
+      );
+      await loadReadiness();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const attestationMissing = readiness?.blockers.includes("publication_attestation_missing");
   const canAttest = event.role === "owner" && event.boundary && event.registration;
 
@@ -180,6 +206,16 @@ export function PublicationReadiness({
             <p className="notice">
               {translate(locale, "publication.reviewReason")} {rejectionReason}
             </p>
+          ) : null}
+          {readiness.readyToPublish && event.role === "owner" ? (
+            <button
+              className="primary-button"
+              disabled={busy}
+              onClick={() => void publish()}
+              type="button"
+            >
+              {translate(locale, "publication.publish")}
+            </button>
           ) : null}
           {reviewable ? (
             <button

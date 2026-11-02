@@ -36,6 +36,8 @@ select ok((public.get_account_deletion_command('01992026-1101-7300-8000-00000000
 delete from public.organizer_profile_memberships where account_id='01992026-1101-7300-8000-000000000002';
 
 -- The event ends: it becomes a history shell and no longer blocks.
+update public.events set state='published' where title='Deletion Fixture';
+update public.events set state='active' where title='Deletion Fixture';
 update public.events set state='ended' where title='Deletion Fixture';
 select is(jsonb_array_length(public.get_account_deletion_command('01992026-1101-7300-8000-000000000001')->'blockers'),0,'finished history no longer blocks');
 select is((pg_temp.request(now(),' Delete-Owner@example.invalid ')->>'pending'),'true','confirmed deletion request accepted');

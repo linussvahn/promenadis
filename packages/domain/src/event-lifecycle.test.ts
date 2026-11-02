@@ -22,7 +22,7 @@ describe("event lifecycle", () => {
     expect(canTransitionEvent("postponed", "active")).toBe(false);
   });
 
-  it("ends an active event instead of cancelling it", () => {
+  it("ends an active event instead of cancelling it (matches the database trigger)", () => {
     expect(canTransitionEvent("active", "ended")).toBe(true);
     expect(canTransitionEvent("active", "cancelled")).toBe(false);
   });

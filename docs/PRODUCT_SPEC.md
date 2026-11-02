@@ -175,8 +175,8 @@ Proposed lifecycle states:
 
 `draft -> published -> active -> ended -> archived`
 
-Cancellation is a separate terminal path for a published event. Drafts may be
-deleted. Published events are cancelled rather than silently deleted.
+Cancellation is a separate terminal path for a published (or postponed) event;
+an active event ends early instead. Drafts may be deleted. Published events are cancelled rather than silently deleted.
 `postponed` is a nonterminal safety path from published or active. It immediately
 hides seller locations, invalidates routes, pauses registration, and retains a
 public notice page.
@@ -365,7 +365,9 @@ The ordinary planned-transfer offer expires after at most seven days and is not
 the delayed emergency-successor recovery flow.
 
 A sole owner requesting account deletion must transfer each draft, published, or
-active event, delete drafts, or cancel published/active events. If they continue
+active event, delete drafts, cancel published events, or end active events
+early. (Settled 2026-11-02: an active event ends early rather than cancels,
+matching the lifecycle rules and authorization matrix.) If they continue
 without a transfer, cancellation immediately unpublishes seller locations before
 the seven-day account-recovery window starts. Ended/archived history shells may
 remain without a personal-account link; organizer profiles must be transferred

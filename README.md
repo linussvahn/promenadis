@@ -49,7 +49,9 @@ review, routing, public delivery, and publication lifecycle transitions are
 still unimplemented. Account deletion (blockers, seven-day disabled window,
 undo, hourly erasure), optional TOTP two-step sign-in, and TOTP-elevated
 platform-admin review of an owner's first event are implemented locally;
-restart Supabase after pulling so the TOTP config applies. Grant local admin
+restart Supabase after pulling so the TOTP config applies. The event lifecycle
+(publish gate, cancel, end early, automatic start/end/archive) is enforced
+locally; publishing stays closed until routing and public delivery exist. Grant local admin
 eligibility with `pnpm admin:grant:local <email>`, then open `/admin`.
 
 Browser-session hardening (2026-09-15): local sign-in now uses an opaque
