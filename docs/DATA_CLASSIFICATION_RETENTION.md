@@ -100,6 +100,8 @@ No data is retained merely because it might become useful later.
 | Organizer-relay body | C1/C3 | Thread participants/authorized abuse handling | 30 days after delivery | Body TTL |
 | Organizer-relay routing metadata | C1 | Delivery subsystem | 14 days after event end/cancel | Event-relative cleanup. Implemented as `app_private.relay_threads` (visitor address, hashed link token and the token encrypted with an instance secret so reply mail can carry the private link) |
 | Email suppression | C1 pseudonymous | Mail subsystem only | While address remains referenced/current suppression needed; delete within 30 days after last reference or valid re-verification/resubscription | HMACed app record plus controllable SES suppression deletion |
+| Post-event feedback (`app_private.event_feedback`: rating, comment) | P0/C1 | Operator; the team sees aggregates only | 90 days | Hourly job; no account, network or team link |
+| Feedback follow-up contact (`app_private.feedback_followups`) | C1 | Operator | 30 days, or on resolution | Hourly job |
 | Support request | C1/C3 | Human support/safety/legal scope | Use relay/case schedule according to content; ordinary correspondence should not exceed 30 days after resolution | Mailbox/form deletion and sanitized engineering reproduction |
 | Optional raw pilot feedback | C1 if text identifies a person; otherwise aggregate | Product operator only | No later than 90 days and within 30 days after synthesis, whichever is earlier | Scheduled deletion; durable summary contains no personal/rare identifying detail |
 | Optional feedback follow-up contact | C1 | Product operator only, stored separately | Resolution or 30 days, whichever comes first | Field/record deletion |

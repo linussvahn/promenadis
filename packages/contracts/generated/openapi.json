@@ -1,6 +1,146 @@
 {
   "components": {
     "schemas": {
+      "AdminOperations": {
+        "type": "object",
+        "properties": {
+          "eventLifecycle": {
+            "type": "boolean"
+          },
+          "eventRetention": {
+            "type": "boolean"
+          },
+          "notificationQueue": {
+            "type": "boolean"
+          },
+          "publicSnapshots": {
+            "type": "boolean"
+          },
+          "switches": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "public_locations",
+                "seller_applications",
+                "organizer_relay",
+                "exports",
+                "support_forms"
+              ]
+            },
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "required": [
+              "public_locations",
+              "seller_applications",
+              "organizer_relay",
+              "exports",
+              "support_forms"
+            ]
+          }
+        },
+        "required": [
+          "eventLifecycle",
+          "eventRetention",
+          "notificationQueue",
+          "publicSnapshots",
+          "switches"
+        ],
+        "additionalProperties": false
+      },
+      "EventFeedbackRequest": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "followupContact": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": ""
+              },
+              {
+                "type": "string",
+                "maxLength": 320,
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              }
+            ]
+          },
+          "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "comment",
+          "rating"
+        ],
+        "additionalProperties": false
+      },
+      "OperationsStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "SupportRequest": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": ""
+              },
+              {
+                "type": "string",
+                "maxLength": 320,
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 2000
+          },
+          "topic": {
+            "type": "string",
+            "enum": [
+              "support",
+              "accessibility",
+              "privacy",
+              "safety",
+              "legal"
+            ]
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "message",
+          "topic"
+        ],
+        "additionalProperties": false
+      },
       "ContactOrganizerRequest": {
         "type": "object",
         "properties": {
@@ -207,7 +347,8 @@
                 "report_reviewed",
                 "event_reminder",
                 "relay_to_organizer",
-                "relay_to_visitor"
+                "relay_to_visitor",
+                "support_request"
               ]
             }
           },

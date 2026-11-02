@@ -9,6 +9,7 @@ import { Form, Link } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { ContactOrganizer } from "./organizer-contact";
 import { PageHeader } from "./page-header";
+import { EventFeedback } from "./support-forms";
 
 export function PublicShell({ children }: { readonly children: (locale: Locale) => ReactNode }) {
   const { locale, setLocale } = useStoredLocale();
@@ -34,6 +35,13 @@ export function PublicShell({ children }: { readonly children: (locale: Locale) 
       <main id="main" tabIndex={-1}>
         {children(locale)}
       </main>
+      <footer className="site-footer">
+        <a href="/support">{translate(locale, "support.footer")}</a> ·{" "}
+        <a href="/support?topic=accessibility">
+          {translate(locale, "support.topic.accessibility")}
+        </a>{" "}
+        · <a href="/support?topic=privacy">{translate(locale, "support.topic.privacy")}</a>
+      </footer>
     </div>
   );
 }
@@ -223,6 +231,9 @@ export function EventLanding({
       ) : null}
       {["published", "active", "postponed"].includes(event.state) ? (
         <ContactOrganizer eventKey={event.publicKey} locale={locale} route={event.visibility} />
+      ) : null}
+      {event.state === "ended" ? (
+        <EventFeedback eventKey={event.publicKey} locale={locale} route={event.visibility} />
       ) : null}
     </article>
   );

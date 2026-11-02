@@ -79,3 +79,43 @@ export function EventMessages({
     </section>
   );
 }
+
+// Aggregate post-event feedback; individual comments stay with the operator.
+export function EventFeedbackSummary({
+  accessToken,
+  event,
+  locale,
+}: {
+  readonly accessToken: () => Promise<string | null>;
+  readonly event: DraftEventSummary;
+  readonly locale: Locale;
+}) {
+  const [summary, setSummary] = useState<{
+    responses: number;
+    averageRating: number | null;
+  } | null>(null);
+  const ended = event.state === "ended" || event.state === "archived";
+  useEffect(() => {
+    if (!ended) return;
+    void (async () => {
+      const api = getPromenadisApiClient();
+      const token = await accessToken();
+      if (!api || !token) return;
+      try {
+        setSummary(await api.getEventFeedbackSummary(token, event.id));
+      } catch {
+        // Nothing to show.
+      }
+    })();
+  }, [accessToken, ended, event.id]);
+  if (!summary || summary.responses === 0) return null;
+  return (
+    <section aria-labelledby="feedback-summary-heading" className="panel">
+      <h3 id="feedback-summary-heading">{translate(locale, "feedback.summary")}</h3>
+      <p>
+        {summary.responses} {translate(locale, "feedback.responses")} ·{" "}
+        {translate(locale, "feedback.average")} {summary.averageRating ?? "—"}
+      </p>
+    </section>
+  );
+}

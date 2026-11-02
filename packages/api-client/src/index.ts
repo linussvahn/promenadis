@@ -34,6 +34,11 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  type EventFeedbackRequest,
+  type SupportRequest,
+  adminOperationsSchema,
+  eventFeedbackSummarySchema,
+  supportRequestsSchema,
   type ContactOrganizerRequest,
   contactStartedSchema,
   eventExportCreatedSchema,
@@ -628,6 +633,40 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         );
       }
       return response.text();
+    },
+    submitSupportRequest(input: SupportRequest) {
+      return publicRequest("/support", reportReceivedSchema, input);
+    },
+    submitEventFeedback(route: "public" | "unlisted", key: string, input: EventFeedbackRequest) {
+      return publicRequest(
+        `/public/${route === "public" ? "events" : "unlisted"}/${key}/feedback`,
+        reportReceivedSchema,
+        input,
+      );
+    },
+    getEventFeedbackSummary(accessToken: string, eventId: string) {
+      return request(
+        `/events/${eventId}/feedback-summary`,
+        accessToken,
+        eventFeedbackSummarySchema,
+      );
+    },
+    getAdminOperations(accessToken: string) {
+      return request("/admin/operations", accessToken, adminOperationsSchema);
+    },
+    setKillSwitch(accessToken: string, key: string, enabled: boolean, reason: string) {
+      return request(`/admin/switches/${key}`, accessToken, adminOperationsSchema, {
+        body: { enabled, reason },
+        method: "POST",
+      });
+    },
+    listSupportRequests(accessToken: string) {
+      return request("/admin/support", accessToken, supportRequestsSchema);
+    },
+    resolveSupportRequest(accessToken: string, requestId: string) {
+      return request(`/admin/support/${requestId}/resolve`, accessToken, supportRequestsSchema, {
+        method: "POST",
+      });
     },
     getPublicSitemap() {
       return publicRequest("/public/sitemap", publicSitemapSchema);

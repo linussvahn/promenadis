@@ -11,6 +11,7 @@ import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
 import { AdminEventIntervention } from "./admin-event-intervention";
 import { AdminModeration } from "./admin-moderation";
+import { AdminOperationsPanel } from "./admin-operations";
 
 export function AdminConsole() {
   return <AccountShell>{({ locale }) => <AdminContent locale={locale} />}</AccountShell>;
@@ -319,6 +320,7 @@ export function AdminContent({ locale }: { readonly locale: Locale }) {
           </section>
           <AdminEventIntervention call={call} locale={locale} />
           <AdminModeration call={call} locale={locale} />
+          <AdminOperationsPanel call={call} locale={locale} />
         </>
       )}
       <p aria-live="polite" className="form-status">

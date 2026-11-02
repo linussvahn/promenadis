@@ -2150,6 +2150,62 @@ test("visitors contact organizers through the relay and hosts export sellers", a
   }
 });
 
+test("support requests reach the mailbox and visitors leave anonymous feedback", async ({
+  page,
+  request,
+}) => {
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const marker = randomUUID().slice(0, 8);
+  localSql(
+    "delete from app_private.support_requests; delete from app_private.feedback_rate_buckets;",
+  );
+  const status = await (await request.get(`${base}/status`)).json();
+  expect(Object.keys(status)).toEqual(["status"]);
+
+  await page.goto("/support?topic=accessibility");
+  await expect(page.getByLabel("Ämne")).toHaveValue("accessibility");
+  await page
+    .getByLabel("Meddelande")
+    .fill(`Kartan går inte att använda med skärmläsare ${marker}.`);
+  await page.getByLabel("E-post för svar (valfritt)").fill(`support-${marker}@example.invalid`);
+  await page.getByRole("button", { name: "Skicka" }).click();
+  await expect(page.getByRole("status")).toHaveText("Tack. Vi har tagit emot ditt meddelande.");
+  execFileSync("node", ["scripts/deliver-local-application-notifications.mjs"], {
+    cwd: repositoryRoot,
+  });
+  const mail = await latestMessage(request, "support@promenadis.local");
+  expect(mail.Text).toContain(marker);
+  expect(mail.Text).toContain("Topic: accessibility");
+
+  const { data: owner } = await admin.auth.admin.createUser({
+    email: `feedback-${marker}@example.invalid`,
+    email_confirm: true,
+  });
+  try {
+    const eventKey = localSql(`
+      select public.create_scheduled_draft_event_command('${owner?.user?.id}',null,'Feedback owner','Feedback walk ${marker}','',
+        'Europe/Stockholm','public', now()+interval '1 day', now()+interval '1 day 4 hours', gen_random_uuid());
+      update public.events set state='published' where title='Feedback walk ${marker}';
+      update public.events set state='active' where title='Feedback walk ${marker}';
+      update public.events set state='ended' where title='Feedback walk ${marker}';
+      select public_key from public.events where title='Feedback walk ${marker}';`)
+      .split("\n")
+      .at(-1);
+    await page.goto(`/e/${eventKey}`);
+    await page.getByRole("radio", { exact: true, name: "4" }).check();
+    await page.getByLabel("Kommentar (valfritt)").fill("Trevlig promenad");
+    await page.getByRole("button", { name: "Skicka" }).click();
+    await expect(page.getByText("Tack för ditt svar!")).toBeVisible();
+    expect(
+      localSql(`select rating from app_private.event_feedback f join public.events e on e.id=f.event_id
+        where e.title='Feedback walk ${marker}';`),
+    ).toBe("4");
+  } finally {
+    await deleteSyntheticAccount(`feedback-${marker}@example.invalid`);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {

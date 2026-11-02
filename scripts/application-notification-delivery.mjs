@@ -98,6 +98,20 @@ export function applicationNotice(
   recipient = {},
   origin = "http://127.0.0.1:5173",
 ) {
+  if (template === "support_request") {
+    const body = [...String(recipient.body ?? "")]
+      .filter((character) => character >= " " || character === "\n" || character === "\t")
+      .join("");
+    const topic = ["support", "accessibility", "privacy", "safety", "legal"].includes(
+      recipient.topic,
+    )
+      ? recipient.topic
+      : "support";
+    return {
+      Subject: `Promenadis ${topic} request`,
+      Text: `Topic: ${topic}\nReply to: ${recipient.replyTo ?? "(no contact given)"}\n\n${body}`,
+    };
+  }
   if (template === "relay_to_organizer" || template === "relay_to_visitor") {
     const title = String(payload?.eventTitle ?? "Promenadis")
       .replace(/[\r\n]+/gu, " ")

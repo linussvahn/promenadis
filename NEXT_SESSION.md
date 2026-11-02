@@ -517,6 +517,28 @@ Slice 2, `20261106000200_relay_export.sql`:
   (token in the fragment only; no-index, no-referrer), "Messages from
   visitors" in the workspace, "Export sellers" on the sellers page.
 
+Slice 3a, `20261106000300_support_operations.sql`:
+
+- `app_private.instance_settings` (`support_mailbox`),
+  `support_requests` (topic, body, optional contact; 5/hour/network;
+  routed through the outbox to the mailbox), elevated
+  `list/resolve_support_request_command`.
+- `event_feedback` + `feedback_followups` (separate, shorter-lived) +
+  per-network one-response buckets; `submit_event_feedback_command` (ended
+  events only), `event_feedback_summary_command` (aggregates for the team).
+- `app_private.beat` writes heartbeats from the snapshot, lifecycle,
+  routing, notification, relay/export and support jobs (cron jobs
+  rescheduled). `operations_status_command` (ok/degraded only) behind
+  `GET /status`; `admin_operations_command` for elevated admins.
+- `app_private.kill_switches` + `set_kill_switch_command` (elevated,
+  reason, audit): `public_locations` (in `publishable_participations`,
+  bumps every safety sequence), `seller_applications`, `organizer_relay`,
+  `exports` (insert guards), `support_forms`.
+- Web: `/support` (topic preselect via `?topic=`), footer links on public
+  pages, feedback form on ended event pages, team feedback summary, Admin
+  → Operations panel. `docs/RUNBOOK.md` covers health, levels, switches and
+  mail commands.
+
 ### Milestone 4 complete locally (2026-11-05)
 
 All three slices are built, tested and pushed. Left for later: real iPhone

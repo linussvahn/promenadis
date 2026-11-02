@@ -374,6 +374,30 @@ export type Database = {
         }
         Relationships: []
       }
+      event_feedback: {
+        Row: {
+          comment: string
+          created_at: string
+          event_id: string
+          id: string
+          rating: number
+        }
+        Insert: {
+          comment?: string
+          created_at?: string
+          event_id: string
+          id?: string
+          rating: number
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          event_id?: string
+          id?: string
+          rating?: number
+        }
+        Relationships: []
+      }
       event_first_reviews: {
         Row: {
           boundary_version: number
@@ -449,6 +473,53 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback_followups: {
+        Row: {
+          contact: string
+          created_at: string
+          feedback_id: string
+          resolved_at: string | null
+        }
+        Insert: {
+          contact: string
+          created_at?: string
+          feedback_id: string
+          resolved_at?: string | null
+        }
+        Update: {
+          contact?: string
+          created_at?: string
+          feedback_id?: string
+          resolved_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_followups_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: true
+            referencedRelation: "event_feedback"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_rate_buckets: {
+        Row: {
+          created_at: string
+          event_id: string
+          network_bucket: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          network_bucket: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          network_bucket?: string
+        }
+        Relationships: []
+      }
       geocode_cache: {
         Row: {
           expires_at: string
@@ -509,6 +580,45 @@ export type Database = {
         Update: {
           name?: string
           value?: string
+        }
+        Relationships: []
+      }
+      instance_settings: {
+        Row: {
+          name: string
+          value: string
+        }
+        Insert: {
+          name: string
+          value: string
+        }
+        Update: {
+          name?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      kill_switches: {
+        Row: {
+          changed_at: string | null
+          changed_by_account_id: string | null
+          enabled: boolean
+          key: string
+          reason: string | null
+        }
+        Insert: {
+          changed_at?: string | null
+          changed_by_account_id?: string | null
+          enabled?: boolean
+          key: string
+          reason?: string | null
+        }
+        Update: {
+          changed_at?: string | null
+          changed_by_account_id?: string | null
+          enabled?: boolean
+          key?: string
+          reason?: string | null
         }
         Relationships: []
       }
@@ -782,6 +892,7 @@ export type Database = {
           recipient_relay_thread_id: string | null
           recipient_report_id: string | null
           recipient_seller_invite_id: string | null
+          recipient_support_request_id: string | null
           recipient_team_invite_id: string | null
           relay_message_id: string | null
           template: string
@@ -806,6 +917,7 @@ export type Database = {
           recipient_relay_thread_id?: string | null
           recipient_report_id?: string | null
           recipient_seller_invite_id?: string | null
+          recipient_support_request_id?: string | null
           recipient_team_invite_id?: string | null
           relay_message_id?: string | null
           template: string
@@ -830,6 +942,7 @@ export type Database = {
           recipient_relay_thread_id?: string | null
           recipient_report_id?: string | null
           recipient_seller_invite_id?: string | null
+          recipient_support_request_id?: string | null
           recipient_team_invite_id?: string | null
           relay_message_id?: string | null
           template?: string
@@ -847,6 +960,13 @@ export type Database = {
             columns: ["recipient_report_id"]
             isOneToOne: false
             referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_outbox_recipient_support_request_id_fkey"
+            columns: ["recipient_support_request_id"]
+            isOneToOne: false
+            referencedRelation: "support_requests"
             referencedColumns: ["id"]
           },
           {
@@ -1295,6 +1415,36 @@ export type Database = {
         }
         Relationships: []
       }
+      support_requests: {
+        Row: {
+          body: string
+          contact: string | null
+          created_at: string
+          id: string
+          network_bucket: string
+          resolved_at: string | null
+          topic: string
+        }
+        Insert: {
+          body: string
+          contact?: string | null
+          created_at?: string
+          id?: string
+          network_bucket: string
+          resolved_at?: string | null
+          topic: string
+        }
+        Update: {
+          body?: string
+          contact?: string | null
+          created_at?: string
+          id?: string
+          network_bucket?: string
+          resolved_at?: string | null
+          topic?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1337,6 +1487,7 @@ export type Database = {
       }
       assert_public_snapshot_safe: { Args: { p_doc: Json }; Returns: undefined }
       base32_decode: { Args: { p_value: string }; Returns: string }
+      beat: { Args: { p_job: string }; Returns: undefined }
       build_public_snapshot: {
         Args: { p_event_id: string; p_revision: number }
         Returns: Json
@@ -1360,6 +1511,7 @@ export type Database = {
       enforce_notification_retention_command: { Args: never; Returns: number }
       enforce_relay_export_retention_command: { Args: never; Returns: number }
       enforce_routing_retention_command: { Args: never; Returns: number }
+      enforce_support_retention_command: { Args: never; Returns: number }
       enqueue_event_reminders_command: { Args: never; Returns: number }
       enqueue_notification: {
         Args: {
@@ -1439,6 +1591,7 @@ export type Database = {
         Returns: string
       }
       normalize_tag: { Args: { p_value: string }; Returns: string }
+      operations_checks: { Args: never; Returns: Json }
       organizer_team_summary: {
         Args: {
           p_include_invite_emails: boolean
@@ -1611,6 +1764,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      switch_on: { Args: { p_key: string }; Returns: boolean }
       tag_is_reserved: { Args: { p_normalized: string }; Returns: boolean }
       take_report_budget: {
         Args: { p_bucket: string; p_limit: number }
@@ -3221,6 +3375,10 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_operations_command: {
+        Args: { p_actor_id: string; p_auth_session_id: string }
+        Returns: Json
+      }
       admin_read_report_contact_command: {
         Args: {
           p_actor_id: string
@@ -3604,6 +3762,10 @@ export type Database = {
         }
         Returns: Json
       }
+      event_feedback_summary_command: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: Json
+      }
       fail_routing_build_command: {
         Args: { p_build_id: string; p_error: string }
         Returns: undefined
@@ -3829,6 +3991,10 @@ export type Database = {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
       }
+      list_support_requests_command: {
+        Args: { p_actor_id: string; p_auth_session_id: string }
+        Returns: Json
+      }
       mark_account_notifications_read_command: {
         Args: { p_actor_id: string; p_notification_id: string }
         Returns: Json
@@ -3845,6 +4011,7 @@ export type Database = {
         Returns: Json
       }
       notification_queue_health_command: { Args: never; Returns: Json }
+      operations_status_command: { Args: never; Returns: Json }
       postpone_event_command: {
         Args: {
           p_actor_id: string
@@ -4064,6 +4231,15 @@ export type Database = {
         Args: { p_job_id: string; p_lease_id: string }
         Returns: Json
       }
+      resolve_support_request_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       restrict_account_command: {
         Args: {
           p_account_id: string
@@ -4162,6 +4338,17 @@ export type Database = {
         }
         Returns: Json
       }
+      set_kill_switch_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_enabled: boolean
+          p_key: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       set_notification_preferences_command: {
         Args: { p_actor_id: string; p_event_reminders: boolean }
         Returns: Json
@@ -4234,6 +4421,16 @@ export type Database = {
         }
         Returns: Json
       }
+      submit_event_feedback_command: {
+        Args: {
+          p_comment: string
+          p_event_key: string
+          p_followup_contact: string
+          p_network_bucket: string
+          p_rating: number
+        }
+        Returns: Json
+      }
       submit_report_command: {
         Args: {
           p_confirms_no_consent: boolean
@@ -4246,6 +4443,15 @@ export type Database = {
           p_reporter_contact: string
           p_subject_id: string
           p_subject_type: string
+        }
+        Returns: Json
+      }
+      submit_support_request_command: {
+        Args: {
+          p_body: string
+          p_contact: string
+          p_network_bucket: string
+          p_topic: string
         }
         Returns: Json
       }

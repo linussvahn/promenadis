@@ -267,7 +267,13 @@ recent sign-in, one active per event, three per day, entitlement cap,
 formula cells neutralized, single download, deleted within 24 hours) is
 complete locally: pgTAP 390, worker relay test and the e2e "visitors
 contact organizers through the relay and hosts export sellers"; database verification 945/945. Turnstile on
-the relay form is a hosted-alpha gate.
+the relay form is a hosted-alpha gate. Slice 3a (one support form with five
+routes into the support mailbox, elevated-admin inbox and resolution;
+anonymous post-event feedback with a separate optional follow-up contact and
+aggregate team summary; job heartbeats with a sanitized `/status` endpoint
+and an admin operations panel; five audited incident switches enforced in
+the database; `docs/RUNBOOK.md`) is complete locally: pgTAP 400 and the e2e
+"support requests reach the mailbox and visitors leave anonymous feedback"; database verification 962/962.
 
 - SES Auth/application mail, relay, notifications, queues/retries, bounce/
   complaint/suppression handling, and required-versus-optional prioritization.

@@ -40,6 +40,14 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  adminOperationsSchema,
+  eventFeedbackRequestSchema,
+  eventFeedbackSummarySchema,
+  killSwitchKeySchema,
+  operationsStatusSchema,
+  setKillSwitchRequestSchema,
+  supportRequestSchema,
+  supportRequestsSchema,
   contactOrganizerRequestSchema,
   contactStartedSchema,
   eventExportCreatedSchema,
@@ -955,6 +963,71 @@ Deno.serve(async (request) => {
       }
       status = "denied";
       return notFound();
+    }
+
+    if (request.method === "GET" && route === "/status") {
+      // For outside-in monitors: overall state only, never topology or counts.
+      operation = "operations.status";
+      const { data, error } = await admin.rpc("operations_status_command");
+      if (error) throw error;
+      status = "succeeded";
+      return json(operationsStatusSchema.parse(data), 200, correlationId, origin);
+    }
+    const feedbackRoute = route.match(/^\/public\/(events|unlisted)\/([0-9a-f]{32})\/feedback$/u);
+    if (request.method === "POST" && (route === "/support" || feedbackRoute)) {
+      const failures = new Map<string, [string, string, number]>([
+        ["Invalid request", ["invalid_request", "Check the form.", 400]],
+        ["Invalid feedback", ["invalid_request", "Check the form.", 400]],
+        ["Request limit reached", ["rate_limited", "Too many requests. Try again later.", 429]],
+        ["Support form paused", ["paused", "The form is paused. Try again later.", 503]],
+        ["Feedback closed", ["feedback_closed", "Feedback is not open for this event.", 409]],
+        ["Feedback already sent", ["already_sent", "Feedback was already sent from here.", 409]],
+      ]);
+      const failure = (message: string) => {
+        const mapped = failures.get(message);
+        if (!mapped) return null;
+        status = "denied";
+        return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+      };
+      if (route === "/support") {
+        operation = "support.submit";
+        const input = supportRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) return failure("Invalid request") as Response;
+        if (input.data.website) {
+          status = "denied";
+          return json({ received: true }, 202, correlationId, origin);
+        }
+        const { error } = await admin.rpc("submit_support_request_command", {
+          p_body: input.data.message,
+          p_contact: input.data.contact || null,
+          p_network_bucket: await networkBucket(request),
+          p_topic: input.data.topic,
+        });
+        if (error) {
+          const denied = failure(error.message);
+          if (denied) return denied;
+          throw error;
+        }
+        status = "succeeded";
+        return json({ received: true }, 202, correlationId, origin);
+      }
+      operation = "feedback.submit";
+      const input = eventFeedbackRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) return failure("Invalid feedback") as Response;
+      const { error } = await admin.rpc("submit_event_feedback_command", {
+        p_comment: input.data.comment,
+        p_event_key: (feedbackRoute as RegExpMatchArray)[2],
+        p_followup_contact: input.data.followupContact || null,
+        p_network_bucket: await networkBucket(request),
+        p_rating: input.data.rating,
+      });
+      if (error) {
+        const denied = failure(error.message);
+        if (denied) return denied;
+        throw error;
+      }
+      status = "succeeded";
+      return json({ received: true }, 202, correlationId, origin);
     }
 
     const contactStart = route.match(/^\/public\/(events|unlisted)\/([0-9a-f]{32})\/contact$/u);
@@ -2699,6 +2772,51 @@ Deno.serve(async (request) => {
         return json(parsed.data, 200, correlationId, origin);
       };
       const adminArgs = { p_actor_id: actorId, p_auth_session_id: actor.sessionId };
+      if (request.method === "GET" && route === "/admin/operations") {
+        operation = "admin.operations_read";
+        return adminResult(
+          await admin.rpc("admin_operations_command", adminArgs),
+          adminOperationsSchema,
+        );
+      }
+      const switchRoute = route.match(/^\/admin\/switches\/([a-z_]{3,40})$/u);
+      if (request.method === "POST" && switchRoute) {
+        operation = "admin.kill_switch_set";
+        const key = killSwitchKeySchema.safeParse(switchRoute[1]);
+        const input = setKillSwitchRequestSchema.safeParse(await requestBody(request));
+        if (!key.success || !input.success) return denied("reason_required", "Give a reason.", 400);
+        return adminResult(
+          await admin.rpc("set_kill_switch_command", {
+            ...adminArgs,
+            p_correlation_id: correlationId,
+            p_enabled: input.data.enabled,
+            p_key: key.data,
+            p_reason: input.data.reason,
+          }),
+          adminOperationsSchema,
+        );
+      }
+      if (request.method === "GET" && route === "/admin/support") {
+        operation = "admin.support_read";
+        return adminResult(
+          await admin.rpc("list_support_requests_command", adminArgs),
+          supportRequestsSchema,
+        );
+      }
+      const supportResolve = route.match(
+        /^\/admin\/support\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/resolve$/iu,
+      );
+      if (request.method === "POST" && supportResolve) {
+        operation = "admin.support_resolve";
+        return adminResult(
+          await admin.rpc("resolve_support_request_command", {
+            ...adminArgs,
+            p_correlation_id: correlationId,
+            p_request_id: supportResolve[1],
+          }),
+          supportRequestsSchema,
+        );
+      }
       if (request.method === "GET" && route === "/admin/appeals") {
         operation = "admin.appeal_queue_read";
         return adminResult(
@@ -3230,6 +3348,7 @@ Deno.serve(async (request) => {
     }
 
     const sellerErrors = new Map<string, [string, string, number]>([
+      ["Applications paused", ["paused", "Applications are paused. Try again later.", 503]],
       ["Event not found", ["not_found", "Event not found.", 404]],
       ["Participation not found", ["not_found", "Application not found.", 404]],
       [
@@ -3651,6 +3770,23 @@ Deno.serve(async (request) => {
       return json(notificationPreferencesSchema.parse(data), 200, correlationId, origin);
     }
 
+    const feedbackSummary = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/feedback-summary$/iu,
+    );
+    if (request.method === "GET" && feedbackSummary) {
+      operation = "feedback.summary";
+      const { data, error } = await admin.rpc("event_feedback_summary_command", {
+        p_actor_id: actorId,
+        p_event_id: feedbackSummary[1],
+      });
+      if (error) {
+        status = "denied";
+        return apiError("forbidden", "You are not on this event team.", 403, correlationId, origin);
+      }
+      status = "succeeded";
+      return json(eventFeedbackSummarySchema.parse(data), 200, correlationId, origin);
+    }
+
     const messagesRoute = route.match(
       /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/messages(?:\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/reply)?$/iu,
     );
@@ -3719,6 +3855,7 @@ Deno.serve(async (request) => {
         ],
         ["Export limit reached", ["rate_limited", "Three exports a day. Try again tomorrow.", 429]],
         ["Export unavailable", ["gone", "This export is no longer available.", 410]],
+        ["Exports paused", ["paused", "Exports are paused. Try again later.", 503]],
       ]);
       const exportFailure = (error: { message: string }) => {
         const mapped = exportErrors.get(error.message);

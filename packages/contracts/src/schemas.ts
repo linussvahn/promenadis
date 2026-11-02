@@ -1721,6 +1721,7 @@ export const notificationTemplateSchema = z.enum([
   "event_reminder",
   "relay_to_organizer",
   "relay_to_visitor",
+  "support_request",
 ]);
 export type NotificationTemplate = z.infer<typeof notificationTemplateSchema>;
 
@@ -1781,7 +1782,68 @@ export const eventExportCreatedSchema = z.strictObject({
 });
 export type EventExportCreated = z.infer<typeof eventExportCreatedSchema>;
 
+export const supportTopicSchema = z.enum([
+  "support",
+  "accessibility",
+  "privacy",
+  "safety",
+  "legal",
+]);
+export const supportRequestSchema = z.strictObject({
+  contact: z.union([z.literal(""), z.email().max(320)]).optional(),
+  message: z.string().trim().min(10).max(2000),
+  topic: supportTopicSchema,
+  website: z.string().max(200).optional(),
+});
+export type SupportRequest = z.infer<typeof supportRequestSchema>;
+export const eventFeedbackRequestSchema = z.strictObject({
+  comment: z.string().trim().max(1000),
+  followupContact: z.union([z.literal(""), z.email().max(320)]).optional(),
+  rating: z.number().int().min(1).max(5),
+});
+export type EventFeedbackRequest = z.infer<typeof eventFeedbackRequestSchema>;
+export const eventFeedbackSummarySchema = z.strictObject({
+  averageRating: z.number().nullable(),
+  ratings: z.array(z.number().int().nonnegative()).length(5),
+  responses: z.number().int().nonnegative(),
+});
+export const operationsStatusSchema = z.strictObject({ status: z.enum(["ok", "degraded"]) });
+export const killSwitchKeySchema = z.enum([
+  "public_locations",
+  "seller_applications",
+  "organizer_relay",
+  "exports",
+  "support_forms",
+]);
+export const adminOperationsSchema = z.strictObject({
+  eventLifecycle: z.boolean(),
+  eventRetention: z.boolean(),
+  notificationQueue: z.boolean(),
+  publicSnapshots: z.boolean(),
+  switches: z.record(killSwitchKeySchema, z.boolean()),
+});
+export type AdminOperations = z.infer<typeof adminOperationsSchema>;
+export const setKillSwitchRequestSchema = z.strictObject({
+  enabled: z.boolean(),
+  reason: z.string().trim().min(3).max(500),
+});
+export const supportRequestsSchema = z.array(
+  z.strictObject({
+    body: z.string().max(2000),
+    createdAt: isoInstant,
+    hasContact: z.boolean(),
+    id: opaqueUuid,
+    resolvedAt: isoInstant.nullable(),
+    topic: supportTopicSchema,
+  }),
+);
+export type SupportRequests = z.infer<typeof supportRequestsSchema>;
+
 export const boundarySchemas = {
+  AdminOperations: adminOperationsSchema,
+  EventFeedbackRequest: eventFeedbackRequestSchema,
+  OperationsStatus: operationsStatusSchema,
+  SupportRequest: supportRequestSchema,
   ContactOrganizerRequest: contactOrganizerRequestSchema,
   ContactStarted: contactStartedSchema,
   EventExportCreated: eventExportCreatedSchema,

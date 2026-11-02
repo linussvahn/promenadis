@@ -348,7 +348,10 @@ export function createBrowserSessionGateway(config: {
         (path.startsWith("/public/") && request.method === "GET") ||
         (/^\/public\/(events|unlisted)\/[0-9a-f]{32}\/contact$/u.test(path) &&
           request.method === "POST") ||
-        (path.startsWith("/contact/") && request.method === "POST")
+        (path.startsWith("/contact/") && request.method === "POST") ||
+        (path === "/support" && request.method === "POST") ||
+        (/^\/public\/(events|unlisted)\/[0-9a-f]{32}\/feedback$/u.test(path) &&
+          request.method === "POST")
       ) {
         const cleaned = new Headers(request.headers);
         cleaned.delete("authorization");
