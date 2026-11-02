@@ -199,6 +199,18 @@ request until a configured site origin exists (hosted alpha).
 
 ### Milestone 4 — walking and offline
 
+Milestone 4 progress: slice 1 (walking-network compiler in
+`packages/routing`, checksum-verified synthetic OSM fixture as the local
+source, build jobs with idempotency and one-at-a-time guard, private
+diagnostics with snap/component/detour per location, host preview page,
+block/manual-access/entrance/connector overrides with reasons and audit,
+approval rules, route-ready publication gate, public immutable package
+selected by the manifest, unsafe-edge blocks in the safety feed, 24-hour
+package retention) is complete locally as of 2026-11-05: pgTAP 370, routing
+build tests, walking-network component tests and the e2e "hosts build,
+inspect, correct and approve the walking network"; database verification 900/900. The hosted source
+(weekly Geofabrik extract) and pinned compiler container are pilot gates.
+
 - Checksum-verified OSM acquisition, isolated graph build, immutable package,
   metadata/attribution, host preview, override and rollback lifecycle.
 - Browser worker routing, spatial index/priority queue, availability-aware and

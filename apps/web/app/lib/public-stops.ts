@@ -5,9 +5,11 @@ export type PublicCategory = PublicSnapshot["categories"][number];
 
 export interface VisibleStop {
   readonly cluster: PublicSnapshot["stops"][number]["cluster"];
+  readonly entrance: PublicSnapshot["stops"][number]["entrance"];
   readonly id: string;
   readonly latitude: number;
   readonly longitude: number;
+  readonly manualAccess: boolean;
   /** Stable 1-based number from the snapshot order, kept when filtering. */
   readonly number: number;
   readonly sellers: readonly PublicSeller[];
@@ -46,9 +48,11 @@ export function applySafetyFeed(snapshot: PublicSnapshot, feed: PublicSafetyFeed
   return snapshot.stops
     .map((stop, index) => ({
       cluster: stop.cluster,
+      entrance: stop.entrance,
       id: stop.id,
       latitude: stop.latitude,
       longitude: stop.longitude,
+      manualAccess: stop.manualAccess,
       number: index + 1,
       sellers: stop.sellerIds.flatMap((id) => {
         const seller = sellers.get(id);

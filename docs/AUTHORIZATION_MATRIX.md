@@ -141,9 +141,10 @@ Routing limits count physical locations, not seller records or derived clusters.
 | Reverse platform-level suspension | No | No | No | Yes | No | Fresh elevation; distinct approver once two admins exist |
 | Decide appeal | No | No | No | Yes | No | Different reviewer when possible; preserve original decision |
 | Preview routing graph/anomalies | Yes | Yes | Yes | Yes | Build data | Moderator cannot publish overrides |
-| Publish entrance/manual-access/unsafe-edge override | No | Yes | Yes | Yes | Build only | Recent auth, reason, immutable version |
+| Publish entrance/manual-access/unsafe-edge override | No | Yes | Yes | Yes | Build only | Reason, immutable version; recent auth except unsafe-edge blocks, which stay a fast protective path and reach live clients through the safety feed |
 | Publish connector up to 100 m | No | Yes | Yes | Yes | Build only | Legal/safe-walking attestation and preview |
 | Launch/retry graph build | No | Yes | Yes | Yes | Executes | Event scope, quotas, idempotency |
+| Approve a previewed walking network | No | Yes | Yes | Yes | No | Current boundary and override set; no unexplained disconnects, rejected connectors or empty graph |
 | Trigger urgent snapshot/feed invalidation | Via authorized safety command | Via authorized command | Via authorized command | Yes | Executes | Cannot be disabled by ordinary write freeze |
 | Bulk sensitive-data export | No | No | No | Yes | Generates only | Distinct approver once two admins exist |
 | Production restore | No | No | No | Yes | Executes narrow steps | Distinct approver once two admins exist; tombstone replay |

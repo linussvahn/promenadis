@@ -24,6 +24,7 @@ const manifest = (overrides: object = {}) => ({
   expiresAt: later,
   generatedAt: earlier,
   publicRevision: 2,
+  routing: null,
   routingVersion: null,
   safetySequence: 3,
   schemaVersion: "1.0",
@@ -97,6 +98,8 @@ const snapshot = {
   sellers: [seller("a", "Crime novels"), seller("b", "Cookbooks")],
   stops: ["a", "b"].map((id) => ({
     cluster: { z13: "1_1", z15: `${id}_1` },
+    entrance: null,
+    manualAccess: false,
     id: id.repeat(24),
     latitude: 59.3,
     longitude: 18.06,

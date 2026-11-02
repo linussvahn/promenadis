@@ -65,6 +65,8 @@ policy = "oneshot"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/api-v1/index.ts"
+# Checksum-verified synthetic OSM source for local walking-network builds.
+static_files = ["./functions/api-v1/fixtures/*.json"]
 
 [analytics]
 enabled = false

@@ -34,6 +34,9 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  type AddRoutingOverrideRequest,
+  eventRoutingSchema,
+  routingPackageSchema,
   earlyLocationVisibilitySchema,
   publicEventManifestSchema,
   publicSafetyFeedSchema,
@@ -480,6 +483,46 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         accessToken,
         earlyLocationVisibilitySchema,
         { body: input, method: "PUT" },
+      );
+    },
+    getPublicRoutingPackage(packageId: string) {
+      return publicRequest(`/public/routing/${packageId}`, routingPackageSchema);
+    },
+    getEventRouting(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/routing`, accessToken, eventRoutingSchema);
+    },
+    buildEventRouting(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/routing/builds`, accessToken, eventRoutingSchema, {
+        method: "POST",
+      });
+    },
+    confirmRoutingBuild(accessToken: string, eventId: string, buildId: string) {
+      return request(
+        `/events/${eventId}/routing/builds/${buildId}/confirm`,
+        accessToken,
+        eventRoutingSchema,
+        { method: "POST" },
+      );
+    },
+    getRoutingPreviewPackage(accessToken: string, eventId: string, buildId: string) {
+      return request(
+        `/events/${eventId}/routing/builds/${buildId}/package`,
+        accessToken,
+        routingPackageSchema,
+      );
+    },
+    addRoutingOverride(accessToken: string, eventId: string, input: AddRoutingOverrideRequest) {
+      return request(`/events/${eventId}/routing/overrides`, accessToken, eventRoutingSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    removeRoutingOverride(accessToken: string, eventId: string, overrideId: string) {
+      return request(
+        `/events/${eventId}/routing/overrides/${overrideId}`,
+        accessToken,
+        eventRoutingSchema,
+        { method: "DELETE" },
       );
     },
     getPublicSitemap() {

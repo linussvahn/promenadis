@@ -104,7 +104,7 @@ export function EventPublicLink({
       <p>
         <code className="public-link-url">{url}</code>
       </p>
-      <button className="button button-secondary" onClick={() => void copy()} type="button">
+      <button className="secondary-button" onClick={() => void copy()} type="button">
         {translate(locale, "publicLink.copy")}
       </button>
       {link.visibility === "unlisted" ? (
@@ -124,7 +124,7 @@ export function EventPublicLink({
               <input id="rotate-safety-reason" maxLength={500} name="safetyReason" required />
             </>
           ) : null}
-          <button className="button button-secondary" disabled={busy} type="submit">
+          <button className="secondary-button" disabled={busy} type="submit">
             {translate(locale, "publicLink.rotate")}
           </button>
         </form>

@@ -40,6 +40,8 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  addRoutingOverrideRequestSchema,
+  eventRoutingSchema,
   earlyLocationVisibilitySchema,
   publicEventManifestSchema,
   publicSafetyFeedSchema,
@@ -116,6 +118,12 @@ import { sessionFromVerifiedAccessToken } from "../../../packages/domain/src/aut
 import { normalizeOrganizationNumber } from "../../../packages/domain/src/organization-number.ts";
 import { createBrowserSessionGateway } from "./browser-sessions.ts";
 import { configuredGeocoder, normalizedGeocodeKey } from "./geocoder.ts";
+import { loadRoutingSource } from "./routing-source.ts";
+import {
+  buildRoutingPackage,
+  COMPILER_VERSION,
+  validateRoutingPackage,
+} from "../../../packages/routing/src/build.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -875,6 +883,35 @@ Deno.serve(async (request) => {
         const headers = new Headers({
           ...corsHeaders(origin),
           "cache-control": `${data.unlisted ? "private" : "public"}, max-age=${Math.min(300, secondsLeft)}`,
+          "content-type": "application/json; charset=utf-8",
+          etag,
+          "referrer-policy": "no-referrer",
+          "x-content-type-options": "nosniff",
+          "x-correlation-id": correlationId,
+          "x-robots-tag": noIndex,
+        });
+        if (request.headers.get("if-none-match") === etag) {
+          return new Response(null, { status: 304, headers });
+        }
+        return new Response(data.body, { status: 200, headers });
+      }
+      const routingPackage = route.match(
+        /^\/public\/routing\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/u,
+      );
+      if (routingPackage) {
+        operation = "public.routing_package";
+        const { data, error } = await admin.rpc("public_routing_package_command", {
+          p_package_id: routingPackage[1],
+        });
+        if (error) throw error;
+        status = "succeeded";
+        if (!data) return notFound();
+        const etag = `"${data.sha256}"`;
+        // Immutable per version; the manifest decides which one is current
+        // and its expiry, so a cached copy is never used on its own authority.
+        const headers = new Headers({
+          ...corsHeaders(origin),
+          "cache-control": `${data.unlisted ? "private" : "public"}, max-age=31536000, immutable`,
           "content-type": "application/json; charset=utf-8",
           etag,
           "referrer-policy": "no-referrer",
@@ -1887,6 +1924,250 @@ Deno.serve(async (request) => {
       }
       status = "succeeded";
       return json(earlyLocationVisibilitySchema.parse(data), 200, correlationId, origin);
+    }
+
+    const routingRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/routing(?:\/builds(?:\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(confirm|package))?|\/overrides(?:\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))?)?$/iu,
+    );
+    if (routingRoute) {
+      const [, eventId, buildId, buildAction, overrideId] = routingRoute;
+      const isBuilds = route.includes("/routing/builds");
+      const isOverrides = route.includes("/routing/overrides");
+      const routingErrors = new Map<string, [string, string, number]>([
+        [
+          "Actor is not an event team member",
+          ["forbidden", "You are not on this event team.", 403],
+        ],
+        [
+          "Actor cannot manage walking routes",
+          ["forbidden", "Only hosts can change walking routes.", 403],
+        ],
+        [
+          "Walking routes are closed",
+          ["invalid_state", "Walking routes can no longer change.", 409],
+        ],
+        ["Boundary required", ["boundary_required", "Draw the event area first.", 409]],
+        ["Build already running", ["build_running", "A build is already running.", 409]],
+        ["Build not ready for review", ["invalid_state", "This build cannot be confirmed.", 409]],
+        [
+          "Build is out of date",
+          ["build_outdated", "The area or overrides changed. Build again.", 409],
+        ],
+        [
+          "Disconnected locations need a decision",
+          ["disconnected_locations", "Decide on every disconnected stop first.", 409],
+        ],
+        [
+          "Resolve the build warnings first",
+          ["build_warnings", "Resolve the build warnings first.", 409],
+        ],
+        ["Reason required", ["invalid_request", "Give a reason.", 400]],
+        ["Recent authentication required", ["recent_auth_required", "Sign in again first.", 403]],
+        ["Invalid override", ["invalid_request", "Check the override.", 400]],
+        ["Location not found", ["not_found", "That stop is gone.", 404]],
+        ["Override not found", ["not_found", "That override is gone.", 404]],
+        [
+          "Entrance must be within 25 metres of the pin",
+          ["invalid_request", "An entrance must be within 25 metres of the pin.", 400],
+        ],
+        [
+          "Safe walking attestation required",
+          ["invalid_request", "Confirm the path is legal and safe to walk.", 400],
+        ],
+        [
+          "Connector longer than 100 metres",
+          ["invalid_request", "A connector is at most 100 metres.", 400],
+        ],
+        [
+          "Connector outside the event area",
+          ["invalid_request", "Keep the connector inside the area.", 400],
+        ],
+        [
+          "Only safety blocks during the event",
+          ["invalid_state", "During the event only blocks and manual-access marks apply.", 409],
+        ],
+      ]);
+      const routingFailure = (error: { message: string }) => {
+        const mapped = routingErrors.get(error.message);
+        if (!mapped) throw error;
+        status = "denied";
+        return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+      };
+      const routingState = async () => {
+        const { data, error } = await admin.rpc("get_event_routing_command", {
+          p_actor_id: actorId,
+          p_event_id: eventId,
+        });
+        if (error) return routingFailure(error);
+        status = "succeeded";
+        return json(eventRoutingSchema.parse(data), 200, correlationId, origin);
+      };
+      if (!isBuilds && !isOverrides && request.method === "GET") {
+        operation = "routing.read";
+        return routingState();
+      }
+      if (isBuilds && !buildId && request.method === "POST") {
+        operation = "routing.build";
+        const { metadata, source } = await loadRoutingSource();
+        const { data: started, error } = await admin.rpc("start_routing_build_command", {
+          p_actor_id: actorId,
+          p_compiler_version: COMPILER_VERSION,
+          p_correlation_id: correlationId,
+          p_event_id: eventId,
+          p_source_metadata: metadata,
+          p_source_sha256: metadata.sha256,
+        });
+        if (error) return routingFailure(error);
+        if (!started.reused) {
+          // Local compiler: runs here against the verified fixture. Hosted
+          // builds run in a pinned container with the same compiler.
+          try {
+            const result = buildRoutingPackage({
+              boundary: started.boundary,
+              locations: started.locations.map(
+                (location: { id: string; longitude: number; latitude: number }) => ({
+                  id: location.id,
+                  point: [location.longitude, location.latitude] as const,
+                }),
+              ),
+              overrides: started.overrides.flatMap(
+                (override: {
+                  id: string;
+                  kind: string;
+                  edgeKey: string | null;
+                  locationId: string | null;
+                  point: [number, number] | null;
+                  toPoint: [number, number] | null;
+                }) =>
+                  override.kind === "block_edge" && override.edgeKey
+                    ? [{ edgeKey: override.edgeKey, id: override.id, kind: "block_edge" as const }]
+                    : override.kind === "manual_access" && override.locationId
+                      ? [
+                          {
+                            id: override.id,
+                            kind: "manual_access" as const,
+                            locationId: override.locationId,
+                          },
+                        ]
+                      : override.kind === "entrance" && override.locationId && override.point
+                        ? [
+                            {
+                              id: override.id,
+                              kind: "entrance" as const,
+                              locationId: override.locationId,
+                              point: override.point,
+                            },
+                          ]
+                        : override.kind === "connector" && override.point && override.toPoint
+                          ? [
+                              {
+                                from: override.point,
+                                id: override.id,
+                                kind: "connector" as const,
+                                to: override.toPoint,
+                              },
+                            ]
+                          : [],
+              ),
+              source,
+              sourceMetadata: metadata,
+            });
+            if (!validateRoutingPackage(JSON.parse(result.body)))
+              throw new Error("invalid_package");
+            const { error: completeError } = await admin.rpc("complete_routing_build_command", {
+              p_body: result.body,
+              p_build_id: started.buildId,
+              p_diagnostics: result.diagnostics,
+            });
+            if (completeError) throw completeError;
+          } catch (buildError) {
+            await admin.rpc("fail_routing_build_command", {
+              p_build_id: started.buildId,
+              p_error: buildError instanceof Error ? buildError.message : "build_failed",
+            });
+          }
+        }
+        return routingState();
+      }
+      if (isBuilds && buildId && buildAction === "confirm" && request.method === "POST") {
+        operation = "routing.confirm";
+        const { error } = await admin.rpc("confirm_routing_build_command", {
+          p_actor_id: actorId,
+          p_build_id: buildId,
+          p_correlation_id: correlationId,
+          p_event_id: eventId,
+        });
+        if (error) return routingFailure(error);
+        return routingState();
+      }
+      if (isBuilds && buildId && buildAction === "package" && request.method === "GET") {
+        operation = "routing.preview_package";
+        const { data, error } = await admin.rpc("team_routing_package_command", {
+          p_actor_id: actorId,
+          p_build_id: buildId,
+          p_event_id: eventId,
+        });
+        if (error) return routingFailure(error);
+        if (!data) {
+          status = "denied";
+          return apiError("not_found", "That build has no package.", 404, correlationId, origin);
+        }
+        status = "succeeded";
+        const response = new Response(data, {
+          status: 200,
+          headers: {
+            ...corsHeaders(origin),
+            "cache-control": "no-store",
+            "content-type": "application/json; charset=utf-8",
+            "x-correlation-id": correlationId,
+            "x-content-type-options": "nosniff",
+          },
+        });
+        return response;
+      }
+      if (isOverrides && !overrideId && request.method === "POST") {
+        operation = "routing.override_add";
+        const input = addRoutingOverrideRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError("invalid_request", "Check the override.", 400, correlationId, origin);
+        }
+        const override = input.data;
+        const { error } = await admin.rpc("add_routing_override_command", {
+          p_actor_id: actorId,
+          p_authenticated_at: actor.authenticatedAt,
+          p_correlation_id: correlationId,
+          p_edge_key: override.kind === "block_edge" ? override.edgeKey : null,
+          p_event_id: eventId,
+          p_kind: override.kind,
+          p_location_id:
+            override.kind === "manual_access" || override.kind === "entrance"
+              ? override.locationId
+              : null,
+          p_point:
+            override.kind === "entrance"
+              ? override.point
+              : override.kind === "connector"
+                ? override.from
+                : null,
+          p_reason: override.reason,
+          p_safe_walking_attested:
+            override.kind === "connector" ? override.safeWalkingAttested : false,
+          p_to_point: override.kind === "connector" ? override.to : null,
+        });
+        if (error) return routingFailure(error);
+        return routingState();
+      }
+      if (isOverrides && overrideId && request.method === "DELETE") {
+        operation = "routing.override_remove";
+        const { error } = await admin.rpc("remove_routing_override_command", {
+          p_actor_id: actorId,
+          p_correlation_id: correlationId,
+          p_override_id: overrideId,
+        });
+        if (error) return routingFailure(error);
+        return routingState();
+      }
     }
 
     const publicLinkRoute = route.match(

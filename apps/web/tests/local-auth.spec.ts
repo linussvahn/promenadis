@@ -1848,6 +1848,154 @@ test("visitors search the public map, follow the safety feed and report a stop",
   }
 });
 
+test("hosts build, inspect, correct and approve the walking network", async ({ request }) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const marker = randomUUID().slice(0, 8);
+  const email = `walking-${marker}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const sellers = ["street", "island"].map((role) => `walking-${role}-${marker}@example.invalid`);
+  const { error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password,
+  });
+  if (createError) throw createError;
+  const sellerIds: string[] = [];
+  for (const sellerEmail of sellers) {
+    const { data, error } = await admin.auth.admin.createUser({
+      email: sellerEmail,
+      email_confirm: true,
+    });
+    if (error || !data.user) throw error ?? new Error("User missing");
+    sellerIds.push(data.user.id);
+  }
+  const client = createClient(localStatus.API_URL, publicKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data } = await client.auth.signInWithPassword({ email, password });
+  const headers = {
+    apikey: publicKey,
+    authorization: `Bearer ${data.session?.access_token}`,
+    origin: "http://127.0.0.1:5173",
+  };
+  try {
+    const created = await request.post(`${base}/events`, {
+      headers,
+      data: {
+        description: "Synthetic walking fixture",
+        endsAt: "2031-09-21T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: `Walking organizer ${marker}`,
+        startsAt: "2031-09-21T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: `Walking fixture ${marker}`,
+        visibility: "public",
+      },
+    });
+    const eventId = (await created.json()).id as string;
+    const noBoundary = await request.post(`${base}/events/${eventId}/routing/builds`, { headers });
+    expect((await noBoundary.json()).code).toBe("boundary_required");
+    localSql(`
+      select public.upsert_draft_event_boundary_command(created_by_account_id, id, null, 'Area',
+        '{"type":"Polygon","coordinates":[[[18.0600,59.3100],[18.0720,59.3100],[18.0720,59.3160],[18.0600,59.3160],[18.0600,59.3100]]]}'::jsonb,
+        gen_random_uuid()) from public.events where id='${eventId}';
+      update public.events set admission_mode='auto_inside' where id='${eventId}';
+      select public.apply_to_event_command('${sellerIds[0]}','${eventId}','Street stall','Testgatan 1','','',18.0632,59.3121,'manual',null,true,gen_random_uuid());
+      select public.apply_to_event_command('${sellerIds[1]}','${eventId}','Courtyard stall','Testgatan 2','','',18.06775,59.3118,'manual',null,true,gen_random_uuid());`);
+
+    const built = await request.post(`${base}/events/${eventId}/routing/builds`, { headers });
+    expect(built.status()).toBe(200);
+    const routing = await built.json();
+    expect(routing.latest).toMatchObject({ state: "awaiting_host_preview" });
+    expect(routing.latest.source.license).toBe("ODbL-1.0");
+    const byName = (name: string) =>
+      routing.latest.locations.find((location: { sellerNames: string[] }) =>
+        location.sellerNames.includes(name),
+      );
+    expect(byName("Street stall").status).toBe("connected");
+    expect(byName("Courtyard stall").status).toBe("disconnected");
+
+    const preview = await request.get(
+      `${base}/events/${eventId}/routing/builds/${routing.latest.id}/package`,
+      { headers },
+    );
+    const pkg = await preview.json();
+    expect(pkg.attribution).toContain("OpenStreetMap");
+    expect(JSON.stringify(pkg)).not.toContain("Testgatan");
+
+    const refused = await request.post(
+      `${base}/events/${eventId}/routing/builds/${routing.latest.id}/confirm`,
+      { headers },
+    );
+    expect((await refused.json()).code).toBe("disconnected_locations");
+
+    // Join the courtyard with a short organizer-confirmed connection and block one street.
+    const connector = await request.post(`${base}/events/${eventId}/routing/overrides`, {
+      headers,
+      data: {
+        from: [18.06755, 59.3117],
+        kind: "connector",
+        reason: "Open gate into the courtyard",
+        safeWalkingAttested: true,
+        to: [18.067, 59.3114],
+      },
+    });
+    expect(connector.status()).toBe(200);
+    const blocked = await request.post(`${base}/events/${eventId}/routing/overrides`, {
+      headers,
+      data: { edgeKey: pkg.edgeKeys[0], kind: "block_edge", reason: "Roadworks all weekend" },
+    });
+    expect((await blocked.json()).overrides).toHaveLength(2);
+    const outdated = await request.post(
+      `${base}/events/${eventId}/routing/builds/${routing.latest.id}/confirm`,
+      { headers },
+    );
+    expect((await outdated.json()).code).toBe("build_outdated");
+
+    const rebuilt = await (
+      await request.post(`${base}/events/${eventId}/routing/builds`, { headers })
+    ).json();
+    expect(
+      rebuilt.latest.locations.every(
+        (location: { status: string }) => location.status === "connected",
+      ),
+    ).toBe(true);
+    const rebuiltPackage = await (
+      await request.get(`${base}/events/${eventId}/routing/builds/${rebuilt.latest.id}/package`, {
+        headers,
+      })
+    ).json();
+    expect(rebuiltPackage.edgeKeys).not.toContain(pkg.edgeKeys[0]);
+    expect(rebuiltPackage.edgeKeys.some((key: string) => key.startsWith("c:"))).toBe(true);
+
+    const confirmed = await request.post(
+      `${base}/events/${eventId}/routing/builds/${rebuilt.latest.id}/confirm`,
+      { headers },
+    );
+    expect((await confirmed.json()).ready).toBe(true);
+    const readiness = await (
+      await request.get(`${base}/events/${eventId}/publication-readiness`, { headers })
+    ).json();
+    expect(readiness.blockers).not.toContain("routing_not_ready");
+
+    // Fixture only: the remaining publication gates are covered elsewhere.
+    localSql(`update public.events set state='published' where id='${eventId}';`);
+    const eventKey = localSql(`select public_key from public.events where id='${eventId}';`);
+    const manifest = await (await request.get(`${base}/public/events/${eventKey}/manifest`)).json();
+    expect(manifest.routing).toMatchObject({ id: manifest.routingVersion });
+    const publicPackage = await request.get(`${base}/public/routing/${manifest.routing.id}`);
+    expect(publicPackage.headers()["cache-control"]).toContain("immutable");
+    expect((await publicPackage.json()).edgeKeys).toEqual(rebuiltPackage.edgeKeys);
+    expect((await request.get(`${base}/public/routing/${routing.latest.id}`)).status()).toBe(404);
+  } finally {
+    await deleteSyntheticAccount(email);
+    for (const sellerEmail of sellers) await deleteSyntheticAccount(sellerEmail);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {

@@ -59,6 +59,7 @@ describe("boundary contracts", () => {
       expiresAt: "2026-09-07T18:00:00+02:00",
       generatedAt,
       publicRevision: 1,
+      routing: null,
       routingVersion: null,
       safetySequence: 1,
       schemaVersion: "1.0",
@@ -400,6 +401,8 @@ describe("boundary contracts", () => {
       stops: [
         {
           cluster: { z13: "1_2", z15: "3_4" },
+          entrance: null,
+          manualAccess: false,
           id: "b".repeat(24),
           latitude: 59.3,
           longitude: 18.06,

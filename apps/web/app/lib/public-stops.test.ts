@@ -26,6 +26,8 @@ const seller = (id: string, overrides: Partial<PublicSnapshot["sellers"][number]
 });
 const stop = (id: string, sellerIds: string[], cell = "1_1") => ({
   cluster: { z13: "0_0", z15: cell },
+  entrance: null,
+  manualAccess: false,
   id: id.repeat(24),
   latitude: 59.3,
   longitude: 18.06,

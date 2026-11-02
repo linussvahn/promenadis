@@ -41,7 +41,7 @@ export function Welcome() {
             <h1 id="hero-title">{translate(locale, "home.title")}</h1>
             <p className="lede">{translate(locale, "home.intro")}</p>
             <p>
-              <a className="button" href="/discover">
+              <a className="primary-button button-link" href="/discover">
                 {translate(locale, "home.discover")}
               </a>
             </p>

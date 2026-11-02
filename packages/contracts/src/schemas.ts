@@ -1365,6 +1365,7 @@ export const publicEventManifestSchema = z.strictObject({
   expiresAt: isoInstant,
   generatedAt: isoInstant,
   publicRevision: z.number().int().nonnegative(),
+  routing: publicArtifactReferenceSchema.nullable(),
   routingVersion: opaqueUuid.nullable(),
   safetySequence: z.number().int().nonnegative(),
   schemaVersion: z.literal("1.0"),
@@ -1454,9 +1455,16 @@ export const publicSnapshotSchema = z.strictObject({
     .array(
       z.strictObject({
         cluster: z.strictObject({ z13: z.string().max(20), z15: z.string().max(20) }),
+        entrance: z
+          .strictObject({
+            latitude: z.number().min(-90).max(90),
+            longitude: z.number().min(-180).max(180),
+          })
+          .nullable(),
         id: publicId,
         latitude: z.number().min(-90).max(90),
         longitude: z.number().min(-180).max(180),
+        manualAccess: z.boolean(),
         sellerIds: z.array(publicId).min(1).max(30),
       }),
     )
@@ -1586,7 +1594,116 @@ export const rotateUnlistedLinkRequestSchema = z.strictObject({
 });
 export type RotateUnlistedLinkRequest = z.infer<typeof rotateUnlistedLinkRequestSchema>;
 
+const lngLat = z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]);
+
+export const routingBuildSummarySchema = z.strictObject({
+  boundaryVersion: z.number().int().positive(),
+  byteSize: z.number().int().nonnegative().nullable(),
+  compilerVersion: z.string().max(80),
+  componentCount: z.number().int().nonnegative().nullable(),
+  confirmedAt: isoInstant.nullable(),
+  createdAt: isoInstant,
+  edgeCount: z.number().int().nonnegative().nullable(),
+  error: z.string().max(200).nullable(),
+  id: opaqueUuid,
+  locations: z.array(
+    z.strictObject({
+      component: z.number().int().nonnegative().nullable(),
+      detourRatio: z.number().nonnegative().nullable(),
+      id: opaqueUuid,
+      sellerNames: z.array(z.string().max(80)),
+      snapMeters: z.number().int().nonnegative().nullable(),
+      status: z.enum(["connected", "disconnected", "manual_access"]),
+    }),
+  ),
+  nodeCount: z.number().int().nonnegative().nullable(),
+  packageId: opaqueUuid.nullable(),
+  rejectedConnectorIds: z.array(opaqueUuid),
+  source: z.record(z.string(), z.unknown()),
+  state: z.enum([
+    "queued",
+    "running",
+    "validating",
+    "awaiting_host_preview",
+    "ready",
+    "failed",
+    "superseded",
+  ]),
+  warnings: z.array(z.string().max(60)),
+});
+
+export const routingOverrideSchema = z.strictObject({
+  createdAt: isoInstant,
+  edgeKey: z.string().max(40).nullable(),
+  id: opaqueUuid,
+  kind: z.enum(["block_edge", "manual_access", "entrance", "connector"]),
+  locationId: opaqueUuid.nullable(),
+  point: lngLat.nullable(),
+  reason: z.string().max(500),
+  toPoint: lngLat.nullable(),
+});
+
+export const eventRoutingSchema = z.strictObject({
+  active: routingBuildSummarySchema.nullable(),
+  boundaryVersion: z.number().int().positive().nullable(),
+  eventId: opaqueUuid,
+  latest: routingBuildSummarySchema.nullable(),
+  overrides: z.array(routingOverrideSchema),
+  ready: z.boolean(),
+});
+export type EventRouting = z.infer<typeof eventRoutingSchema>;
+export type RoutingBuildSummary = z.infer<typeof routingBuildSummarySchema>;
+
+export const addRoutingOverrideRequestSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    edgeKey: z.string().regex(/^[0-9]+-[0-9]+$/u),
+    kind: z.literal("block_edge"),
+    reason: z.string().trim().min(3).max(500),
+  }),
+  z.strictObject({
+    kind: z.literal("manual_access"),
+    locationId: opaqueUuid,
+    reason: z.string().trim().min(3).max(500),
+  }),
+  z.strictObject({
+    kind: z.literal("entrance"),
+    locationId: opaqueUuid,
+    point: lngLat,
+    reason: z.string().trim().min(3).max(500),
+  }),
+  z.strictObject({
+    from: lngLat,
+    kind: z.literal("connector"),
+    reason: z.string().trim().min(3).max(500),
+    safeWalkingAttested: z.literal(true),
+    to: lngLat,
+  }),
+]);
+export type AddRoutingOverrideRequest = z.infer<typeof addRoutingOverrideRequestSchema>;
+
+// The public walking-network package: street graph and attribution only.
+export const routingPackageSchema = z.strictObject({
+  attribution: z.string().min(1).max(200),
+  bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  compilerVersion: z.string().max(80),
+  edgeKeys: z.array(z.string().max(80)),
+  edges: z.array(z.number().int().nonnegative()),
+  license: z.string().min(1).max(40),
+  nodes: z.array(z.number()),
+  schemaVersion: z.literal("1.0"),
+  source: z.strictObject({
+    name: z.string().max(120),
+    retrievedAt: isoInstant,
+    sha256: sha256,
+    url: z.string().max(300),
+  }),
+});
+export type RoutingPackageContract = z.infer<typeof routingPackageSchema>;
+
 export const boundarySchemas = {
+  RoutingPackage: routingPackageSchema,
+  AddRoutingOverrideRequest: addRoutingOverrideRequestSchema,
+  EventRouting: eventRoutingSchema,
   SubmitPublicReportRequest: submitPublicReportRequestSchema,
   EarlyLocationVisibility: earlyLocationVisibilitySchema,
   PublicSafetyFeed: publicSafetyFeedSchema,

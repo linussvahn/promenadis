@@ -13,6 +13,7 @@ export default [
   route("events/:eventId/review", "routes/event-review.tsx"),
   route("events/:eventId/sellers", "routes/event-sellers.tsx"),
   route("events/:eventId/join", "routes/event-join.tsx"),
+  route("events/:eventId/walking", "routes/event-walking.tsx"),
   route("report", "routes/report.tsx"),
   route("discover", "routes/discover.tsx"),
   route("e/:key", "routes/public-event.tsx"),

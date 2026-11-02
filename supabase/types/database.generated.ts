@@ -1010,6 +1010,33 @@ export type Database = {
         }
         Relationships: []
       }
+      routing_packages: {
+        Row: {
+          body: string
+          byte_size: number
+          created_at: string
+          event_id: string
+          id: string
+          sha256: string
+        }
+        Insert: {
+          body: string
+          byte_size: number
+          created_at?: string
+          event_id: string
+          id?: string
+          sha256: string
+        }
+        Update: {
+          body?: string
+          byte_size?: number
+          created_at?: string
+          event_id?: string
+          id?: string
+          sha256?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1027,6 +1054,15 @@ export type Database = {
         Returns: Json
       }
       account_recovery_status: { Args: { p_account_id: string }; Returns: Json }
+      active_routing_package: {
+        Args: { p_event_id: string }
+        Returns: {
+          byte_size: number
+          confirmed_at: string
+          package_id: string
+          sha256: string
+        }[]
+      }
       advance_event_lifecycle_command: { Args: never; Returns: number }
       apply_postponement: {
         Args: {
@@ -1061,6 +1097,7 @@ export type Database = {
         Returns: boolean
       }
       enforce_event_retention_command: { Args: never; Returns: number }
+      enforce_routing_retention_command: { Args: never; Returns: number }
       erase_due_accounts_command: { Args: never; Returns: number }
       erase_event_seller_data: { Args: { p_event_id: string }; Returns: number }
       event_boundary_summary: {
@@ -1237,10 +1274,27 @@ export type Database = {
         Args: { p_authenticated_at: string }
         Returns: undefined
       }
+      require_routing_editor: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: Database["public"]["Tables"]["events"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       resolve_recovery_dispatch: {
         Args: { p_correlation_id: string; p_dispatch_id: string }
         Returns: string
       }
+      routing_blockers: { Args: { p_event_id: string }; Returns: Json }
+      routing_build_summary: {
+        Args: { p_build: Database["public"]["Tables"]["routing_builds"]["Row"] }
+        Returns: Json
+      }
+      routing_locations: { Args: { p_event_id: string }; Returns: Json }
+      routing_overrides_hash: { Args: { p_event_id: string }; Returns: string }
       seller_listing_summary: {
         Args: { p_participation_id: string }
         Returns: Json
@@ -2163,6 +2217,155 @@ export type Database = {
           },
         ]
       }
+      routing_builds: {
+        Row: {
+          boundary_version: number
+          compiler_version: string
+          confirmed_at: string | null
+          confirmed_by_account_id: string | null
+          created_at: string
+          diagnostics: Json | null
+          error: string | null
+          event_id: string
+          id: string
+          overrides_hash: string
+          package_id: string | null
+          requested_by_account_id: string | null
+          source_metadata: Json
+          source_sha256: string
+          state: string
+          superseded_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          boundary_version: number
+          compiler_version: string
+          confirmed_at?: string | null
+          confirmed_by_account_id?: string | null
+          created_at?: string
+          diagnostics?: Json | null
+          error?: string | null
+          event_id: string
+          id?: string
+          overrides_hash: string
+          package_id?: string | null
+          requested_by_account_id?: string | null
+          source_metadata: Json
+          source_sha256: string
+          state?: string
+          superseded_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          boundary_version?: number
+          compiler_version?: string
+          confirmed_at?: string | null
+          confirmed_by_account_id?: string | null
+          created_at?: string
+          diagnostics?: Json | null
+          error?: string | null
+          event_id?: string
+          id?: string
+          overrides_hash?: string
+          package_id?: string | null
+          requested_by_account_id?: string | null
+          source_metadata?: Json
+          source_sha256?: string
+          state?: string
+          superseded_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routing_builds_confirmed_by_account_id_fkey"
+            columns: ["confirmed_by_account_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "routing_builds_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routing_builds_requested_by_account_id_fkey"
+            columns: ["requested_by_account_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["account_id"]
+          },
+        ]
+      }
+      routing_overrides: {
+        Row: {
+          created_at: string
+          created_by_account_id: string | null
+          edge_key: string | null
+          event_id: string
+          id: string
+          kind: string
+          location_id: string | null
+          point: unknown
+          reason: string
+          removed_at: string | null
+          safe_walking_attested: boolean
+          to_point: unknown
+        }
+        Insert: {
+          created_at?: string
+          created_by_account_id?: string | null
+          edge_key?: string | null
+          event_id: string
+          id?: string
+          kind: string
+          location_id?: string | null
+          point?: unknown
+          reason: string
+          removed_at?: string | null
+          safe_walking_attested?: boolean
+          to_point?: unknown
+        }
+        Update: {
+          created_at?: string
+          created_by_account_id?: string | null
+          edge_key?: string | null
+          event_id?: string
+          id?: string
+          kind?: string
+          location_id?: string | null
+          point?: unknown
+          reason?: string
+          removed_at?: string | null
+          safe_walking_attested?: boolean
+          to_point?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routing_overrides_created_by_account_id_fkey"
+            columns: ["created_by_account_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "routing_overrides_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routing_overrides_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "event_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seller_availability: {
         Row: {
           ends_at: string
@@ -2624,6 +2827,22 @@ export type Database = {
         Args: { p_claim_id: string }
         Returns: boolean
       }
+      add_routing_override_command: {
+        Args: {
+          p_actor_id: string
+          p_authenticated_at: string
+          p_correlation_id: string
+          p_edge_key: string
+          p_event_id: string
+          p_kind: string
+          p_location_id: string
+          p_point: Json
+          p_reason: string
+          p_safe_walking_attested: boolean
+          p_to_point: Json
+        }
+        Returns: Json
+      }
       admin_find_account_command: {
         Args: {
           p_actor_id: string
@@ -2845,6 +3064,10 @@ export type Database = {
         Args: { p_claim_id: string }
         Returns: undefined
       }
+      complete_routing_build_command: {
+        Args: { p_body: string; p_build_id: string; p_diagnostics: Json }
+        Returns: Json
+      }
       confirm_account_recovery_email_command: {
         Args: {
           p_claim_id: string
@@ -2859,6 +3082,15 @@ export type Database = {
           p_actor_id: string
           p_correlation_id: string
           p_participation_id: string
+        }
+        Returns: Json
+      }
+      confirm_routing_build_command: {
+        Args: {
+          p_actor_id: string
+          p_build_id: string
+          p_correlation_id: string
+          p_event_id: string
         }
         Returns: Json
       }
@@ -3021,6 +3253,10 @@ export type Database = {
         }
         Returns: Json
       }
+      fail_routing_build_command: {
+        Args: { p_build_id: string; p_error: string }
+        Returns: undefined
+      }
       finish_account_recovery_dispatch_command: {
         Args: { p_correlation_id: string; p_dispatch_id: string }
         Returns: string
@@ -3050,6 +3286,10 @@ export type Database = {
         Returns: Json
       }
       get_event_publication_readiness_command: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: Json
+      }
+      get_event_routing_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
       }
@@ -3275,6 +3515,10 @@ export type Database = {
         Returns: Json
       }
       public_organizer_page_command: { Args: { p_key: string }; Returns: Json }
+      public_routing_package_command: {
+        Args: { p_package_id: string }
+        Returns: Json
+      }
       public_sitemap_command: { Args: never; Returns: Json }
       public_snapshot_command: {
         Args: { p_snapshot_id: string }
@@ -3339,6 +3583,14 @@ export type Database = {
           p_expected_team_version: number
           p_membership_id: string
           p_organizer_profile_id: string
+        }
+        Returns: Json
+      }
+      remove_routing_override_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_override_id: string
         }
         Returns: Json
       }
@@ -3526,6 +3778,17 @@ export type Database = {
         }
         Returns: Json
       }
+      start_routing_build_command: {
+        Args: {
+          p_actor_id: string
+          p_compiler_version: string
+          p_correlation_id: string
+          p_event_id: string
+          p_source_metadata: Json
+          p_source_sha256: string
+        }
+        Returns: Json
+      }
       store_browser_session_command: {
         Args: {
           p_account_id: string
@@ -3572,6 +3835,10 @@ export type Database = {
       take_browser_session_command: {
         Args: { p_hash: string; p_kind: string; p_lease: string }
         Returns: Json
+      }
+      team_routing_package_command: {
+        Args: { p_actor_id: string; p_build_id: string; p_event_id: string }
+        Returns: string
       }
       update_draft_event_details_command: {
         Args: {

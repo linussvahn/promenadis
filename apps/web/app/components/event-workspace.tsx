@@ -13,8 +13,9 @@ import { EventSellers } from "./event-sellers";
 import { EventTeam } from "./event-team";
 import { PublicationReadiness } from "./publication-readiness";
 import { RegistrationEditor } from "./registration-editor";
+import { WalkingNetwork } from "./walking-network";
 
-type WorkspaceView = "overview" | "area" | "registration" | "review" | "sellers";
+type WorkspaceView = "overview" | "area" | "registration" | "review" | "sellers" | "walking";
 
 export function EventWorkspace({ view }: { readonly view: WorkspaceView }) {
   return (
@@ -183,6 +184,22 @@ function EventWorkspaceContent({
     );
   }
 
+  if (view === "walking") {
+    return (
+      <main className="account-page flow-page wide-flow-page" id="main" tabIndex={-1}>
+        <Link className="back-link" to={`/events/${event.id}`}>
+          ← {translate(locale, "event.backToOverview")}
+        </Link>
+        <header className="app-heading flow-heading">
+          <p className="eyebrow">{event.title}</p>
+          <h1>{translate(locale, "walking.title")}</h1>
+          <p className="lede">{translate(locale, "walking.intro")}</p>
+        </header>
+        <WalkingNetwork accessToken={accessToken} event={event} locale={locale} />
+      </main>
+    );
+  }
+
   if (view === "registration") {
     return (
       <main className="account-page flow-page" id="main" tabIndex={-1}>
@@ -339,6 +356,9 @@ function EventWorkspaceContent({
           </ol>
           <Link className="secondary-button button-link" to={`/events/${event.id}/sellers`}>
             {translate(locale, "sellers.open")}
+          </Link>
+          <Link className="secondary-button button-link" to={`/events/${event.id}/walking`}>
+            {translate(locale, "walking.open")}
           </Link>
           <div className="upcoming-note">
             <strong>{translate(locale, "event.nextFeatures")}</strong>

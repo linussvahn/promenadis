@@ -208,7 +208,11 @@ export function EventLanding({
       </dl>
       {event.state === "published" || event.state === "active" ? (
         <p>
-          <Link className="button" rel="nofollow" to={`${eventPath(event)}/map`}>
+          <Link
+            className="primary-button button-link"
+            rel="nofollow"
+            to={`${eventPath(event)}/map`}
+          >
             {translate(locale, "map.showMap")}
           </Link>
         </p>
@@ -248,7 +252,7 @@ export function DiscoveryPage({
           <input defaultChecked={liveOnly} name="live" type="checkbox" value="1" />
           <span>{translate(locale, "public.discover.liveOnly")}</span>
         </label>
-        <button className="button" type="submit">
+        <button className="primary-button" type="submit">
           {translate(locale, "public.discover.searchButton")}
         </button>
       </Form>

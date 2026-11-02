@@ -12,6 +12,7 @@
       "!!**/test-results",
       "!!apps/web/.react-router",
       "!!supabase/.temp",
+      "!!supabase/functions/api-v1/fixtures",
       "!!supabase/types/database.generated.ts"
     ]
   },
