@@ -201,7 +201,7 @@ or counsel work before a pilot.
 | Browser credential theft, refresh races or cookie replay | `test:local-session-security`, gateway tests, e2e session test | Hosted cookie flags over HTTPS |
 | Owner lockout or fraudulent transfer | pgTAP 060–110 | — |
 | Privilege escalation/admin misuse | pgTAP 220–250, 320, 400 (elevation required for switches, support, appeals) | Second-admin approval exercised with two real admins |
-| Malicious UGC, stored XSS, badge impersonation | Plain-text rendering only (no raw HTML anywhere; JSON-LD escapes `<`), public-pages test | Script-source CSP with nonces |
+| Malicious UGC, stored XSS, badge impersonation | Plain-text rendering only (no raw HTML anywhere; JSON-LD escapes `<`), public-pages test; per-response script nonce CSP (`script-src 'self' 'nonce-…'`, `script-src-attr 'none'`), e2e "scripts run only from this origin or with the response nonce" | CSP verified at the CDN edge |
 | CSV formula injection | pgTAP 390, e2e export test (`=HYPERLINK` neutralized) | — |
 | Report/relay spam or targeted harassment | pgTAP 310, 390, 400 (network and subject buckets, honeypots), incident switches | Turnstile |
 | SSRF/provider-response poisoning | Geocoder fixture adapter with fixed hosts; routing source checksum | Hosted Geoapify response validation |

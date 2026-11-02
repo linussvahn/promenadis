@@ -467,8 +467,22 @@ assets and page that loaded before it took control, and keeps `theme.js`
 and `register-sw.js` for offline use. Before this, a walk started on the
 first visit fell back to the generic offline page on reload.
 `pnpm test:local-offline` proves the fix against the production build.
-Still open: real devices and installed PWAs, a script-source CSP with
-hydration nonces, signed-in route sync (deferred).
+Still open: real devices and installed PWAs, signed-in route sync
+(deferred).
+
+### Script nonce CSP (2026-11-03)
+
+No migration. Each server-rendered response gets a random 128-bit nonce
+(`app/entry.server.tsx`) passed to React's stream, `ServerRouter`,
+`Scripts` and `ScrollRestoration` via `CspNonceContext`. Policy, from
+`contentSecurityPolicy` in `app/lib/csp-nonce.ts`: `script-src 'self'
+'nonce-…'`, `script-src-attr 'none'`, `worker-src 'self' blob:` (maplibre
+tile workers), plus the earlier frame/object/base/form rules. Other
+directives stay open: map tiles, styles and fonts come from OpenFreeMap.
+Dev and production builds were probed with no violations, including the
+routing worker. Smoke e2e proves injected inline scripts and handler
+attributes are refused. Pages cached by the service worker keep their own
+header and nonce.
 
 ### Milestone 6 code work complete locally (2026-11-06)
 

@@ -8,6 +8,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import type { Route } from "./+types/root";
+import { useCspNonce } from "./lib/csp-nonce";
 import stylesheet from "./styles/app.css?url";
 
 export const links: Route.LinksFunction = () => [
@@ -26,6 +27,7 @@ export const meta: Route.MetaFunction = () => [
 ];
 
 export function Layout({ children }: { readonly children: ReactNode }) {
+  const nonce = useCspNonce();
   return (
     <html lang="sv" suppressHydrationWarning>
       <head>
@@ -34,12 +36,12 @@ export function Layout({ children }: { readonly children: ReactNode }) {
         <Meta />
         {/* The bootstrap sets only the root theme attribute before hydration. */}
         <script src="/theme.js" />
-        <Links />
+        <Links nonce={nonce} />
       </head>
       <body>
         {children}
-        <ScrollRestoration />
-        <Scripts />
+        <ScrollRestoration nonce={nonce} />
+        <Scripts nonce={nonce} />
         <script src="/register-sw.js" />
       </body>
     </html>

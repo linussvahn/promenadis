@@ -26,6 +26,13 @@ await new Promise((ready, fail) => {
   });
   server.on("exit", (code) => fail(new Error(`Server exited with ${code}`)));
 });
+// The proxy listens before the app behind it does; wait for a real page.
+for (let attempt = 0; ; attempt += 1) {
+  const response = await fetch("http://127.0.0.1:4173/").catch(() => null);
+  if (response?.ok) break;
+  if (attempt > 100) throw new Error("The production build never answered.");
+  await new Promise((settle) => setTimeout(settle, 200));
+}
 
 const failures = [];
 const check = (condition, message) => {

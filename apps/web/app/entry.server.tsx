@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { PassThrough } from "node:stream";
 
 import type { EntryContext, RouterContextProvider } from "react-router";
@@ -6,6 +7,7 @@ import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
+import { CspNonceContext, contentSecurityPolicy } from "./lib/csp-nonce";
 
 export const streamTimeout = 5_000;
 
@@ -18,12 +20,10 @@ export default function handleRequest(
 ) {
   // Location may be asked for by this origin only, never by embedded frames.
   responseHeaders.set("Permissions-Policy", "geolocation=(self), camera=(), microphone=()");
-  // No framing, plugins, foreign base URLs or cross-origin form posts. Script
-  // sources stay open for now: hydration uses inline scripts without a nonce.
-  responseHeaders.set(
-    "Content-Security-Policy",
-    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
-  );
+  // No framing, plugins, foreign base URLs or cross-origin form posts, and
+  // scripts only from this origin or carrying this response's nonce.
+  const nonce = randomBytes(16).toString("base64");
+  responseHeaders.set("Content-Security-Policy", contentSecurityPolicy(nonce));
   responseHeaders.set("X-Frame-Options", "DENY");
   responseHeaders.set("X-Content-Type-Options", "nosniff");
   // Routes that need stricter referrer handling (unlisted pages) set it themselves.
@@ -56,8 +56,11 @@ export default function handleRequest(
     );
 
     const { pipe, abort } = renderToPipeableStream(
-      <ServerRouter context={routerContext} url={request.url} />,
+      <CspNonceContext.Provider value={nonce}>
+        <ServerRouter context={routerContext} nonce={nonce} url={request.url} />
+      </CspNonceContext.Provider>,
       {
+        nonce,
         [readyOption]() {
           shellRendered = true;
           const body = new PassThrough({

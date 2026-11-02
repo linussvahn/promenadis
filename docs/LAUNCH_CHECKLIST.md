@@ -301,8 +301,8 @@ anonymous-denial and security-header e2e, server-rendered pages now send
 `Content-Security-Policy: frame-ancestors 'none'; object-src 'none';
 base-uri 'self'; form-action 'self'`, `X-Frame-Options`, `nosniff` and a
 default referrer policy; threat-to-test mapping in `docs/THREAT_MODEL.md`
-section 9) is complete locally as of 2026-11-06. A script-source CSP needs
-hydration nonces and stays open. Slice 2 (ETag/304 for manifest and safety
+section 9) is complete locally as of 2026-11-06. A script-source CSP with a
+per-response nonce followed on 2026-11-03 (`app/lib/csp-nonce.ts`). Slice 2 (ETag/304 for manifest and safety
 feed with weak comparison through compressing proxies and a conditional
 client cache; envelope load test `pnpm test:local-load`: 500 sellers at 450
 stops give a 510 KB snapshot, 40 KB gzipped, built in about 0.2 s, a 0.3 KB
