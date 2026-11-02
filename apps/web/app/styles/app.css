@@ -1745,3 +1745,22 @@ select:disabled {
   flex-wrap: wrap;
   gap: 0.75rem;
 }
+
+.route-planner .stop-list {
+  margin-top: 1rem;
+}
+
+.route-current {
+  border-width: 0.1875rem;
+  border-color: light-dark(#20322b, #a0dcb8);
+}
+
+.map-start-marker {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: #2e6b4f;
+  border: 0.1875rem solid #fffdf8;
+  border-radius: 999rem;
+  box-shadow: 0 0.2rem 0.6rem rgb(32 50 43 / 30%);
+}

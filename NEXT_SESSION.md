@@ -505,6 +505,28 @@ Slice 1, `20261105000100_walking_network.sql`:
   /public/routing/{id}` (immutable cache, ETag). Web: `/events/:id/walking`
   with status, map preview (tap a segment to block it), per-stop status,
   manual-access, block and connector forms, override list.
+Slice 2 (browser routing, no migration):
+
+- `packages/routing/src/graph.ts`: `WalkingGraph` (CSR adjacency, uniform
+  grid for snapping, Dijkstra from a snapped point, pairwise matrix, path
+  geometry); blocked edge keys from the safety feed are excluded at load.
+- `packages/routing/src/order.ts`: `schedule` (waits for windows, records
+  likely misses, manual gaps with null time), `orderRoute` (nearest
+  neighbour + reversal/relocation local search; shortest baseline;
+  availability plan limited to 1.2× walking unless must-see; an alternative
+  that misses fewer is returned, not applied), `visitMinutes` presets.
+- Web: `app/lib/route-compute.ts` (pure; snaps, connected component,
+  excluded stops, legs by stop ID, paths), `routing.worker.ts` +
+  `route-planner.ts` (worker with inline fallback), `route-state.ts`
+  (localStorage `promenadis-route:{eventKey}`, expires with the snapshot;
+  storage failure shows a loss-risk notice), `components/route-planner.tsx`.
+  The map page loads the manifest-selected package, offers "add to walk"
+  and "must see" per seller, draws the route (manual gaps dotted), lets a
+  start be picked on the map, and offers recalculation when the required
+  graph or blocked edges change.
+- `pnpm demo:seed` now builds and approves the demo walking network through
+  the BFF before publishing.
+
 - AGENTS.md asks to keep local data and avoid database resets; `pnpm
   db:verify` still resets by design, so run it knowing local demo data goes
   (`pnpm demo:seed` restores the demo).

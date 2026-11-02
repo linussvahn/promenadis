@@ -210,6 +210,17 @@ package retention) is complete locally as of 2026-11-05: pgTAP 370, routing
 build tests, walking-network component tests and the e2e "hosts build,
 inspect, correct and approve the walking network"; database verification 900/900. The hosted source
 (weekly Geofabrik extract) and pinned compiler container are pilot gates.
+Slice 2 (browser routing in a Web Worker with main-thread fallback: grid
+spatial index, binary-heap Dijkstra, start snap within 100 m, stop snap
+within 60 m; availability-aware ordering with the 20% guardrail and offered
+alternative, must-see up to 10, locked positions, shortest mode, return to
+start, pace presets, manual gaps without invented time, excluded stops that
+can be included; route list, drawn path, next/previous, skip/undo, visited
+per stop or seller, manual reorder with recalculation; route state on the
+device only, expiring with the event; live network changes offered, never
+applied silently) is complete locally: routing graph/order tests,
+route-state tests and the extended e2e "hosts build, inspect, correct and
+approve the walking network".
 
 - Checksum-verified OSM acquisition, isolated graph build, immutable package,
   metadata/attribution, host preview, override and rollback lifecycle.

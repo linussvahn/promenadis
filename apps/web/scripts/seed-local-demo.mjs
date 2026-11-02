@@ -1,7 +1,8 @@
 // Local preview only: creates a synthetic, already-live public flea market
 // with three sellers so the public pages and map can be tried by hand.
-// Publication is set directly because walking routes (Milestone 4) still gate
-// the real publish command. Synthetic data only; never run against a hosted
+// The walking network is built and approved through the BFF; publication is
+// then set directly because the other publish gates (recovery code,
+// attestation, first-event review) are not part of a demo. Synthetic data only; never run against a hosted
 // project.
 import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
@@ -101,15 +102,47 @@ select public.save_seller_listing_command('${ids[role]}',
   '${tags}', ${stepFree ?? "null"}, null, null, 'outdoor', null, false, '[]', '[]', gen_random_uuid());`,
   )
   .join("\n")}
-update public.events set state = 'published' where title = '${title}';
-update public.events set state = 'active' where title = '${title}';
-select app_private.refresh_public_snapshots_command();
-select public_key from public.events where title = '${title}';`)
+select id from public.events where title = '${title}';`)
   .split("\n")
   .at(-1);
 
-console.log(`Demo event is live: http://127.0.0.1:5173/e/${key}`);
-console.log(`Map: http://127.0.0.1:5173/e/${key}/map`);
+// Build and approve the walking network through the BFF, as a host would.
+const password = `Local-demo-${crypto.randomUUID()}`;
+await admin.auth.admin.updateUserById(ids.owner, { password });
+const browser = createClient(status.API_URL, status.PUBLISHABLE_KEY ?? status.ANON_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+const { data: signedIn, error: signInError } = await browser.auth.signInWithPassword({
+  email: "demo-owner@example.invalid",
+  password,
+});
+if (signInError) throw signInError;
+const bff = async (path) => {
+  const response = await fetch(`${status.API_URL}/functions/v1/api-v1${path}`, {
+    headers: {
+      apikey: status.PUBLISHABLE_KEY ?? status.ANON_KEY,
+      authorization: `Bearer ${signedIn.session.access_token}`,
+      origin: "http://127.0.0.1:5173",
+    },
+    method: "POST",
+  });
+  if (!response.ok) throw new Error(`${path}: ${response.status} ${await response.text()}`);
+  return response.json();
+};
+const built = await bff(`/events/${key}/routing/builds`);
+await bff(`/events/${key}/routing/builds/${built.latest.id}/confirm`);
+await browser.auth.signOut();
+
+const publicKey = sql(`
+update public.events set state = 'published' where id = '${key}';
+update public.events set state = 'active' where id = '${key}';
+select app_private.refresh_public_snapshots_command();
+select public_key from public.events where id = '${key}';`)
+  .split("\n")
+  .at(-1);
+
+console.log(`Demo event is live: http://127.0.0.1:5173/e/${publicKey}`);
+console.log(`Map: http://127.0.0.1:5173/e/${publicKey}/map`);
 console.log(
   "Sign in as demo-owner@example.invalid (codes arrive in Mailpit, http://127.0.0.1:54324).",
 );

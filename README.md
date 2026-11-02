@@ -131,9 +131,10 @@ The focused regression `pnpm test:local-session-security` checks stale-session
 step-up and revocation using a disposable synthetic account.
 
 To try the public pages and map, run `pnpm demo:seed` after `pnpm db:start`.
-It creates a synthetic live public flea market with three sellers and prints
-its landing and map URLs. Publication is set directly because walking routes
-still gate the publish command.
+It creates a synthetic live public flea market with three sellers, builds and
+approves its walking network, and prints its landing and map URLs.
+Publication is set directly because the remaining publish gates (recovery
+code, attestation, first-event review) are not part of a demo.
 
 ## Existing prototype
 

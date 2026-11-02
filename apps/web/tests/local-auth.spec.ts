@@ -1848,7 +1848,7 @@ test("visitors search the public map, follow the safety feed and report a stop",
   }
 });
 
-test("hosts build, inspect, correct and approve the walking network", async ({ request }) => {
+test("hosts build, inspect, correct and approve the walking network", async ({ page, request }) => {
   test.setTimeout(90_000);
   if (!admin || !localStatus) throw new Error("Local test configuration missing");
   const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
@@ -1990,6 +1990,42 @@ test("hosts build, inspect, correct and approve the walking network", async ({ r
     expect(publicPackage.headers()["cache-control"]).toContain("immutable");
     expect((await publicPackage.json()).edgeKeys).toEqual(rebuiltPackage.edgeKeys);
     expect((await request.get(`${base}/public/routing/${routing.latest.id}`)).status()).toBe(404);
+
+    // A visitor plans and starts a walk; progress stays on the device.
+    localSql(`update public.events set state='active' where id='${eventId}';
+      select app_private.refresh_public_snapshots_command();`);
+    await page.goto(`/e/${eventKey}/map`);
+    const addToWalk = page.getByLabel("Lägg till i promenaden");
+    await expect(addToWalk).toHaveCount(2);
+    await addToWalk.nth(0).check();
+    await addToWalk.nth(1).check();
+    await page.getByRole("button", { name: "Planera promenaden" }).click();
+    const planner = page.getByRole("region", { name: "Planera en promenad" });
+    await expect(planner.getByText(/Gång \d+ min/u)).toBeVisible();
+    await expect(planner.getByRole("heading", { name: /^1\. Stopp/u })).toBeVisible();
+    await expect(planner.getByRole("heading", { name: /^2\. Stopp/u })).toBeVisible();
+    await planner.getByRole("button", { name: "Starta promenaden" }).click();
+    await planner.getByRole("button", { name: "Markera besökt" }).first().click();
+    await page.reload();
+    await expect(
+      page.getByRole("region", { name: "Planera en promenad" }).getByText(/· Besökt/u),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() =>
+        Object.keys(localStorage).some((k) => k.startsWith("promenadis-route:")),
+      ),
+    ).toBe(true);
+
+    // An unsafe segment blocked during the event is offered, never applied silently.
+    const live = await request.post(`${base}/events/${eventId}/routing/overrides`, {
+      headers,
+      data: { edgeKey: rebuiltPackage.edgeKeys[5], kind: "block_edge", reason: "Fallen tree" },
+    });
+    expect(live.status()).toBe(200);
+    await expect(page.getByText(/Gångnätet har ändrats/u)).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole("region", { name: "Planera en promenad" }).getByText(/· Besökt/u),
+    ).toBeVisible();
   } finally {
     await deleteSyntheticAccount(email);
     for (const sellerEmail of sellers) await deleteSyntheticAccount(sellerEmail);

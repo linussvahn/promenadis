@@ -1,6 +1,10 @@
-import type { PublicSafetyFeed, PublicSnapshot } from "@promenadis/contracts";
+import type {
+  PublicSafetyFeed,
+  PublicSnapshot,
+  RoutingPackageContract,
+} from "@promenadis/contracts";
 import { formatCurrency, formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MapView, { Layer, type MapRef, Marker, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
@@ -13,8 +17,17 @@ import {
   type StopFilters,
   type VisibleStop,
 } from "../lib/public-stops";
+import {
+  emptyRoute,
+  loadRoute,
+  type SavedRoute,
+  saveRoute,
+  setMustSee,
+  setSelected,
+} from "../lib/route-state";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { DEFAULT_CENTER, MAP_STYLE, MapErrorBoundary } from "./boundary-editor";
+import { RoutePlanner } from "./route-planner";
 
 type Route = "public" | "unlisted";
 type LoadState =
@@ -24,6 +37,9 @@ type LoadState =
       readonly feed: PublicSafetyFeed;
       readonly snapshot: PublicSnapshot | null;
       readonly checkedAt: Date;
+      /** The walking network the manifest selects, when one is approved. */
+      readonly pkg: RoutingPackageContract | null;
+      readonly graphVersion: string | null;
     };
 
 const FEED_INTERVAL_MS = 15_000;
@@ -35,6 +51,7 @@ const MANIFEST_INTERVAL_MS = 60_000;
 function usePublicStops(route: Route, eventKey: string) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const snapshotRef = useRef<PublicSnapshot | null>(null);
+  const packageRef = useRef<{ id: string; pkg: RoutingPackageContract } | null>(null);
   useEffect(() => {
     const api = getPromenadisApiClient();
     if (!api) {
@@ -64,10 +81,19 @@ function usePublicStops(route: Route, eventKey: string) {
           else if (snapshotRef.current?.revision !== manifest.publicRevision) {
             snapshotRef.current = await api.getPublicSnapshot(manifest.snapshot.id);
           }
+          if (!manifest.routing) packageRef.current = null;
+          else if (packageRef.current?.id !== manifest.routing.id) {
+            const pkg = await api.getPublicRoutingPackage(manifest.routing.id);
+            packageRef.current = { id: manifest.routing.id, pkg };
+          }
         }
         const feed = await api.getPublicSafetyFeed(route, eventKey);
-        // A new safety sequence means a rebuilt snapshot is on its way.
+        // A new safety sequence means a rebuilt snapshot is on its way; a new
+        // required graph means a new walking network to fetch (and accept).
         if (lastSequence !== null && feed.sequence !== lastSequence) lastManifestAt = 0;
+        if (feed.requiredGraphVersion && feed.requiredGraphVersion !== packageRef.current?.id) {
+          lastManifestAt = 0;
+        }
         lastSequence = feed.sequence;
         if (feed.state !== "published" && feed.state !== "active") {
           snapshotRef.current = null;
@@ -80,7 +106,16 @@ function usePublicStops(route: Route, eventKey: string) {
           if (!cancelled) setState({ kind: "expired" });
           return;
         }
-        if (!cancelled) setState({ checkedAt: new Date(), feed, kind: "ready", snapshot });
+        if (!cancelled) {
+          setState({
+            checkedAt: new Date(),
+            feed,
+            graphVersion: packageRef.current?.id ?? null,
+            kind: "ready",
+            pkg: packageRef.current?.pkg ?? null,
+            snapshot,
+          });
+        }
       } catch {
         // Without a fresh feed, precise data is not shown.
         snapshotRef.current = null;
@@ -106,12 +141,17 @@ function SellerDetails({
   snapshot,
   locale,
   route,
+  walk,
+  onWalkChange,
 }: {
   readonly seller: PublicSeller;
   readonly snapshot: PublicSnapshot;
   readonly locale: Locale;
   readonly route: Route;
+  readonly walk: SavedRoute;
+  readonly onWalkChange: (walk: SavedRoute) => void;
 }) {
+  const chosen = walk.selected.includes(seller.id);
   const facts = [
     seller.accessibility.stepFree ? translate(locale, "map.stepFree") : null,
     seller.accessibility.stairs ? translate(locale, "map.stairs") : null,
@@ -166,6 +206,29 @@ function SellerDetails({
             .join(", ")}
         </p>
       ) : null}
+      <label className="checkbox-field">
+        <input
+          checked={chosen}
+          onChange={(event) =>
+            onWalkChange(setSelected(walk, seller.id, event.currentTarget.checked))
+          }
+          type="checkbox"
+        />
+        <span>{translate(locale, "route.add")}</span>
+      </label>
+      {chosen ? (
+        <label className="checkbox-field">
+          <input
+            checked={walk.mustSee.includes(seller.id)}
+            disabled={!walk.mustSee.includes(seller.id) && walk.mustSee.length >= 10}
+            onChange={(event) =>
+              onWalkChange(setMustSee(walk, seller.id, event.currentTarget.checked))
+            }
+            type="checkbox"
+          />
+          <span>{translate(locale, "route.mustSee")}</span>
+        </label>
+      ) : null}
       <a
         className="text-link"
         href={`/report?key=${snapshot.eventKey}&route=${route}&type=participation&subject=${seller.id}`}
@@ -177,17 +240,49 @@ function SellerDetails({
   );
 }
 
+function routeFeatures(walk: SavedRoute, stops: readonly VisibleStop[]) {
+  const plan = walk.plan;
+  if (!plan || walk.planStale) return null;
+  const byId = new Map(stops.map((stop) => [stop.id, stop]));
+  const point = (id: string | null) => {
+    const stop = id ? byId.get(id) : null;
+    return stop ? [stop.longitude, stop.latitude] : walk.preferences.startPoint;
+  };
+  return {
+    features: plan.legs.flatMap((leg, index) => {
+      const path = plan.paths[index];
+      const coordinates = path ?? [point(leg.fromStopId), point(leg.toStopId)].filter(Boolean);
+      return coordinates.length >= 2
+        ? [
+            {
+              geometry: { coordinates: coordinates as number[][], type: "LineString" as const },
+              properties: { gap: leg.manualGap },
+              type: "Feature" as const,
+            },
+          ]
+        : [];
+    }),
+    type: "FeatureCollection" as const,
+  };
+}
+
 function StopsMap({
   stops,
   snapshot,
   locale,
   onSelect,
+  walk,
+  onPick,
 }: {
   readonly stops: readonly VisibleStop[];
   readonly snapshot: PublicSnapshot;
   readonly locale: Locale;
   readonly onSelect: (stopId: string) => void;
+  readonly walk: SavedRoute;
+  readonly onPick: ((point: readonly [number, number]) => void) | null;
 }) {
+  const lines = routeFeatures(walk, stops);
+  const start = walk.preferences.startKind === "map" ? walk.preferences.startPoint : null;
   const mapRef = useRef<MapRef | null>(null);
   const [zoom, setZoom] = useState(15);
   const ring = snapshot.event.boundary?.coordinates[0] ?? [];
@@ -201,9 +296,36 @@ function StopsMap({
     <MapView
       initialViewState={{ latitude: center[1] ?? 0, longitude: center[0] ?? 0, zoom: 15 }}
       mapStyle={MAP_STYLE}
+      onClick={({ lngLat }) => onPick?.([lngLat.lng, lngLat.lat])}
       onMove={({ viewState }) => setZoom(viewState.zoom)}
       ref={mapRef}
     >
+      {lines ? (
+        <Source data={lines} id="public-route" type="geojson">
+          <Layer
+            filter={["!", ["get", "gap"]]}
+            id="public-route-walk"
+            paint={{ "line-color": "#20322b", "line-width": 4 }}
+            type="line"
+          />
+          {/* Manual connection: dotted, never a normal route line. */}
+          <Layer
+            filter={["get", "gap"]}
+            id="public-route-gap"
+            paint={{ "line-color": "#8d3d22", "line-dasharray": [1, 2], "line-width": 3 }}
+            type="line"
+          />
+        </Source>
+      ) : null}
+      {start ? (
+        <Marker latitude={start[1]} longitude={start[0]}>
+          <span
+            aria-label={translate(locale, "route.start")}
+            className="map-start-marker"
+            role="img"
+          />
+        </Marker>
+      ) : null}
       {ring.length >= 3 ? (
         <Source
           data={{
@@ -277,6 +399,18 @@ export function PublicEventMap({
     () => (ready?.snapshot ? filterStops(allStops, ready.snapshot, filters, ready.checkedAt) : []),
     [allStops, ready, filters],
   );
+  const expiresAt = ready?.snapshot?.expiresAt ?? null;
+  const [walk, setWalk] = useState<SavedRoute>(() =>
+    emptyRoute(eventKey, new Date(0).toISOString()),
+  );
+  const [storageFailed, setStorageFailed] = useState(false);
+  useEffect(() => {
+    if (expiresAt) setWalk(loadRoute(eventKey, expiresAt));
+  }, [eventKey, expiresAt]);
+  const changeWalk = useCallback((next: SavedRoute) => {
+    setWalk(next);
+    setStorageFailed(!saveRoute(next));
+  }, []);
   const select = (stopId: string) => {
     const element = document.getElementById(`stop-${stopId}`);
     element?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -364,6 +498,17 @@ export function PublicEventMap({
               ))}
             </form>
           </search>
+          <RoutePlanner
+            blockedEdgeIds={state.feed.blockedEdgeIds}
+            graphVersion={state.graphVersion}
+            locale={locale}
+            onChange={changeWalk}
+            pkg={state.pkg}
+            route={walk}
+            snapshot={snapshot}
+            stops={allStops}
+          />
+          {storageFailed ? <p className="notice">{translate(locale, "route.notSaved")}</p> : null}
           <section
             aria-label={translate(locale, "map.mapLabel")}
             className="boundary-map public-map"
@@ -374,7 +519,22 @@ export function PublicEventMap({
                   <p className="map-fallback">{translate(locale, "boundary.mapUnavailable")}</p>
                 }
               >
-                <StopsMap locale={locale} onSelect={select} snapshot={snapshot} stops={stops} />
+                <StopsMap
+                  locale={locale}
+                  onPick={
+                    walk.preferences.startKind === "map" && !walk.active
+                      ? (point) =>
+                          changeWalk({
+                            ...walk,
+                            preferences: { ...walk.preferences, startPoint: [point[0], point[1]] },
+                          })
+                      : null
+                  }
+                  onSelect={select}
+                  snapshot={snapshot}
+                  stops={stops}
+                  walk={walk}
+                />
               </MapErrorBoundary>
             ) : null}
           </section>
@@ -390,13 +550,18 @@ export function PublicEventMap({
                     <h3>
                       {translate(locale, "map.stop")} {stop.number}
                     </h3>
+                    {stop.manualAccess ? (
+                      <p className="field-hint">{translate(locale, "route.manualAccess")}</p>
+                    ) : null}
                     {stop.sellers.map((seller) => (
                       <SellerDetails
                         key={seller.id}
                         locale={locale}
+                        onWalkChange={changeWalk}
                         route={route}
                         seller={seller}
                         snapshot={snapshot}
+                        walk={walk}
                       />
                     ))}
                   </li>
