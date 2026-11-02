@@ -37,5 +37,10 @@ export const excludedData = [
   "app_private.admin_elevation_sessions",
   "auth.sessions",
   "auth.refresh_tokens",
+  // Session-bound or one-time token material.
+  "auth.mfa_amr_claims",
+  "auth.mfa_challenges",
+  "auth.one_time_tokens",
+  "auth.flow_state",
 ];
 export const schemas = ["public", "app_private", "auth", "supabase_migrations"];

@@ -312,6 +312,18 @@ parallel exports, builds and withdrawals never exceed capacity or admit two;
 a 50-stop route plans in well under a second) is complete locally. The local
 edge runtime now uses `per_worker`. Provider quota failure tests remain
 hosted work.
+Slice 3 (lifecycle and clock edges in pgTAP 430: hard expiry beats a
+lagging end job, an expired snapshot is not served and the feed drops every
+seller, the 14-day erasure boundary, no link rotation after the end,
+postponement during the event deletes snapshot bytes and sellers return only
+after reconfirming, future and stale sign-in times refused; DST wall-time
+tests for the autumn change and the spring gap) is complete locally. It found
+and fixed one gap: snapshot reads now also check the live hard expiry
+(`20261107000100_snapshot_live_expiry.sql`); database verification 986/986. Milestone 6 code work is
+complete locally; its remaining items are not code: the real-device,
+browser and installed-PWA matrix, a manual WCAG 2.2 AA assessment and
+accessibility statement, Swedish launch counsel, hosted quota failure tests,
+and scheduling the pilot operator, support coverage and post-event review.
 
 - Full authorization/RLS/state/concurrency review and threat-model test mapping.
 - Load tests for the accepted event envelope and failure tests at provider quotas.

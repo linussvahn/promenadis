@@ -60,7 +60,8 @@ summary within five business days for SEV-0 or major SEV-1 incidents.
   Ed25519 signing pair to `~/.promenadis-recovery` (or
   `PROMENADIS_RECOVERY_KEYS`). Keep the recovery private key offline.
 - `pnpm backup:local` exports the `public`, `app_private`, `auth` and
-  `supabase_migrations` schemas without live session data, compresses and
+  `supabase_migrations` schemas without live session, MFA-claim or one-time
+  token data, compresses and
   encrypts the dump (AES-256-GCM, key wrapped with RSA-OAEP) into
   `.local-backups/`, and writes a signed manifest with checksum, counts,
   migration and the erasure-tombstone watermark.

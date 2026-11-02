@@ -192,7 +192,7 @@ or counsel work before a pilot.
 | Threat | Local evidence | Open |
 | --- | --- | --- |
 | Object-level authorization failure | pgTAP 420 (no browser grants, RLS on every table, no browser-executable function); per-command denial tests in pgTAP 060–410; e2e "protected routes refuse anonymous callers" | Hosted RLS/grant diff before each release |
-| Premature or overlong location publication | pgTAP 350 (early visibility, hard expiry, tombstones), 330 (14-day erasure), slice 3 edge tests | Real-clock soak during a closed alpha |
+| Premature or overlong location publication | pgTAP 350 (early visibility, hard expiry, tombstones), 330 (14-day erasure), 430 (expiry beats job lag, erasure boundary, postponement), DST wall-time tests | Real-clock soak during a closed alpha |
 | Stale CDN/snapshot restores removed pin | pgTAP 350/360 (feed removals across rebuilds), e2e map test (feed removes a seller without rebuild) | CDN purge verification at the edge |
 | Offline device retains old public data | `offline-store` tests (expiry, LRU), e2e walking test (offline banner, reconnect) | Real iPhone/Android offline/reconnect test |
 | Guessing or resharing unlisted URL | pgTAP 340 (128-bit keys, rotation 410), e2e landing test (no-index, no-referrer headers) | — |

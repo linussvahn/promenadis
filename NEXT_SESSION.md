@@ -456,6 +456,21 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Milestone 6 code work complete locally (2026-11-06)
+
+Slices 1–3 are built, tested and pushed. What remains is not code: the
+real-device/browser/PWA matrix, manual WCAG 2.2 AA assessment and the
+published accessibility statement, Swedish launch counsel, hosted quota
+failure tests and CDN checks, and scheduling the pilot (operator, support
+coverage, graph preview, post-event review). Hosted-alpha gates from earlier
+milestones (SES, Turnstile, monitors, S3 backups, Geofabrik source and
+compiler container, a site origin) come first.
+
+Slice 3, `20261107000100_snapshot_live_expiry.sql`: `public_snapshot_command`
+also checks the live hard expiry. `supabase/tests/database/430_lifecycle_edges.test.sql`
+and `apps/web/app/lib/wall-time.test.ts` cover the edges listed in the
+launch checklist.
+
 ### Milestone 6 plan and slice 1 (2026-11-06)
 
 Plan: (1) privilege audit, anonymous denial, security headers, threat

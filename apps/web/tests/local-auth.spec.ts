@@ -1830,6 +1830,8 @@ test("visitors search the public map, follow the safety feed and report a stop",
         "u",
       ),
     );
+    // Wait for hydration: before it, a submit is a native GET that drops the link.
+    await expect(page.getByLabel("Färgtema")).toBeEnabled();
     await page.getByLabel("Vad gäller det?").selectOption("fraud");
     await page.getByLabel("Beskriv vad som är fel").fill("Säljer förfalskade böcker.");
     await page.getByRole("button", { name: "Skicka anmälan" }).click();
