@@ -464,13 +464,46 @@ Planned slices, each its own commit:
 2. (done) Geocoding adapter (local fixture, Geoapify later), shared locations
    (exact-address prompt, host merge/split), address-change reapproval, pin
    correction up to 25 m.
-3. Taxonomy `flea-market-v1`, event taxonomy subset, seller listing content
+3. (done) Taxonomy `flea-market-v1`, event taxonomy subset, seller listing content
    (title, description, categories, tags, items, accessibility facts),
    availability and live status.
 4. Reports, unauthorized-address quarantine, hide/suspend/revoke, appeals,
    invite-only seller invitations.
 5. Event-relative retention: non-public at end/cancel, 14-day erasure,
    tombstones, heartbeats; postponement and reschedule confirmation.
+
+Slice 3, `20261103000300_taxonomy_listings.sql`:
+
+- Taxonomy `flea-market-v1`: `taxonomy_versions`, `taxonomy_categories`
+  (14 fixed UUIDs `0199a000-0000-7000-8000-0000000000NN`, keys, `is_other`,
+  deprecation/replacement columns), `taxonomy_category_localizations`
+  (sv/en labels, descriptions, reviewed synonyms). Taxonomy changes are
+  reviewed migrations only.
+- `event_taxonomies` (pinned version, enabled subset in event order, up to 12
+  suggested tags) created by trigger; `save_event_taxonomy_command`
+  (owner/co-host, drafts only — published events are pinned). Duplication
+  copies the subset, suggestions and admission mode.
+- Listing: `seller_listings` (title, description <= 1000, accessibility facts
+  as nullable booleans plus indoor/outdoor, early-visibility opt-out),
+  `seller_category_assignments` (1-5 enabled categories; "Other" needs a
+  10+ character description), `seller_tags` (<= 10, <= 30 graphemes in the
+  contract, normalized identity, reserved words for badges/accessibility/
+  safety refused), `highlighted_items` (<= 20, one category, sold status,
+  optional integer minor-unit price in SEK), `seller_availability` (<= 10,
+  inside the event, no overlap; empty = whole event). One whole-listing save.
+- `seller_live_status` + `set_seller_live_status_command`: active events and
+  approved sellers only; open/away/closed_early; the team may act on behalf
+  only with a reason (audited); closing early is final for the seller and
+  keeps the place.
+- BFF: `GET/PUT /events/{id}/taxonomy`, `GET/PUT /participations/{id}/listing`,
+  `POST /participations/{id}/live-status`.
+- Web: `SellerListingEditor` on the join page (and live-status buttons
+  during the event), `EventTaxonomyEditor` and a per-seller listing view with
+  on-behalf live status on the sellers page.
+- Deferred to Milestone 3: public display and full-text/trigram search,
+  explicit taxonomy upgrade for drafts (only v1 exists).
+- Verified: pgTAP 300 (31; 714 total), 93 web tests, full verify, DB
+  rebuild, 15/15 local-auth e2e, 5 smoke, integration scripts.
 
 Slice 2, `20261103000200_shared_locations_address_change.sql`:
 

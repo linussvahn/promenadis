@@ -139,7 +139,10 @@ tests, seller-join and event-sellers component tests, and the e2e "sellers
 apply through the join page…". Slice 2 (geocoding adapter and budget, shared
 stops with host merge/split, address-change reapproval, 25 m pin corrections)
 is complete locally: pgTAP 290 and the e2e "geocoded pins, shared stops…".
-Listing content, moderation and event-relative retention remain.
+Slice 3 (flea-market-v1 taxonomy, event category subset, seller listings,
+items, accessibility facts, availability, live status) is complete locally:
+pgTAP 300 and the e2e "hosts pick categories…". Moderation and
+event-relative retention remain.
 
 - Seller application, entitlement/waitlist/promotion, address/geocode/manual pin,
   shared-location merge/split, and address-change reapproval.

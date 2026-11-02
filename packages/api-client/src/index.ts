@@ -6,6 +6,11 @@ import {
   type DecideFirstEventReviewRequest,
   type CancelEventRequest,
   type ApplyToEventRequest,
+  type SaveEventTaxonomyRequest,
+  type SaveSellerListingRequest,
+  type SetLiveStatusRequest,
+  eventTaxonomySchema,
+  sellerListingSchema,
   type ChangeParticipationAddressRequest,
   type GeocodeRequest,
   type LocationReviewRequest,
@@ -366,6 +371,45 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         body: input,
         method: "POST",
       });
+    },
+    getEventTaxonomy(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/taxonomy`, accessToken, eventTaxonomySchema);
+    },
+    saveEventTaxonomy(accessToken: string, eventId: string, input: SaveEventTaxonomyRequest) {
+      return request(`/events/${eventId}/taxonomy`, accessToken, eventTaxonomySchema, {
+        body: input,
+        method: "PUT",
+      });
+    },
+    getSellerListing(accessToken: string, participationId: string) {
+      return request(
+        `/participations/${participationId}/listing`,
+        accessToken,
+        sellerListingSchema,
+      );
+    },
+    saveSellerListing(
+      accessToken: string,
+      participationId: string,
+      input: SaveSellerListingRequest,
+    ) {
+      return request(
+        `/participations/${participationId}/listing`,
+        accessToken,
+        sellerListingSchema,
+        {
+          body: input,
+          method: "PUT",
+        },
+      );
+    },
+    setSellerLiveStatus(accessToken: string, participationId: string, input: SetLiveStatusRequest) {
+      return request(
+        `/participations/${participationId}/live-status`,
+        accessToken,
+        sellerListingSchema,
+        { body: input, method: "POST" },
+      );
     },
     listMyParticipations(accessToken: string) {
       return request("/participations", accessToken, myParticipationsSchema);

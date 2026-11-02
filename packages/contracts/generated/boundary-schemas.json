@@ -1353,6 +1353,573 @@
     ],
     "additionalProperties": false
   },
+  "EventTaxonomy": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "categories": {
+        "maxItems": 14,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "isOther": {
+              "type": "boolean"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[a-z_]+$"
+            },
+            "label": {
+              "type": "object",
+              "properties": {
+                "en": {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                "sv": {
+                  "type": "string",
+                  "maxLength": 60
+                }
+              },
+              "required": [
+                "en",
+                "sv"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "enabled",
+            "id",
+            "isOther",
+            "key",
+            "label"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "suggestedTags": {
+        "maxItems": 12,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "maxLength": 60
+        }
+      },
+      "taxonomyKey": {
+        "type": "string",
+        "maxLength": 40
+      },
+      "version": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "categories",
+      "suggestedTags",
+      "taxonomyKey",
+      "version"
+    ],
+    "additionalProperties": false
+  },
+  "SaveEventTaxonomyRequest": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "enabledCategoryIds": {
+        "minItems": 1,
+        "maxItems": 14,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "expectedVersion": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "suggestedTags": {
+        "maxItems": 12,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        }
+      }
+    },
+    "required": [
+      "enabledCategoryIds",
+      "expectedVersion",
+      "suggestedTags"
+    ],
+    "additionalProperties": false
+  },
+  "SellerListing": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "accessibility": {
+        "type": "object",
+        "properties": {
+          "elevator": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "setting": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "indoor",
+                  "outdoor",
+                  "both"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stairs": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "stepFree": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "strollerFriendly": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "elevator",
+          "setting",
+          "stairs",
+          "stepFree",
+          "strollerFriendly"
+        ],
+        "additionalProperties": false
+      },
+      "availability": {
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "endsAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "startsAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            }
+          },
+          "required": [
+            "endsAt",
+            "startsAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "categoryIds": {
+        "maxItems": 5,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "description": {
+        "type": "string",
+        "maxLength": 1000
+      },
+      "earlyVisibilityOptOut": {
+        "type": "boolean"
+      },
+      "items": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "categoryId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "priceMinor": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "available",
+                "sold"
+              ]
+            }
+          },
+          "required": [
+            "categoryId",
+            "currency",
+            "id",
+            "name",
+            "priceMinor",
+            "status"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "liveStatus": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "setAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "away",
+                  "closed_early"
+                ]
+              },
+              "until": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "setAt",
+              "status",
+              "until"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "tags": {
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "maxLength": 60
+        }
+      },
+      "title": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 80
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "version": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "accessibility",
+      "availability",
+      "categoryIds",
+      "description",
+      "earlyVisibilityOptOut",
+      "items",
+      "liveStatus",
+      "tags",
+      "title",
+      "version"
+    ],
+    "additionalProperties": false
+  },
+  "SaveSellerListingRequest": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "accessibility": {
+        "type": "object",
+        "properties": {
+          "elevator": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "setting": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "indoor",
+                  "outdoor",
+                  "both"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stairs": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "stepFree": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "strollerFriendly": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "elevator",
+          "setting",
+          "stairs",
+          "stepFree",
+          "strollerFriendly"
+        ],
+        "additionalProperties": false
+      },
+      "availability": {
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "endsAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "startsAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            }
+          },
+          "required": [
+            "endsAt",
+            "startsAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "categoryIds": {
+        "minItems": 1,
+        "maxItems": 5,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "description": {
+        "type": "string",
+        "maxLength": 1000
+      },
+      "earlyVisibilityOptOut": {
+        "type": "boolean"
+      },
+      "expectedVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "items": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "categoryId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "priceMinor": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "available",
+                "sold"
+              ]
+            }
+          },
+          "required": [
+            "categoryId",
+            "name",
+            "priceMinor",
+            "status"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "tags": {
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        }
+      },
+      "title": {
+        "anyOf": [
+          {
+            "type": "string",
+            "const": ""
+          },
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        ]
+      }
+    },
+    "required": [
+      "accessibility",
+      "availability",
+      "categoryIds",
+      "description",
+      "earlyVisibilityOptOut",
+      "expectedVersion",
+      "items",
+      "tags",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "SetLiveStatusRequest": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "reason": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "open",
+          "away",
+          "closed_early"
+        ]
+      },
+      "until": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "status",
+      "until"
+    ],
+    "additionalProperties": false
+  },
   "ChangeParticipationAddressRequest": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",

@@ -10,6 +10,11 @@ import {
   adminElevationRequestSchema,
   adminEventInterventionRequestSchema,
   applyToEventRequestSchema,
+  eventTaxonomySchema,
+  saveEventTaxonomyRequestSchema,
+  saveSellerListingRequestSchema,
+  sellerListingSchema,
+  setLiveStatusRequestSchema,
   changeParticipationAddressRequestSchema,
   geocodeRequestSchema,
   geocodeResultSchema,
@@ -2357,6 +2362,31 @@ Deno.serve(async (request) => {
         ["correction_too_large", "Larger moves need a new address.", 400],
       ],
       ["Geocoding limit reached", ["rate_limited", "Place the pin by hand for now.", 429]],
+      [
+        "Actor cannot configure categories",
+        ["forbidden", "Only the owner or a co-host can do this.", 403],
+      ],
+      [
+        "Categories are pinned after publication",
+        ["invalid_state", "Categories cannot change after publication.", 409],
+      ],
+      ["Taxonomy version conflict", ["version_conflict", "The categories changed. Reload.", 409]],
+      ["Invalid category settings", ["invalid_request", "Check the categories and tags.", 400]],
+      ["Listing version conflict", ["version_conflict", "The listing changed. Reload.", 409]],
+      ["Invalid listing", ["invalid_request", "Check the listing.", 400]],
+      ["Describe what Other means", ["other_needs_description", "Describe what you sell.", 400]],
+      [
+        "Availability must be within the event",
+        ["invalid_availability", "Times must be within the event and not overlap.", 400],
+      ],
+      ["Reason required", ["reason_required", "Give a reason.", 400]],
+      ["Live status only during the event", ["invalid_state", "Only during the event.", 409]],
+      [
+        "Only approved sellers have a live status",
+        ["invalid_state", "Only approved sellers.", 409],
+      ],
+      ["Invalid live status", ["invalid_request", "Check the status.", 400]],
+      ["Closed for the day", ["closed_for_day", "You have closed for the day.", 409]],
     ]);
     const sellerResult = <T>(
       result: { data: unknown; error: { message: string } | null },
@@ -2376,7 +2406,7 @@ Deno.serve(async (request) => {
     };
 
     const sellerEventRoute = route.match(
-      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(seller-view|participation|sellers|admission|geocode|location-review)$/iu,
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(seller-view|participation|sellers|admission|geocode|location-review|taxonomy)$/iu,
     );
     if (sellerEventRoute) {
       const [, eventId, action] = sellerEventRoute;
@@ -2474,6 +2504,41 @@ Deno.serve(async (request) => {
         status = "succeeded";
         return json(point ? { found: true, ...point } : notFound, 200, correlationId, origin);
       }
+      if (action === "taxonomy" && request.method === "GET") {
+        operation = "event.taxonomy_read";
+        return sellerResult(
+          await admin.rpc("get_event_taxonomy_command", {
+            p_actor_id: actorId,
+            p_event_id: eventId,
+          }),
+          eventTaxonomySchema,
+        );
+      }
+      if (action === "taxonomy" && request.method === "PUT") {
+        operation = "event.taxonomy_save";
+        const input = saveEventTaxonomyRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError(
+            "invalid_request",
+            "Check the categories and tags.",
+            400,
+            correlationId,
+            origin,
+          );
+        }
+        return sellerResult(
+          await admin.rpc("save_event_taxonomy_command", {
+            p_actor_id: actorId,
+            p_correlation_id: correlationId,
+            p_enabled_category_ids: input.data.enabledCategoryIds,
+            p_event_id: eventId,
+            p_expected_version: input.data.expectedVersion,
+            p_suggested_tags: input.data.suggestedTags,
+          }),
+          eventTaxonomySchema,
+        );
+      }
       if (request.method === "POST" && action === "location-review") {
         operation = "location.review";
         const input = locationReviewRequestSchema.safeParse(await requestBody(request));
@@ -2544,6 +2609,72 @@ Deno.serve(async (request) => {
         await admin.rpc("list_my_participations_command", { p_actor_id: actorId }),
         myParticipationsSchema,
       );
+    }
+
+    const listingRoute = route.match(
+      /^\/participations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(listing|live-status)$/iu,
+    );
+    if (listingRoute) {
+      const [, participationId, action] = listingRoute;
+      if (action === "listing" && request.method === "GET") {
+        operation = "seller.listing_read";
+        return sellerResult(
+          await admin.rpc("get_seller_listing_command", {
+            p_actor_id: actorId,
+            p_participation_id: participationId,
+          }),
+          sellerListingSchema,
+        );
+      }
+      if (action === "listing" && request.method === "PUT") {
+        operation = "seller.listing_save";
+        const input = saveSellerListingRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError("invalid_request", "Check the listing.", 400, correlationId, origin);
+        }
+        const { accessibility } = input.data;
+        return sellerResult(
+          await admin.rpc("save_seller_listing_command", {
+            p_actor_id: actorId,
+            p_availability: input.data.availability,
+            p_category_ids: input.data.categoryIds,
+            p_correlation_id: correlationId,
+            p_description: input.data.description,
+            p_early_visibility_opt_out: input.data.earlyVisibilityOptOut,
+            p_elevator: accessibility.elevator,
+            p_expected_version: input.data.expectedVersion,
+            p_items: input.data.items,
+            p_participation_id: participationId,
+            p_setting: accessibility.setting,
+            p_stairs: accessibility.stairs,
+            p_step_free: accessibility.stepFree,
+            p_stroller_friendly: accessibility.strollerFriendly,
+            p_tags: input.data.tags,
+            p_title: input.data.title || null,
+          }),
+          sellerListingSchema,
+        );
+      }
+      if (action === "live-status" && request.method === "POST") {
+        operation = "seller.live_status";
+        const input = setLiveStatusRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError("invalid_request", "Check the status.", 400, correlationId, origin);
+        }
+        return sellerResult(
+          await admin.rpc("set_seller_live_status_command", {
+            p_actor_id: actorId,
+            p_correlation_id: correlationId,
+            p_participation_id: participationId,
+            p_reason: input.data.reason ?? null,
+            p_status: input.data.status,
+            p_until: input.data.until,
+          }),
+          sellerListingSchema,
+        );
+      }
     }
 
     const pinRoute = route.match(

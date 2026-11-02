@@ -7,6 +7,7 @@ import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
 import { SellerAddressForm, type SellerAddressInput } from "./seller-address-form";
+import { SellerListingEditor } from "./seller-listing-editor";
 
 export function SellerJoin() {
   return <AccountShell>{({ locale }) => <SellerJoinContent locale={locale} />}</AccountShell>;
@@ -207,7 +208,20 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
             </button>
           ) : null}
         </section>
-      ) : event.registrationOpen ? (
+      ) : null}
+      {participation && !closed && !["ended", "cancelled", "archived"].includes(event.state) ? (
+        <SellerListingEditor
+          call={call}
+          eventActive={event.state === "active"}
+          eventEndsAt={event.endsAt}
+          eventId={eventId}
+          eventStartsAt={event.startsAt}
+          locale={locale}
+          participation={participation}
+          timezone={event.timezone}
+        />
+      ) : null}
+      {participation ? null : event.registrationOpen ? (
         <section aria-labelledby="apply-heading" className="panel">
           <h2 id="apply-heading">{translate(locale, "seller.applyTitle")}</h2>
           <p>{translate(locale, "seller.applyIntro")}</p>

@@ -679,6 +679,7 @@ export type Database = {
         }
         Returns: Json
       }
+      event_taxonomy_summary: { Args: { p_event_id: string }; Returns: Json }
       event_team_summary: {
         Args: { p_event_id: string; p_include_invite_emails: boolean }
         Returns: Json
@@ -720,6 +721,7 @@ export type Database = {
         Args: { p_address_line: string; p_postal_code: string }
         Returns: string
       }
+      normalize_tag: { Args: { p_value: string }; Returns: string }
       organizer_team_summary: {
         Args: {
           p_include_invite_emails: boolean
@@ -783,6 +785,10 @@ export type Database = {
         Args: { p_correlation_id: string; p_dispatch_id: string }
         Returns: string
       }
+      seller_listing_summary: {
+        Args: { p_participation_id: string }
+        Returns: Json
+      }
       seller_participation_summary: {
         Args: {
           p_include_address: boolean
@@ -803,6 +809,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      tag_is_reserved: { Args: { p_normalized: string }; Returns: boolean }
       totp_code: { Args: { p_key: string; p_step: number }; Returns: string }
       valid_organization_number: { Args: { p_value: string }; Returns: boolean }
     }
@@ -1316,6 +1323,45 @@ export type Database = {
           },
         ]
       }
+      event_taxonomies: {
+        Row: {
+          enabled_category_ids: string[]
+          event_id: string
+          suggested_tags: string[]
+          taxonomy_version_id: string
+          version: number
+        }
+        Insert: {
+          enabled_category_ids: string[]
+          event_id: string
+          suggested_tags?: string[]
+          taxonomy_version_id: string
+          version?: number
+        }
+        Update: {
+          enabled_category_ids?: string[]
+          event_id?: string
+          suggested_tags?: string[]
+          taxonomy_version_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_taxonomies_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_taxonomies_taxonomy_version_id_fkey"
+            columns: ["taxonomy_version_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           admission_mode: string
@@ -1384,6 +1430,54 @@ export type Database = {
             columns: ["organizer_profile_id"]
             isOneToOne: false
             referencedRelation: "organizer_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      highlighted_items: {
+        Row: {
+          category_id: string
+          currency: string
+          id: string
+          name: string
+          participation_id: string
+          position: number
+          price_minor: number | null
+          status: string
+        }
+        Insert: {
+          category_id: string
+          currency?: string
+          id?: string
+          name: string
+          participation_id: string
+          position: number
+          price_minor?: number | null
+          status?: string
+        }
+        Update: {
+          category_id?: string
+          currency?: string
+          id?: string
+          name?: string
+          participation_id?: string
+          position?: number
+          price_minor?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "highlighted_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "highlighted_items_participation_id_fkey"
+            columns: ["participation_id"]
+            isOneToOne: false
+            referencedRelation: "seller_participations"
             referencedColumns: ["id"]
           },
         ]
@@ -1546,6 +1640,157 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_availability: {
+        Row: {
+          ends_at: string
+          id: string
+          participation_id: string
+          starts_at: string
+        }
+        Insert: {
+          ends_at: string
+          id?: string
+          participation_id: string
+          starts_at: string
+        }
+        Update: {
+          ends_at?: string
+          id?: string
+          participation_id?: string
+          starts_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_availability_participation_id_fkey"
+            columns: ["participation_id"]
+            isOneToOne: false
+            referencedRelation: "seller_participations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_category_assignments: {
+        Row: {
+          category_id: string
+          participation_id: string
+          position: number
+        }
+        Insert: {
+          category_id: string
+          participation_id: string
+          position: number
+        }
+        Update: {
+          category_id?: string
+          participation_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_category_assignments_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_category_assignments_participation_id_fkey"
+            columns: ["participation_id"]
+            isOneToOne: false
+            referencedRelation: "seller_participations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_listings: {
+        Row: {
+          description: string
+          early_visibility_opt_out: boolean
+          has_elevator: boolean | null
+          has_stairs: boolean | null
+          participation_id: string
+          setting: string | null
+          step_free: boolean | null
+          stroller_friendly: boolean | null
+          title: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          description?: string
+          early_visibility_opt_out?: boolean
+          has_elevator?: boolean | null
+          has_stairs?: boolean | null
+          participation_id: string
+          setting?: string | null
+          step_free?: boolean | null
+          stroller_friendly?: boolean | null
+          title?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          description?: string
+          early_visibility_opt_out?: boolean
+          has_elevator?: boolean | null
+          has_stairs?: boolean | null
+          participation_id?: string
+          setting?: string | null
+          step_free?: boolean | null
+          stroller_friendly?: boolean | null
+          title?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_listings_participation_id_fkey"
+            columns: ["participation_id"]
+            isOneToOne: true
+            referencedRelation: "seller_participations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_live_status: {
+        Row: {
+          participation_id: string
+          set_at: string
+          set_by_account_id: string | null
+          status: string
+          until: string | null
+        }
+        Insert: {
+          participation_id: string
+          set_at?: string
+          set_by_account_id?: string | null
+          status: string
+          until?: string | null
+        }
+        Update: {
+          participation_id?: string
+          set_at?: string
+          set_by_account_id?: string | null
+          status?: string
+          until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_live_status_participation_id_fkey"
+            columns: ["participation_id"]
+            isOneToOne: true
+            referencedRelation: "seller_participations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_live_status_set_by_account_id_fkey"
+            columns: ["set_by_account_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["account_id"]
+          },
+        ]
+      }
       seller_participations: {
         Row: {
           account_id: string
@@ -1622,6 +1867,133 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      seller_tags: {
+        Row: {
+          display: string
+          normalized: string
+          participation_id: string
+          position: number
+        }
+        Insert: {
+          display: string
+          normalized: string
+          participation_id: string
+          position: number
+        }
+        Update: {
+          display?: string
+          normalized?: string
+          participation_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_tags_participation_id_fkey"
+            columns: ["participation_id"]
+            isOneToOne: false
+            referencedRelation: "seller_participations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      taxonomy_categories: {
+        Row: {
+          deprecated_at: string | null
+          id: string
+          is_other: boolean
+          key: string
+          replacement_category_id: string | null
+          sort_order: number
+          version_id: string
+        }
+        Insert: {
+          deprecated_at?: string | null
+          id: string
+          is_other?: boolean
+          key: string
+          replacement_category_id?: string | null
+          sort_order: number
+          version_id: string
+        }
+        Update: {
+          deprecated_at?: string | null
+          id?: string
+          is_other?: boolean
+          key?: string
+          replacement_category_id?: string | null
+          sort_order?: number
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taxonomy_categories_replacement_category_id_fkey"
+            columns: ["replacement_category_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "taxonomy_categories_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      taxonomy_category_localizations: {
+        Row: {
+          category_id: string
+          description: string
+          label: string
+          locale: string
+          synonyms: string[]
+        }
+        Insert: {
+          category_id: string
+          description: string
+          label: string
+          locale: string
+          synonyms?: string[]
+        }
+        Update: {
+          category_id?: string
+          description?: string
+          label?: string
+          locale?: string
+          synonyms?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taxonomy_category_localizations_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      taxonomy_versions: {
+        Row: {
+          created_at: string
+          event_format: string
+          id: string
+          key: string
+        }
+        Insert: {
+          created_at?: string
+          event_format: string
+          id: string
+          key: string
+        }
+        Update: {
+          created_at?: string
+          event_format?: string
+          id?: string
+          key?: string
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -2023,6 +2395,10 @@ export type Database = {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
       }
+      get_event_taxonomy_command: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: Json
+      }
       get_event_team_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
@@ -2049,6 +2425,10 @@ export type Database = {
       }
       get_organizer_verification_command: {
         Args: { p_actor_id: string; p_organizer_profile_id: string }
+        Returns: Json
+      }
+      get_seller_listing_command: {
+        Args: { p_actor_id: string; p_participation_id: string }
         Returns: Json
       }
       initiate_account_recovery_claim_command: {
@@ -2266,6 +2646,38 @@ export type Database = {
         }
         Returns: Json
       }
+      save_event_taxonomy_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_enabled_category_ids: string[]
+          p_event_id: string
+          p_expected_version: number
+          p_suggested_tags: string[]
+        }
+        Returns: Json
+      }
+      save_seller_listing_command: {
+        Args: {
+          p_actor_id: string
+          p_availability: Json
+          p_category_ids: string[]
+          p_correlation_id: string
+          p_description: string
+          p_early_visibility_opt_out: boolean
+          p_elevator: boolean
+          p_expected_version: number
+          p_items: Json
+          p_participation_id: string
+          p_setting: string
+          p_stairs: boolean
+          p_step_free: boolean
+          p_stroller_friendly: boolean
+          p_tags: string[]
+          p_title: string
+        }
+        Returns: Json
+      }
       set_event_emergency_successor_command: {
         Args: {
           p_actor_id: string
@@ -2275,6 +2687,17 @@ export type Database = {
           p_expected_team_version: number
           p_successor_membership_id: string
           p_target_organizer_profile_id: string
+        }
+        Returns: Json
+      }
+      set_seller_live_status_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_participation_id: string
+          p_reason: string
+          p_status: string
+          p_until: string
         }
         Returns: Json
       }

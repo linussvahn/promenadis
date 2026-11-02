@@ -133,7 +133,7 @@ describe("SellerJoin", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Find the address on the map" }));
     expect(await screen.findByText(/pin is placed from the address/u)).toBeVisible();
-    expect(screen.getByLabelText("Latitude")).toHaveValue("59.331");
+    await waitFor(() => expect(screen.getByLabelText("Latitude")).toHaveValue("59.331"));
     fireEvent.click(screen.getByLabelText(/I have the right to use/u));
     fireEvent.click(screen.getByRole("button", { name: "Send application" }));
     fireEvent.click(await screen.findByLabelText(/Yes, the same entrance/u));

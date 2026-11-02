@@ -4,11 +4,13 @@ import type {
   EventSellers as EventSellersData,
   LocationReviewRequest,
   PinCorrectionRequest,
+  SellerListing,
   SellerParticipation,
 } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { EventTaxonomyEditor } from "./event-taxonomy-editor";
 
 const errorKeys = {
   conflict_of_interest: "sellers.ownApplication",
@@ -144,6 +146,13 @@ export function EventSellers({
         <p className="field-help">{translate(locale, "sellers.joinLinkHelp")}</p>
       </section>
 
+      <EventTaxonomyEditor
+        call={call}
+        editable={canManage && event.state === "draft"}
+        eventId={event.id}
+        locale={locale}
+      />
+
       {canManage && (event.state === "draft" || event.state === "published") ? (
         <form className="panel form-panel" key={data.eventVersion} onSubmit={saveAdmission}>
           <h2>{translate(locale, "sellers.admission")}</h2>
@@ -228,6 +237,12 @@ export function EventSellers({
                 {translate(locale, "sellers.appliedAt")}{" "}
                 {formatDateTime(locale, seller.appliedAt, event.timezone)}
               </p>
+              <SellerListingView
+                call={call}
+                eventActive={event.state === "active"}
+                locale={locale}
+                participation={seller}
+              />
               {open || holding ? (
                 <form className="details-form" onSubmit={(formEvent) => decide(seller, formEvent)}>
                   <label htmlFor={`seller-reason-${seller.id}`}>
@@ -405,5 +420,119 @@ function LocationTools({
         </form>
       </details>
     </div>
+  );
+}
+
+function SellerListingView({
+  call,
+  eventActive,
+  locale,
+  participation,
+}: {
+  readonly call: () => Promise<{
+    api: NonNullable<ReturnType<typeof getPromenadisApiClient>>;
+    token: string;
+  } | null>;
+  readonly eventActive: boolean;
+  readonly locale: Locale;
+  readonly participation: SellerParticipation;
+}) {
+  const [listing, setListing] = useState<SellerListing | null>(null);
+  const [status, setStatus] = useState("");
+
+  const load = async () => {
+    if (listing) return;
+    const client = await call();
+    if (!client) return;
+    try {
+      setListing(await client.api.getSellerListing(client.token, participation.id));
+    } catch {
+      setStatus(translate(locale, "listing.loadFailed"));
+    }
+  };
+
+  const onBehalf = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    const submitter = (formEvent.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const next = (submitter?.value ?? "open") as "open" | "away" | "closed_early";
+    const reason = String(new FormData(formEvent.currentTarget).get("reason") ?? "").trim();
+    const client = await call();
+    if (!client) return;
+    try {
+      setListing(
+        await client.api.setSellerLiveStatus(client.token, participation.id, {
+          reason,
+          status: next,
+          until: null,
+        }),
+      );
+      setStatus(translate(locale, `live.${next}`));
+    } catch (error) {
+      setStatus(
+        translate(
+          locale,
+          error instanceof PromenadisApiError && error.code === "reason_required"
+            ? "live.reasonRequired"
+            : "listing.error",
+        ),
+      );
+    }
+  };
+
+  return (
+    <details
+      className="settings-details"
+      onToggle={(event) => {
+        if (event.currentTarget.open) void load();
+      }}
+    >
+      <summary>{translate(locale, "listing.view")}</summary>
+      {listing ? (
+        <div>
+          {listing.version === 0 ? <p>{translate(locale, "listing.empty")}</p> : null}
+          {listing.title ? (
+            <p>
+              <strong>{listing.title}</strong>
+            </p>
+          ) : null}
+          {listing.description ? <p>{listing.description}</p> : null}
+          {listing.tags.length ? <p>{listing.tags.join(" · ")}</p> : null}
+          {listing.items.length ? (
+            <ul>
+              {listing.items.map((item) => (
+                <li key={item.id}>
+                  {item.name}
+                  {item.priceMinor !== null ? ` · ${item.priceMinor / 100} ${item.currency}` : ""}
+                  {item.status === "sold" ? ` · ${translate(locale, "listing.sold")}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="field-help">
+            {listing.liveStatus
+              ? translate(locale, `live.${listing.liveStatus.status}`)
+              : translate(locale, "live.scheduled")}
+          </p>
+          {eventActive && participation.state === "approved" ? (
+            <form className="details-form" onSubmit={onBehalf}>
+              <label htmlFor={`live-reason-${participation.id}`}>
+                {translate(locale, "live.onBehalfReason")}
+              </label>
+              <textarea id={`live-reason-${participation.id}`} maxLength={500} name="reason" />
+              <div className="form-actions">
+                {(["open", "away", "closed_early"] as const).map((next) => (
+                  <button className="secondary-button" key={next} type="submit" value={next}>
+                    {translate(locale, `live.set.${next}`)}
+                  </button>
+                ))}
+              </div>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+      <p aria-live="polite" className="form-status">
+        {status}
+      </p>
+    </details>
   );
 }

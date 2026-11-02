@@ -826,6 +826,122 @@ export const updateEventAdmissionRequestSchema = z.strictObject({
 
 export type UpdateEventAdmissionRequest = z.infer<typeof updateEventAdmissionRequestSchema>;
 
+const graphemeCount = (value: string) =>
+  [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(value)].length;
+const tagInput = z
+  .string()
+  .trim()
+  .min(1)
+  .max(60)
+  .refine((value) => graphemeCount(value) <= 30, { message: "At most 30 characters" });
+const uniqueTags = (tags: readonly string[]) =>
+  new Set(tags.map((tag) => tag.trim().replace(/\s+/gu, " ").toLowerCase())).size === tags.length;
+
+export const taxonomyCategorySchema = z.strictObject({
+  enabled: z.boolean(),
+  id: opaqueUuid,
+  isOther: z.boolean(),
+  key: z.string().regex(/^[a-z_]+$/u),
+  label: z.strictObject({ en: z.string().max(60), sv: z.string().max(60) }),
+});
+
+export type TaxonomyCategory = z.infer<typeof taxonomyCategorySchema>;
+
+export const eventTaxonomySchema = z.strictObject({
+  categories: z.array(taxonomyCategorySchema).max(14),
+  suggestedTags: z.array(z.string().max(60)).max(12),
+  taxonomyKey: z.string().max(40),
+  version: z.number().int().positive(),
+});
+
+export type EventTaxonomy = z.infer<typeof eventTaxonomySchema>;
+
+export const saveEventTaxonomyRequestSchema = z.strictObject({
+  enabledCategoryIds: z.array(opaqueUuid).min(1).max(14),
+  expectedVersion: z.number().int().positive(),
+  suggestedTags: z.array(tagInput).max(12).refine(uniqueTags, { message: "Duplicate tag" }),
+});
+
+export type SaveEventTaxonomyRequest = z.infer<typeof saveEventTaxonomyRequestSchema>;
+
+const triState = z.boolean().nullable();
+const listingAccessibilitySchema = z.strictObject({
+  elevator: triState,
+  setting: z.enum(["indoor", "outdoor", "both"]).nullable(),
+  stairs: triState,
+  stepFree: triState,
+  strollerFriendly: triState,
+});
+
+const availabilitySlotSchema = z
+  .strictObject({ endsAt: isoInstant, startsAt: isoInstant })
+  .refine((slot) => new Date(slot.endsAt) > new Date(slot.startsAt), {
+    message: "End must be after start",
+  });
+
+export const sellerListingSchema = z.strictObject({
+  accessibility: listingAccessibilitySchema,
+  availability: z.array(availabilitySlotSchema).max(10),
+  categoryIds: z.array(opaqueUuid).max(5),
+  description: z.string().max(1000),
+  earlyVisibilityOptOut: z.boolean(),
+  items: z
+    .array(
+      z.strictObject({
+        categoryId: opaqueUuid,
+        currency: z.string().regex(/^[A-Z]{3}$/u),
+        id: opaqueUuid,
+        name: z.string().max(80),
+        priceMinor: z.number().int().min(0).max(10_000_000).nullable(),
+        status: z.enum(["available", "sold"]),
+      }),
+    )
+    .max(20),
+  liveStatus: z
+    .strictObject({
+      setAt: isoInstant,
+      status: z.enum(["open", "away", "closed_early"]),
+      until: isoInstant.nullable(),
+    })
+    .nullable(),
+  tags: z.array(z.string().max(60)).max(10),
+  title: z.string().max(80).nullable(),
+  version: z.number().int().nonnegative(),
+});
+
+export type SellerListing = z.infer<typeof sellerListingSchema>;
+
+export const saveSellerListingRequestSchema = z.strictObject({
+  accessibility: listingAccessibilitySchema,
+  availability: z.array(availabilitySlotSchema).max(10),
+  categoryIds: z.array(opaqueUuid).min(1).max(5),
+  description: z.string().trim().max(1000),
+  earlyVisibilityOptOut: z.boolean(),
+  expectedVersion: z.number().int().nonnegative(),
+  items: z
+    .array(
+      z.strictObject({
+        categoryId: opaqueUuid,
+        name: z.string().trim().min(1).max(80),
+        priceMinor: z.number().int().min(0).max(10_000_000).nullable(),
+        status: z.enum(["available", "sold"]),
+      }),
+    )
+    .max(20),
+  tags: z.array(tagInput).max(10).refine(uniqueTags, { message: "Duplicate tag" }),
+  title: z.union([z.literal(""), z.string().trim().min(1).max(80)]),
+});
+
+export type SaveSellerListingRequest = z.infer<typeof saveSellerListingRequestSchema>;
+
+export const setLiveStatusRequestSchema = z.strictObject({
+  reason: z.string().trim().max(500).optional(),
+  status: z.enum(["open", "away", "closed_early"]),
+  until: isoInstant.nullable(),
+});
+
+export type SetLiveStatusRequest = z.infer<typeof setLiveStatusRequestSchema>;
+
 export const adminStatusSchema = z.strictObject({
   elevated: z.boolean(),
   eligible: z.boolean(),
@@ -1055,6 +1171,11 @@ export const boundarySchemas = {
   MyParticipations: myParticipationsSchema,
   EventForSeller: eventForSellerSchema,
   ApplyToEventRequest: applyToEventRequestSchema,
+  EventTaxonomy: eventTaxonomySchema,
+  SaveEventTaxonomyRequest: saveEventTaxonomyRequestSchema,
+  SellerListing: sellerListingSchema,
+  SaveSellerListingRequest: saveSellerListingRequestSchema,
+  SetLiveStatusRequest: setLiveStatusRequestSchema,
   ChangeParticipationAddressRequest: changeParticipationAddressRequestSchema,
   GeocodeRequest: geocodeRequestSchema,
   GeocodeResult: geocodeResultSchema,

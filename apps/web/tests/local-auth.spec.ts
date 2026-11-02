@@ -1095,6 +1095,142 @@ test("geocoded pins, shared stops, address review and pin corrections", async ({
   }
 });
 
+test("hosts pick categories; sellers write listings and set live status during the event", async ({
+  request,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const emails = ["owner", "seller"].map(
+    (role) => `listing-${role}-${randomUUID()}@example.invalid`,
+  );
+  const password = `Local-test-${randomUUID()}`;
+  const headersFor = async (email: string) => {
+    const client = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return {
+      apikey: publicKey,
+      authorization: `Bearer ${data.session?.access_token}`,
+      origin: "http://127.0.0.1:5173",
+    };
+  };
+  for (const email of emails) {
+    const { error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
+    if (error) throw error;
+  }
+  try {
+    const [owner, seller] = await Promise.all(emails.map(headersFor));
+    const created = await request.post(`${base}/events`, {
+      headers: owner,
+      data: {
+        description: "Synthetic listings",
+        endsAt: "2031-09-17T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic listing owner",
+        startsAt: "2031-09-17T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic listing market",
+        visibility: "unlisted",
+      },
+    });
+    const eventId = (await created.json()).id as string;
+    const ownerId = localSql(`select id from auth.users where email='${emails[0]}';`);
+    localSql(`select public.upsert_draft_event_boundary_command('${ownerId}','${eventId}',null,'Synthetic area',
+        '{"type":"Polygon","coordinates":[[[18.06,59.33],[18.064,59.33],[18.064,59.333],[18.06,59.333],[18.06,59.33]]]}'::jsonb,
+        gen_random_uuid());
+      update public.events set admission_mode='auto_inside' where id='${eventId}';`);
+    const taxonomy = await (
+      await request.get(`${base}/events/${eventId}/taxonomy`, { headers: owner })
+    ).json();
+    expect(taxonomy.categories).toHaveLength(14);
+    const books = taxonomy.categories.find((c: { key: string }) => c.key === "books_media").id;
+    const saved = await request.put(`${base}/events/${eventId}/taxonomy`, {
+      headers: owner,
+      data: {
+        enabledCategoryIds: [books],
+        expectedVersion: taxonomy.version,
+        suggestedTags: ["Vinyl"],
+      },
+    });
+    expect(await saved.json()).toMatchObject({ suggestedTags: ["Vinyl"] });
+
+    const participation = await (
+      await request.post(`${base}/events/${eventId}/participation`, {
+        headers: seller,
+        data: {
+          addressLine: "Testgatan 5",
+          displayName: "Synthetic records",
+          latitude: 59.331,
+          locality: "",
+          longitude: 18.061,
+          placement: "manual",
+          postalCode: "",
+          rightToUseAttested: true,
+          sharesEntrance: null,
+        },
+      })
+    ).json();
+    const listing = {
+      accessibility: {
+        elevator: null,
+        setting: "outdoor",
+        stairs: false,
+        stepFree: true,
+        strollerFriendly: null,
+      },
+      availability: [],
+      categoryIds: [books],
+      description: "Jazz and soul records",
+      earlyVisibilityOptOut: true,
+      expectedVersion: 0,
+      items: [{ categoryId: books, name: "Blue Note LP", priceMinor: 15000, status: "available" }],
+      tags: ["Vinyl", "Jazz"],
+      title: "Record corner",
+    };
+    const badTag = await request.put(`${base}/participations/${participation.id}/listing`, {
+      headers: seller,
+      data: { ...listing, tags: ["Verifierad säljare"] },
+    });
+    expect(badTag.status()).toBe(400);
+    const written = await request.put(`${base}/participations/${participation.id}/listing`, {
+      headers: seller,
+      data: listing,
+    });
+    expect(await written.json()).toMatchObject({
+      earlyVisibilityOptOut: true,
+      tags: ["Vinyl", "Jazz"],
+      version: 1,
+    });
+    const teamView = await (
+      await request.get(`${base}/participations/${participation.id}/listing`, { headers: owner })
+    ).json();
+    expect(teamView.items[0]).toMatchObject({
+      currency: "SEK",
+      name: "Blue Note LP",
+      priceMinor: 15000,
+    });
+
+    localSql(`update public.events set state='published' where id='${eventId}';
+      update public.events set state='active' where id='${eventId}';`);
+    const away = await request.post(`${base}/participations/${participation.id}/live-status`, {
+      headers: seller,
+      data: { status: "away", until: null },
+    });
+    expect((await away.json()).liveStatus).toMatchObject({ status: "away" });
+    const noReason = await request.post(`${base}/participations/${participation.id}/live-status`, {
+      headers: owner,
+      data: { status: "closed_early", until: null },
+    });
+    expect((await noReason.json()).code).toBe("reason_required");
+  } finally {
+    for (const email of emails) await deleteSyntheticAccount(email);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {
