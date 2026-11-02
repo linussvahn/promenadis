@@ -97,7 +97,7 @@ describe("SellerJoin", () => {
     fireEvent.change(screen.getByLabelText("Postal code (optional)"), {
       target: { value: "113 45" },
     });
-    fireEvent.change(screen.getByLabelText("Latitude"), { target: { value: "59.331" } });
+    fireEvent.change(await screen.findByLabelText("Latitude"), { target: { value: "59.331" } });
     fireEvent.change(screen.getByLabelText("Longitude"), { target: { value: "18.062" } });
     fireEvent.click(screen.getByLabelText(/I have the right to use/u));
     fireEvent.click(screen.getByRole("button", { name: "Send application" }));

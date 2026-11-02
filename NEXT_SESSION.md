@@ -456,6 +456,20 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Map and offline follow-up (2026-11-03)
+
+No migration. The map draws the location accuracy as a circle around the
+position puck (`accuracyRing` in `app/lib/geolocation.ts`). Workspace and
+seller-form pages load maplibre on demand (`React.lazy` for the boundary
+editor, walking network and pin picker); only the public map route loads it
+eagerly. Service worker v3 claims the page on first install and copies the
+assets and page that loaded before it took control, and keeps `theme.js`
+and `register-sw.js` for offline use. Before this, a walk started on the
+first visit fell back to the generic offline page on reload.
+`pnpm test:local-offline` proves the fix against the production build.
+Still open: real devices and installed PWAs, a script-source CSP with
+hydration nonces, signed-in route sync (deferred).
+
 ### Milestone 6 code work complete locally (2026-11-06)
 
 Slices 1–3 are built, tested and pushed. What remains is not code: the

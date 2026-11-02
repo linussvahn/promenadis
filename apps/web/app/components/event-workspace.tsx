@@ -1,8 +1,8 @@
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
+import { lazy, Suspense } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
-import { BoundaryEditor } from "./boundary-editor";
 import { CreationProgress } from "./creation-progress";
 import { EventControls } from "./event-controls";
 import { EventDetailsEditor } from "./event-details-editor";
@@ -15,7 +15,14 @@ import { EventSellers } from "./event-sellers";
 import { EventTeam } from "./event-team";
 import { PublicationReadiness } from "./publication-readiness";
 import { RegistrationEditor } from "./registration-editor";
-import { WalkingNetwork } from "./walking-network";
+
+// Map pages load maplibre on demand so other workspace pages stay light.
+const BoundaryEditor = lazy(() =>
+  import("./boundary-editor").then((module) => ({ default: module.BoundaryEditor })),
+);
+const WalkingNetwork = lazy(() =>
+  import("./walking-network").then((module) => ({ default: module.WalkingNetwork })),
+);
 
 type WorkspaceView = "overview" | "area" | "registration" | "review" | "sellers" | "walking";
 
@@ -89,14 +96,16 @@ function EventWorkspaceContent({
           <p className="lede">{translate(locale, "boundary.intro")}</p>
         </header>
         <section aria-label={translate(locale, "boundary.title")} className="panel map-panel">
-          <BoundaryEditor
-            events={[event]}
-            locale={locale}
-            onSaved={async () => {
-              await loadDashboard();
-              if (isCreationFlow) await navigate(`/events/${event.id}/review`);
-            }}
-          />
+          <Suspense fallback={<p role="status">{translate(locale, "common.loading")}</p>}>
+            <BoundaryEditor
+              events={[event]}
+              locale={locale}
+              onSaved={async () => {
+                await loadDashboard();
+                if (isCreationFlow) await navigate(`/events/${event.id}/review`);
+              }}
+            />
+          </Suspense>
         </section>
       </main>
     );
@@ -198,7 +207,9 @@ function EventWorkspaceContent({
           <h1>{translate(locale, "walking.title")}</h1>
           <p className="lede">{translate(locale, "walking.intro")}</p>
         </header>
-        <WalkingNetwork accessToken={accessToken} event={event} locale={locale} />
+        <Suspense fallback={<p role="status">{translate(locale, "common.loading")}</p>}>
+          <WalkingNetwork accessToken={accessToken} event={event} locale={locale} />
+        </Suspense>
       </main>
     );
   }

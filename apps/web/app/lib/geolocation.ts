@@ -14,6 +14,22 @@ function fromError(error: GeolocationPositionError): PositionResult {
   return { kind: "unavailable" };
 }
 
+/** Polygon ring approximating the accuracy radius around `point`. */
+export function accuracyRing(
+  point: readonly [number, number],
+  meters: number,
+  steps = 48,
+): [number, number][] {
+  const latRadius = meters / 111_320;
+  const lngRadius = latRadius / Math.cos((point[1] * Math.PI) / 180);
+  const ring: [number, number][] = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const angle = (i / steps) * 2 * Math.PI;
+    ring.push([point[0] + lngRadius * Math.cos(angle), point[1] + latRadius * Math.sin(angle)]);
+  }
+  return ring;
+}
+
 /** A recent standard-accuracy fix with a 10-second timeout. */
 export function requestPosition(): Promise<PositionResult> {
   if (typeof navigator === "undefined" || !navigator.geolocation) {

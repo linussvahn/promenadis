@@ -18,7 +18,7 @@ import {
   type StopFilters,
   type VisibleStop,
 } from "../lib/public-stops";
-import { useWatchedPosition } from "../lib/geolocation";
+import { accuracyRing, useWatchedPosition } from "../lib/geolocation";
 import { loadOffline, resetOfflineData, saveOffline, unpinOffline } from "../lib/offline-store";
 import {
   emptyRoute,
@@ -400,6 +400,31 @@ function StopsMap({
             role="img"
           />
         </Marker>
+      ) : null}
+      {position ? (
+        <Source
+          data={{
+            geometry: {
+              coordinates: [accuracyRing(position.point, position.accuracy)],
+              type: "Polygon",
+            },
+            properties: {},
+            type: "Feature",
+          }}
+          id="public-position-accuracy"
+          type="geojson"
+        >
+          <Layer
+            id="public-position-accuracy-fill"
+            paint={{ "fill-color": "#2f6fd6", "fill-opacity": 0.12 }}
+            type="fill"
+          />
+          <Layer
+            id="public-position-accuracy-line"
+            paint={{ "line-color": "#2f6fd6", "line-opacity": 0.5, "line-width": 1 }}
+            type="line"
+          />
+        </Source>
       ) : null}
       {position ? (
         <Marker latitude={position.point[1]} longitude={position.point[0]}>

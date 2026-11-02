@@ -7,6 +7,8 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
+    "serve:production": "node scripts/serve-local-production.mjs",
+    "test:local-offline": "node scripts/test-offline-production.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:local-auth": "PROMENADIS_LOCAL_AUTH_E2E=1 playwright test tests/local-auth.spec.ts --workers=1",

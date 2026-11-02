@@ -37,6 +37,7 @@
     "backup:restore-drill": "node scripts/backup/restore-drill.mjs",
     "test:local-backup": "node scripts/backup/test-local-backup.mjs",
     "test:local-load": "node scripts/load/test-envelope.mjs",
+    "test:local-offline": "pnpm --filter @promenadis/web test:local-offline",
     "test:local-concurrency": "node scripts/load/test-concurrency.mjs",
     "test:local-notifications": "node scripts/test-local-security-notifications.mjs && node scripts/test-local-application-notifications.mjs",
     "test:local-recovery-preparation": "node scripts/test-local-recovery-preparation.mjs",

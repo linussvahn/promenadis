@@ -1,10 +1,14 @@
 import { type createPromenadisApiClient, PromenadisApiError } from "@promenadis/api-client";
 import type { BoundaryPoint, SellerParticipation } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, type ReactNode, useRef, useState } from "react";
-import { PinPicker } from "./pin-picker";
+import { type FormEvent, lazy, type ReactNode, Suspense, useRef, useState } from "react";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
+
+// maplibre loads only when the pin picker renders.
+const PinPicker = lazy(() =>
+  import("./pin-picker").then((module) => ({ default: module.PinPicker })),
+);
 
 export interface SellerAddressInput {
   readonly addressLine: string;
@@ -189,13 +193,15 @@ export function SellerAddressForm({
       </button>
       <h3>{translate(locale, "seller.pinTitle")}</h3>
       <p className="field-help">{translate(locale, "seller.pinHelp")}</p>
-      <PinPicker
-        boundary={eventBoundary}
-        idPrefix={idPrefix}
-        locale={locale}
-        onChange={setPin}
-        value={pin}
-      />
+      <Suspense fallback={<p role="status">{translate(locale, "common.loading")}</p>}>
+        <PinPicker
+          boundary={eventBoundary}
+          idPrefix={idPrefix}
+          locale={locale}
+          onChange={setPin}
+          value={pin}
+        />
+      </Suspense>
       {sharedQuestion ? (
         <fieldset className="choice-group">
           <legend>{translate(locale, "seller.sharedQuestion")}</legend>

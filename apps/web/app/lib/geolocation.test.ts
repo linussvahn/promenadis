@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { requestPosition } from "./geolocation";
+import { accuracyRing, requestPosition } from "./geolocation";
 
 const original = navigator.geolocation;
 afterEach(() => {
@@ -48,5 +48,18 @@ describe("requestPosition", () => {
     }
     stub(undefined as never);
     expect(await requestPosition()).toEqual({ kind: "unsupported" });
+  });
+});
+
+describe("accuracyRing", () => {
+  it("closes a ring whose points lie at the accuracy radius", () => {
+    const point = [18.07, 59.31] as const;
+    const ring = accuracyRing(point, 50);
+    expect(ring[0]).toEqual(ring.at(-1));
+    for (const [lng, lat] of ring) {
+      const dy = (lat - point[1]) * 111_320;
+      const dx = (lng - point[0]) * 111_320 * Math.cos((point[1] * Math.PI) / 180);
+      expect(Math.hypot(dx, dy)).toBeCloseTo(50, 3);
+    }
   });
 });

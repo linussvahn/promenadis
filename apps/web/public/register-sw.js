@@ -38,13 +38,23 @@ if ("serviceWorker" in navigator) {
     notice.append(message, update, later);
     document.body.append(notice);
   };
+  // Assets and the page itself loaded before the worker took control; ask it
+  // to keep copies so a walk started on the first visit survives a reload.
+  const reportLoaded = () =>
+    navigator.serviceWorker.controller?.postMessage({
+      assets: performance.getEntriesByType("resource").map((entry) => entry.name),
+      page: window.location.pathname,
+      type: "promenadis:cache-loaded",
+    });
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (accepted) window.location.reload();
+    else reportLoaded();
   });
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js", { scope: "/" })
       .then((registration) => {
+        reportLoaded();
         offer(registration);
         registration.addEventListener("updatefound", () => {
           registration.installing?.addEventListener("statechange", () => {

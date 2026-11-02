@@ -78,3 +78,11 @@ summary within five business days for SEV-0 or major SEV-1 incidents.
 - `pnpm test:local-load`: envelope event (500 sellers, 450 stops), size
   limits and visitor polling with conditional requests.
 - `pnpm test:local-concurrency`: capacity and single-flight races.
+
+## Offline checks (local)
+
+- `pnpm test:local-offline`: reseeds the demo event, builds, serves the
+  production build on http://127.0.0.1:4173 (`pnpm --filter @promenadis/web
+  serve:production`, same `/api` proxy as dev) and checks in Chromium that a
+  walk started on the first visit survives an offline reload. The demo event
+  gets a new public link each run.

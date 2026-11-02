@@ -233,8 +233,9 @@ updates) is complete locally: offline-store and geolocation tests and the
 e2e walking test going offline and back. Milestone 4 is complete locally
 except real-device and installed-PWA testing (Milestone 6), the hosted graph
 source and compiler, and signed-in route sync. Offline reload of the page
-itself is verified only by reasoning in dev mode; the production build is
-needed for the asset cache.
+itself is verified against the production build by `pnpm test:local-offline`
+(a walk started on the first visit survives an offline reload; service
+worker v3).
 
 - Checksum-verified OSM acquisition, isolated graph build, immutable package,
   metadata/attribution, host preview, override and rollback lifecycle.
