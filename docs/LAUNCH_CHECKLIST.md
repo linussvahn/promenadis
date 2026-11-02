@@ -301,7 +301,17 @@ anonymous-denial and security-header e2e, server-rendered pages now send
 base-uri 'self'; form-action 'self'`, `X-Frame-Options`, `nosniff` and a
 default referrer policy; threat-to-test mapping in `docs/THREAT_MODEL.md`
 section 9) is complete locally as of 2026-11-06. A script-source CSP needs
-hydration nonces and stays open.
+hydration nonces and stays open. Slice 2 (ETag/304 for manifest and safety
+feed with weak comparison through compressing proxies and a conditional
+client cache; envelope load test `pnpm test:local-load`: 500 sellers at 450
+stops give a 510 KB snapshot, 40 KB gzipped, built in about 0.2 s, a 0.3 KB
+feed, and 1,850 visitor requests at 50 concurrent answered at about 365/s
+with p95 near 0.4 s locally and every unchanged feed poll a 304; race test
+`pnpm test:local-concurrency`: 40 simultaneous applications for 30 places,
+parallel exports, builds and withdrawals never exceed capacity or admit two;
+a 50-stop route plans in well under a second) is complete locally. The local
+edge runtime now uses `per_worker`. Provider quota failure tests remain
+hosted work.
 
 - Full authorization/RLS/state/concurrency review and threat-model test mapping.
 - Load tests for the accepted event envelope and failure tests at provider quotas.

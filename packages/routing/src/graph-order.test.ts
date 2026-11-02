@@ -165,3 +165,35 @@ describe("orderRoute", () => {
     expect(visitMinutes("leisurely", 2, 12)).toBe(17);
   });
 });
+
+describe("routing at the 50-stop ceiling", () => {
+  it("snaps, builds the matrix and orders 50 stops within budget", () => {
+    const graph = new WalkingGraph(pkg);
+    const start = performance.now();
+    const snaps = Array.from({ length: 50 }, (_, i) =>
+      graph.snap([18.0605 + (i % 10) * 0.0011, 59.3105 + Math.floor(i / 10) * 0.0011], 60),
+    );
+    const matrix = graph.matrix(snaps);
+    const t0 = Date.UTC(2031, 8, 9, 8);
+    const result = orderRoute({
+      hasStart: false,
+      matrix,
+      mode: "availability",
+      returnToStart: false,
+      startTime: t0,
+      stops: snaps.map((_, i) => ({
+        id: `s${i}`,
+        sellers: [
+          { id: `p${i}`, mustSee: false, windows: [{ endsAt: t0 + 6 * 3_600_000, startsAt: t0 }] },
+        ],
+        visitSeconds: 300,
+      })),
+    });
+    const elapsed = performance.now() - start;
+    expect(snaps.every(Boolean)).toBe(true);
+    expect(result.plan.order).toHaveLength(50);
+    expect(new Set(result.plan.order).size).toBe(50);
+    // Generous for CI; a phone worker gets the same work off the main thread.
+    expect(elapsed).toBeLessThan(5_000);
+  });
+});

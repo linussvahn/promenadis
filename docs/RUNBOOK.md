@@ -71,3 +71,9 @@ summary within five business days for SEV-0 or major SEV-1 incidents.
   invalid after a real restore.
 - Hosted: the same steps run as a scheduled container writing to a
   versioned, Object-Locked S3 bucket in Stockholm (pilot gate).
+
+## Capacity checks (local)
+
+- `pnpm test:local-load`: envelope event (500 sellers, 450 stops), size
+  limits and visitor polling with conditional requests.
+- `pnpm test:local-concurrency`: capacity and single-flight races.

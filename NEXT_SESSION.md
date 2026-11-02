@@ -472,6 +472,26 @@ object/form restrictions, `X-Frame-Options`, `nosniff` and a default
 referrer policy. E2E "protected routes refuse anonymous callers and pages
 send security headers". `docs/THREAT_MODEL.md` §9 maps threats to tests.
 
+Slice 2 (no migration):
+
+- BFF manifest and feed send an ETag over their safety content (feed
+  timestamps excluded) and answer `304`; `etagMatches` compares weakly
+  because compression turns tags into `W/"…"` (the snapshot and routing
+  package routes use it too). The API client keeps the last validated body
+  per polled path and sends `If-None-Match`.
+- `scripts/load/test-envelope.mjs` (`pnpm test:local-load`) seeds 500
+  sellers at 450 stops (lifting the 30-seller entitlement check only for its
+  fixture and restoring it), checks snapshot/feed size limits and drives
+  1,850 manifest/feed/snapshot reads at 50 concurrent. Measured locally:
+  snapshot 510 KB raw / 40 KB gzip, build ~0.2 s, 365 req/s, p95 ~0.4 s.
+- `scripts/load/test-concurrency.mjs` (`pnpm test:local-concurrency`) runs
+  parallel psql sessions inside one container exec (many `docker exec`
+  calls overwhelm Podman): applications vs capacity, exports, builds,
+  withdrawals with promotion. No race found.
+- `supabase/config.toml` edge runtime `per_worker` (was `oneshot`, which
+  booted a worker per request: 8 req/s). Function edits need a restart.
+- Routing test plans 50 stops (~50 ms).
+
 ### Milestone 5 complete locally (2026-11-06)
 
 All slices are built, tested and pushed. Hosted-only parts remain: SES

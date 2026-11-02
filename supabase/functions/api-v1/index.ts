@@ -192,6 +192,13 @@ function json(
 
 const noIndex = "noindex, nofollow, nosnippet, noimageindex";
 
+// Weak comparison (RFC 9110): compressing proxies turn "x" into W/"x".
+function etagMatches(header: string | null, etag: string) {
+  if (!header) return false;
+  const bare = etag.replace(/^W\//u, "");
+  return header.split(",").some((candidate) => candidate.trim().replace(/^W\//u, "") === bare);
+}
+
 // Anonymous public reads: short shared caching; unlisted resources are never
 // indexed and never leak their URL through the referrer.
 function publicJson(
@@ -870,9 +877,23 @@ Deno.serve(async (request) => {
           : publicSafetyFeedSchema.parse(data.feed);
         if (!manifest && JSON.stringify(body).length > 32_768)
           throw new Error("safety_feed_too_large");
-        const response = publicJson(body, correlationId, origin, {
-          unlisted: delivery[1] === "unlisted",
-        });
+        // Conditional checks: the ETag covers the safety content, not the
+        // per-read timestamps, so an unchanged feed answers a small 304.
+        const { expiresAt: _expires, generatedAt: _generated, ...stable } = body;
+        const digest = await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(JSON.stringify(manifest ? body : stable)),
+        );
+        const etag = `"${[...new Uint8Array(digest)]
+          .slice(0, 16)
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("")}"`;
+        const response = etagMatches(request.headers.get("if-none-match"), etag)
+          ? new Response(null, { status: 304, headers: corsHeaders(origin) })
+          : publicJson(body, correlationId, origin, { unlisted: delivery[1] === "unlisted" });
+        response.headers.set("etag", etag);
+        response.headers.set("x-correlation-id", correlationId);
+        if (delivery[1] === "unlisted") response.headers.set("referrer-policy", "no-referrer");
         // Clients poll these; keep any shared cache short.
         response.headers.set(
           "cache-control",
@@ -909,7 +930,7 @@ Deno.serve(async (request) => {
           "x-correlation-id": correlationId,
           "x-robots-tag": noIndex,
         });
-        if (request.headers.get("if-none-match") === etag) {
+        if (etagMatches(request.headers.get("if-none-match"), etag)) {
           return new Response(null, { status: 304, headers });
         }
         return new Response(data.body, { status: 200, headers });
@@ -938,7 +959,7 @@ Deno.serve(async (request) => {
           "x-correlation-id": correlationId,
           "x-robots-tag": noIndex,
         });
-        if (request.headers.get("if-none-match") === etag) {
+        if (etagMatches(request.headers.get("if-none-match"), etag)) {
           return new Response(null, { status: 304, headers });
         }
         return new Response(data.body, { status: 200, headers });

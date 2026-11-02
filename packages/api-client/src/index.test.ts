@@ -501,4 +501,34 @@ describe("Promenadis API client", () => {
     expect(init.body).toBeUndefined();
     expect(init.headers).not.toHaveProperty("x-account-id");
   });
+
+  it("polls the safety feed conditionally and reuses the validated body on 304", async () => {
+    const feed = {
+      awaySellerIds: [],
+      blockedEdgeIds: [],
+      eventKey: "c".repeat(32),
+      expiresAt: "2031-09-09T10:02:00+00:00",
+      generatedAt: "2031-09-09T10:00:00+00:00",
+      removedSellerIds: [],
+      removedStopIds: [],
+      requiredGraphVersion: null,
+      schemaVersion: "1.0",
+      sequence: 2,
+      state: "active",
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(feed), {
+          headers: { "content-type": "application/json", etag: '"abc"' },
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 304 }));
+    globalThis.fetch = fetchMock;
+    const client = createPromenadisApiClient({ baseUrl: "/api", browserSession: true });
+    await client.getPublicSafetyFeed("public", "c".repeat(32));
+    expect(await client.getPublicSafetyFeed("public", "c".repeat(32))).toEqual(feed);
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ "if-none-match": '"abc"' });
+  });
 });

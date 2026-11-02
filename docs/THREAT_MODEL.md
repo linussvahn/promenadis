@@ -213,6 +213,6 @@ or counsel work before a pilot.
 | Environment confusion | Local-only adapters fail closed outside `kong` | Separate hosted projects |
 | Backup resurrects erased data | `test:local-backup` (replay removes an erased account; tampering refused), pgTAP 410 | Quarterly real-archive restore |
 | Logging/monitoring leaks personal data | Structured operation log allowlist in the BFF; `/status` returns one field (e2e) | Log schema review on hosted logs |
-| Resource/cost exhaustion | Slice 2 load test at the event envelope | Provider quota failure tests |
+| Resource/cost exhaustion | `pnpm test:local-load` (envelope sizes, 304 polling, origin throughput), `pnpm test:local-concurrency` (capacity and single-flight races) | Provider quota failure tests, CDN hit-rate check |
 | Dependency or browser feature failure | Map/worker/storage fallbacks covered by component tests | Real-device matrix |
 | Clickjacking/CSRF/open redirect | e2e header test (`frame-ancestors 'none'`, `X-Frame-Options`), origin and gateway header checks | — |

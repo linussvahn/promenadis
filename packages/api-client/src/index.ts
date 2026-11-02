@@ -199,20 +199,34 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     return schema.parse(body);
   }
 
+  // Last validated body per polled resource, for conditional requests.
+  const conditional = new Map<string, { etag: string; body: unknown }>();
+
   // Anonymous calls; without a body this is a GET of a public page resource.
-  async function publicRequest<T>(path: string, schema: z.ZodType<T>, body?: unknown): Promise<T> {
+  async function publicRequest<T>(
+    path: string,
+    schema: z.ZodType<T>,
+    body?: unknown,
+    options: { readonly conditional?: boolean } = {},
+  ): Promise<T> {
+    const cached = options.conditional ? conditional.get(path) : undefined;
     const response = await fetch(
       `${config.baseUrl}${config.browserSession ? "" : "/functions/v1/api-v1"}${path}`,
       {
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        headers: config.browserSession
-          ? { "x-promenadis-browser": "1", "content-type": "application/json" }
-          : { apikey: config.publishableKey ?? "", "content-type": "application/json" },
+        headers: {
+          ...(config.browserSession
+            ? { "x-promenadis-browser": "1", "content-type": "application/json" }
+            : { apikey: config.publishableKey ?? "", "content-type": "application/json" }),
+          ...(cached ? { "if-none-match": cached.etag } : {}),
+        },
         credentials: config.browserSession ? "same-origin" : "omit",
         cache: "no-store",
         method: body === undefined ? "GET" : "POST",
       },
     );
+    // 304: the server confirmed the last validated body is still current.
+    if (response.status === 304 && cached) return schema.parse(cached.body);
     const parsedBody = await parseJson(response);
     if (!response.ok) {
       const parsedError = apiErrorSchema.safeParse(parsedBody);
@@ -225,7 +239,10 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
           : response.headers.get("x-correlation-id"),
       );
     }
-    return schema.parse(parsedBody);
+    const parsed = schema.parse(parsedBody);
+    const etag = response.headers.get("etag");
+    if (options.conditional && etag) conditional.set(path, { body: parsedBody, etag });
+    return parsed;
   }
 
   return {
@@ -474,12 +491,16 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
       return publicRequest(
         `/public/${route === "public" ? "events" : "unlisted"}/${key}/manifest`,
         publicEventManifestSchema,
+        undefined,
+        { conditional: true },
       );
     },
     getPublicSafetyFeed(route: "public" | "unlisted", key: string) {
       return publicRequest(
         `/public/${route === "public" ? "events" : "unlisted"}/${key}/safety`,
         publicSafetyFeedSchema,
+        undefined,
+        { conditional: true },
       );
     },
     getPublicSnapshot(snapshotId: string) {

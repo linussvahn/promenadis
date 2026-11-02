@@ -59,7 +59,9 @@ content_path = "./supabase/templates/magic-link.html"
 
 [edge_runtime]
 enabled = true
-policy = "oneshot"
+# Long-lived workers, close to hosted behaviour and needed for the load test.
+# Edits to the function need `pnpm db:stop && pnpm db:start`.
+policy = "per_worker"
 
 [functions.api-v1]
 enabled = true
