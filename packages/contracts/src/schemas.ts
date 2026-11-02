@@ -213,11 +213,22 @@ export const accountRecoveryClaimSchema = z.strictObject({
 
 export type AccountRecoveryClaim = z.infer<typeof accountRecoveryClaimSchema>;
 
-export const initiateAccountRecoveryRequestSchema = z.strictObject({
+const recoveryEmailsSchema = {
   currentEmail: z.email().trim().max(320),
   newEmail: z.email().trim().max(320),
-  recoveryCode: z.string().regex(/^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){4}$/u),
-});
+};
+
+// Exactly one factor: the saved recovery code or a current authenticator code.
+export const initiateAccountRecoveryRequestSchema = z.union([
+  z.strictObject({
+    ...recoveryEmailsSchema,
+    recoveryCode: z.string().regex(/^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){4}$/u),
+  }),
+  z.strictObject({
+    ...recoveryEmailsSchema,
+    totpCode: z.string().regex(/^[0-9]{6}$/u),
+  }),
+]);
 
 export const initiateAccountRecoveryResponseSchema = accountRecoveryClaimSchema.extend({
   delivery: z.literal("captured_locally"),

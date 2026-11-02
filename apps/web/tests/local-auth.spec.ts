@@ -814,6 +814,107 @@ test("organization verification needs a valid number and an elevated reviewer", 
   }
 });
 
+test("an authenticator code can replace the recovery code to recover an owner account", async ({
+  request,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const email = `totp-recovery-${randomUUID()}@example.invalid`;
+  const newEmail = `totp-recovery-new-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password,
+  });
+  if (createError) throw createError;
+  const accountId = created.user.id;
+  const anonymous = { apikey: publicKey, origin: "http://127.0.0.1:5173" };
+  try {
+    const owner = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const signedIn = await owner.auth.signInWithPassword({ email, password });
+    const headers = {
+      ...anonymous,
+      authorization: `Bearer ${signedIn.data.session?.access_token}`,
+    };
+    const event = await request.post(`${base}/events`, {
+      headers,
+      data: {
+        description: "Synthetic TOTP recovery fixture",
+        endsAt: "2031-09-14T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic TOTP owner",
+        startsAt: "2031-09-14T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic TOTP walk",
+        visibility: "unlisted",
+      },
+    });
+    expect(event.status()).toBe(201);
+    const enrolled = await (
+      await request.post(`${base}/account/mfa/totp`, { headers, data: {} })
+    ).json();
+    const verifiedFactor = await owner.auth.mfa.challengeAndVerify({
+      factorId: enrolled.factorId,
+      code: totp(enrolled.secret),
+    });
+    expect(verifiedFactor.error).toBeNull();
+
+    // Anonymous, email lost: prove possession of the authenticator instead.
+    const wrong = await request.post(`${base}/account-recovery`, {
+      headers: anonymous,
+      data: { currentEmail: email, newEmail, totpCode: totp(enrolled.secret, 5) },
+    });
+    expect(wrong.status()).toBe(400);
+    expect((await wrong.json()).code).toBe("invalid_recovery");
+    const both = await request.post(`${base}/account-recovery`, {
+      headers: anonymous,
+      data: {
+        currentEmail: email,
+        newEmail,
+        recoveryCode: "ABCD-EFGH-JKLM-NPQR-STUV",
+        totpCode: "123456",
+      },
+    });
+    expect(both.status()).toBe(400);
+    // The same 30-second step was already used to verify the factor.
+    const started = await request.post(`${base}/account-recovery`, {
+      headers: anonymous,
+      data: { currentEmail: email, newEmail, totpCode: totp(enrolled.secret, 1) },
+    });
+    expect(started.status()).toBe(201);
+    const claim = await started.json();
+    const message = await latestMessage(request, newEmail);
+    const link = message.Text.match(/http:\/\/127\.0\.0\.1:5173\/recover-account#[^\s]+/u)?.[0];
+    const token = new URLSearchParams(new URL(link ?? "").hash.slice(1)).get("token");
+    const verified = await request.post(`${base}/account-recovery/${claim.id}/verify`, {
+      headers: anonymous,
+      data: { verificationToken: token },
+    });
+    expect(verified.status()).toBe(200);
+
+    localSql(`update app_private.account_recovery_claims
+      set initiated_at=now()-interval '2 days', email_verified_at=now()-interval '2 days'+interval '1 minute',
+        ready_at=now()-interval '1 hour', expires_at=now()+interval '4 days'
+      where id='${claim.id}' and account_id='${accountId}' and method='totp';
+      update app_private.notification_jobs set completed_at=now()
+      where source_id='${claim.id}' and template_key='account_recovery_started';`);
+    const completed = await request.post(`${base}/account-recovery/${claim.id}/complete`, {
+      headers: anonymous,
+      data: { verificationToken: token },
+    });
+    expect(await completed.json()).toMatchObject({ state: "completed" });
+    expect((await admin.auth.admin.getUserById(accountId)).data.user?.email).toBe(newEmail);
+  } finally {
+    await deleteSyntheticAccount(newEmail);
+    await deleteSyntheticAccount(email);
+  }
+});
+
 test("the visible email OTP signs in", async ({ page, request }) => {
   test.setTimeout(90_000);
   const email = `otp-${randomUUID()}@example.invalid`;

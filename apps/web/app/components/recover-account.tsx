@@ -14,6 +14,7 @@ export function RecoverAccount() {
   const [link, setLink] = useState<{ claimId: string; verificationToken: string } | null>(null);
   const [completion, setCompletion] = useState<"completed" | "finishing" | null>(null);
   const [checking, setChecking] = useState(false);
+  const [factor, setFactor] = useState<"recoveryCode" | "totp">("recoveryCode");
 
   useEffect(() => {
     // Fragments never reach the server. Keep the secret only in component memory.
@@ -109,13 +110,20 @@ export function RecoverAccount() {
     setBusy(true);
     setStatus("");
     try {
-      await api.initiateAccountRecovery({
+      const emails = {
         currentEmail: String(data.get("currentEmail") ?? "").trim(),
         newEmail: String(data.get("newEmail") ?? "").trim(),
-        recoveryCode: String(data.get("recoveryCode") ?? "")
-          .trim()
-          .toUpperCase(),
-      });
+      };
+      await api.initiateAccountRecovery(
+        factor === "totp"
+          ? { ...emails, totpCode: String(data.get("totpCode") ?? "").trim() }
+          : {
+              ...emails,
+              recoveryCode: String(data.get("recoveryCode") ?? "")
+                .trim()
+                .toUpperCase(),
+            },
+      );
       form.reset();
       setStatus(translate(locale, "accountRecovery.sentLocal"));
     } catch (error) {
@@ -215,15 +223,54 @@ export function RecoverAccount() {
               required
               type="email"
             />
-            <label htmlFor="recoveryCode">{translate(locale, "accountRecovery.code")}</label>
-            <input
-              autoComplete="off"
-              id="recoveryCode"
-              name="recoveryCode"
-              maxLength={24}
-              pattern="[A-HJ-NP-Za-hj-np-z2-9]{4}(-[A-HJ-NP-Za-hj-np-z2-9]{4}){4}"
-              required
-            />
+            <fieldset className="choice-group">
+              <legend>{translate(locale, "accountRecovery.factor")}</legend>
+              <label className="checkbox-field">
+                <input
+                  checked={factor === "recoveryCode"}
+                  name="factor"
+                  onChange={() => setFactor("recoveryCode")}
+                  type="radio"
+                />
+                <span>{translate(locale, "accountRecovery.factorCode")}</span>
+              </label>
+              <label className="checkbox-field">
+                <input
+                  checked={factor === "totp"}
+                  name="factor"
+                  onChange={() => setFactor("totp")}
+                  type="radio"
+                />
+                <span>{translate(locale, "accountRecovery.factorTotp")}</span>
+              </label>
+            </fieldset>
+            {factor === "totp" ? (
+              <>
+                <label htmlFor="totpCode">{translate(locale, "mfa.code")}</label>
+                <input
+                  autoComplete="one-time-code"
+                  id="totpCode"
+                  inputMode="numeric"
+                  maxLength={6}
+                  minLength={6}
+                  name="totpCode"
+                  pattern="[0-9]{6}"
+                  required
+                />
+              </>
+            ) : (
+              <>
+                <label htmlFor="recoveryCode">{translate(locale, "accountRecovery.code")}</label>
+                <input
+                  autoComplete="off"
+                  id="recoveryCode"
+                  name="recoveryCode"
+                  maxLength={24}
+                  pattern="[A-HJ-NP-Za-hj-np-z2-9]{4}(-[A-HJ-NP-Za-hj-np-z2-9]{4}){4}"
+                  required
+                />
+              </>
+            )}
             <label htmlFor="newEmail">{translate(locale, "accountRecovery.newEmail")}</label>
             <input autoComplete="email" id="newEmail" name="newEmail" required type="email" />
             <button className="primary-button" disabled={busy} type="submit">

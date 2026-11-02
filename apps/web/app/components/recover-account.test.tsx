@@ -152,6 +152,28 @@ describe("RecoverAccount", () => {
     expect(screen.queryByRole("button", { name: "Finish recovery" })).not.toBeInTheDocument();
     expect(mocks.confirmAccountRecoveryEmail).not.toHaveBeenCalled();
   });
+  it("starts recovery with an authenticator code instead of the recovery code", async () => {
+    mocks.initiateAccountRecovery.mockResolvedValue({ delivery: "captured_locally" });
+    render(<RecoverAccount />);
+    fireEvent.click(screen.getByLabelText("A code from my authenticator app"));
+    expect(screen.queryByLabelText("Recovery code")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Current email address"), {
+      target: { value: "owner@example.invalid" },
+    });
+    fireEvent.change(screen.getByLabelText("Replacement email address"), {
+      target: { value: "new@example.invalid" },
+    });
+    fireEvent.change(screen.getByLabelText("Six-digit code from the app"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start recovery" }));
+    await screen.findByText("The verification message is now available in local Mailpit.");
+    expect(mocks.initiateAccountRecovery).toHaveBeenCalledWith({
+      currentEmail: "owner@example.invalid",
+      newEmail: "new@example.invalid",
+      totpCode: "123456",
+    });
+  });
   it("has no detectable automated accessibility violations", async () => {
     const { container } = render(<RecoverAccount />);
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });

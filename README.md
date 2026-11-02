@@ -52,7 +52,9 @@ platform-admin review of an owner's first event are implemented locally;
 restart Supabase after pulling so the TOTP config applies. The event lifecycle
 (publish gate, cancel, end early, automatic start/end/archive) is enforced
 locally; publishing stays closed until routing and public delivery exist.
-Associations and companies can request a reviewer-checked "Registered
+Account recovery accepts either the saved recovery code or a current
+authenticator (TOTP) code. Associations and companies can request a
+reviewer-checked "Registered
 organization verified" badge from Settings. After pulling changes that add a
 new shared TypeScript import to the Edge function, restart Supabase: the CLI
 mounts imported files individually at start. Grant local admin

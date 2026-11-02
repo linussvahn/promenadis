@@ -30,11 +30,12 @@ export type Database = {
       account_recovery_claims: {
         Row: {
           account_id: string
-          code_version: number
+          code_version: number | null
           email_verified_at: string | null
           expires_at: string
           id: string
           initiated_at: string
+          method: string
           new_email: string
           original_email: string | null
           ready_at: string
@@ -43,11 +44,12 @@ export type Database = {
         }
         Insert: {
           account_id: string
-          code_version: number
+          code_version?: number | null
           email_verified_at?: string | null
           expires_at: string
           id?: string
           initiated_at?: string
+          method?: string
           new_email: string
           original_email?: string | null
           ready_at: string
@@ -56,11 +58,12 @@ export type Database = {
         }
         Update: {
           account_id?: string
-          code_version?: number
+          code_version?: number | null
           email_verified_at?: string | null
           expires_at?: string
           id?: string
           initiated_at?: string
+          method?: string
           new_email?: string
           original_email?: string | null
           ready_at?: string
@@ -525,6 +528,27 @@ export type Database = {
           },
         ]
       }
+      recovery_totp_attempts: {
+        Row: {
+          account_id: string
+          failures: number
+          last_step: number
+          window_started_at: string
+        }
+        Insert: {
+          account_id: string
+          failures?: number
+          last_step?: number
+          window_started_at: string
+        }
+        Update: {
+          account_id?: string
+          failures?: number
+          last_step?: number
+          window_started_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -543,6 +567,11 @@ export type Database = {
       }
       account_recovery_status: { Args: { p_account_id: string }; Returns: Json }
       advance_event_lifecycle_command: { Args: never; Returns: number }
+      base32_decode: { Args: { p_value: string }; Returns: string }
+      consume_recovery_totp: {
+        Args: { p_account_id: string; p_code: string }
+        Returns: boolean
+      }
       erase_due_accounts_command: { Args: never; Returns: number }
       event_boundary_summary: {
         Args: {
@@ -572,15 +601,17 @@ export type Database = {
         Args: { p_event_id: string; p_owner_account_id: string }
         Returns: string
       }
+      has_verified_totp: { Args: { p_account_id: string }; Returns: boolean }
       lock_eligible_recovery_claim: {
         Args: { p_claim_id: string; p_verification_token: string }
         Returns: {
           account_id: string
-          code_version: number
+          code_version: number | null
           email_verified_at: string | null
           expires_at: string
           id: string
           initiated_at: string
+          method: string
           new_email: string
           original_email: string | null
           ready_at: string
@@ -635,6 +666,7 @@ export type Database = {
         Args: { p_correlation_id: string; p_dispatch_id: string }
         Returns: string
       }
+      totp_code: { Args: { p_key: string; p_step: number }; Returns: string }
       valid_organization_number: { Args: { p_value: string }; Returns: boolean }
     }
     Enums: {
@@ -1628,6 +1660,7 @@ export type Database = {
           p_current_email: string
           p_new_email: string
           p_recovery_code: string
+          p_totp_code: string
           p_verification_token: string
         }
         Returns: Json

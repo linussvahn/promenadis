@@ -463,6 +463,30 @@ commit and push each, ask only on real blockers. Order: account deletion
 (done), optional owner TOTP, then platform-admin elevation plus first-event
 review.
 
+### TOTP as a recovery factor (2026-11-02)
+
+- `20261102000300_totp_recovery_factor.sql`: claims gain `method`
+  (`recovery_code`|`totp`, `code_version` only for codes); in-database RFC 6238
+  check (`base32_decode`, `totp_code` verified against both RFC vectors,
+  `consume_recovery_totp` with +-1 step, replay fence and 5-failures/24h
+  lockout in `recovery_totp_attempts`). Initiation takes exactly one factor and
+  RETURNS `{"error":"invalid_recovery"}` for a wrong TOTP so the failure count
+  commits (a raise would roll it back). Confirm/eligibility require the factor
+  to stay verified; a trigger on `auth.mfa_factors` withdraws TOTP claims when
+  it is removed. Encrypted factor secrets fail closed.
+- Contract is now a union (recovery code XOR totp code); the recovery page has
+  a factor choice. Test 120 call sites updated for the new parameter.
+- Verified: pgTAP 260 (20), component, e2e (wrong code, both factors, success
+  through completion), full verify, DB rebuild, all recovery integration
+  scripts, smoke e2e; local-auth e2e 10/11 with the known flaky
+  "opaque sessions" test, which passed 3/3 alone.
+
+Milestone 1 status: every item on the list is now implemented locally except
+what explicitly depends on later milestones (publication's routing/delivery
+gates, sellers, public pages, notifications). Next: Milestone 2 (sellers and
+safety lifecycle), or a Milestone 1 completion review against
+`docs/LAUNCH_CHECKLIST.md` first.
+
 ### Organizer verification (2026-11-02)
 
 - `20261102000200_organizer_verification.sql` + domain

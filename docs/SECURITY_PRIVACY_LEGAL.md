@@ -191,6 +191,16 @@ lease, so late or duplicate provider requests cannot land, and the outcome is
 read from Auth's own tables rather than the provider response. An applied
 change revokes every Auth session, refresh token and browser session.
 
+TOTP recovery factor (2026-11-02): an owner may start recovery with a current
+code from their verified authenticator instead of the saved recovery code.
+The code is checked inside Postgres against Auth's stored factor secret, so
+the secret never leaves the database; only a plain base32 secret is accepted
+and an encrypted one fails closed (hosted deployments need a reviewed
+replacement before enabling this). Five wrong codes lock TOTP recovery for 24
+hours per account, an accepted time step is never reusable, and removing or
+unverifying the factor withdraws a pending TOTP-based claim. All other
+recovery gates are unchanged.
+
 Decision 2026-11-01: after completion, the previous sign-in address receives a
 fixed notice that the address no longer signs in. It names no new address and
 carries no link. That address is kept only in a private binding for that one

@@ -2426,31 +2426,62 @@
         "additionalProperties": false
       },
       "InitiateAccountRecoveryRequest": {
-        "type": "object",
-        "properties": {
-          "currentEmail": {
-            "type": "string",
-            "maxLength": 320,
-            "format": "email",
-            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "currentEmail": {
+                "type": "string",
+                "maxLength": 320,
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              "newEmail": {
+                "type": "string",
+                "maxLength": 320,
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              "recoveryCode": {
+                "type": "string",
+                "pattern": "^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){4}$"
+              }
+            },
+            "required": [
+              "currentEmail",
+              "newEmail",
+              "recoveryCode"
+            ],
+            "additionalProperties": false
           },
-          "newEmail": {
-            "type": "string",
-            "maxLength": 320,
-            "format": "email",
-            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-          },
-          "recoveryCode": {
-            "type": "string",
-            "pattern": "^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){4}$"
+          {
+            "type": "object",
+            "properties": {
+              "currentEmail": {
+                "type": "string",
+                "maxLength": 320,
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              "newEmail": {
+                "type": "string",
+                "maxLength": 320,
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              "totpCode": {
+                "type": "string",
+                "pattern": "^[0-9]{6}$"
+              }
+            },
+            "required": [
+              "currentEmail",
+              "newEmail",
+              "totpCode"
+            ],
+            "additionalProperties": false
           }
-        },
-        "required": [
-          "currentEmail",
-          "newEmail",
-          "recoveryCode"
-        ],
-        "additionalProperties": false
+        ]
       },
       "InitiateAccountRecoveryResponse": {
         "type": "object",

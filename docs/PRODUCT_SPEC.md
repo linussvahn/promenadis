@@ -152,6 +152,9 @@ actions require approval by a different administrator before taking effect.
   successor. Recovery or successor transfer uses a new verified email, a 24-hour
   delay, notifications to the old email and event team, and a complete audit
   trail. A successor receives event ownership, not access to the old account.
+- An owner with a verified authenticator may start recovery with a current
+  authenticator code instead of the recovery code; the rest of the flow is
+  identical, and five wrong codes lock that path for 24 hours.
 - For recovery-code account recovery, the full 24-hour minimum wait starts
   after replacement-email verification, not when an unverified request is
   created. The signed-in owner may cancel a pending request; replacing the

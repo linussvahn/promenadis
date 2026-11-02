@@ -493,12 +493,15 @@ Deno.serve(async (request) => {
         p_correlation_id: correlationId,
         p_current_email: input.data.currentEmail,
         p_new_email: input.data.newEmail,
-        p_recovery_code: input.data.recoveryCode,
+        p_recovery_code: "recoveryCode" in input.data ? input.data.recoveryCode : null,
+        p_totp_code: "totpCode" in input.data ? input.data.totpCode : null,
         p_verification_token: verificationToken,
       });
-      if (error) {
+      // A wrong authenticator code is returned (so its attempt count commits),
+      // and answered exactly like a wrong recovery code.
+      if (error || (data && typeof data === "object" && "error" in data)) {
         status = "denied";
-        const pending = error.message === "Recovery claim already pending";
+        const pending = error?.message === "Recovery claim already pending";
         return apiError(
           pending ? "claim_pending" : "invalid_recovery",
           pending

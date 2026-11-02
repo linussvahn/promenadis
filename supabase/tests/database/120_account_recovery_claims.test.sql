@@ -10,7 +10,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'authenticated',
-    'public.initiate_account_recovery_claim_command(text,text,text,text,uuid)',
+    'public.initiate_account_recovery_claim_command(text,text,text,text,text,uuid)',
     'EXECUTE'
   ),
   'authenticated clients cannot bypass recovery initiation'
@@ -45,7 +45,7 @@ select public.enroll_account_recovery_code_command(
 
 select throws_ok(
   $$select public.initiate_account_recovery_claim_command(
-    'recovery-owner@example.invalid', '2345-6789-ABCD-EFGH-JKLM',
+    'recovery-owner@example.invalid', '2345-6789-ABCD-EFGH-JKLM', null,
     'replacement@example.invalid', repeat('x', 43),
     '01992026-0909-7200-8000-000000000114'
   )$$,
@@ -54,7 +54,7 @@ select throws_ok(
 );
 select lives_ok(
   $$select public.initiate_account_recovery_claim_command(
-    'recovery-owner@example.invalid', 'ABCD-EFGH-JKLM-NPQR-STUV',
+    'recovery-owner@example.invalid', 'ABCD-EFGH-JKLM-NPQR-STUV', null,
     'replacement@example.invalid', repeat('x', 43),
     '01992026-0909-7200-8000-000000000115'
   )$$,
@@ -155,7 +155,7 @@ select public.enroll_account_recovery_code_command(
   '01992026-0909-7200-8000-000000000101', '2345-6789-ABCD-EFGH-JKLM', 1, now(), gen_random_uuid()
 );
 select public.initiate_account_recovery_claim_command(
-  'recovery-owner@example.invalid', '2345-6789-ABCD-EFGH-JKLM',
+  'recovery-owner@example.invalid', '2345-6789-ABCD-EFGH-JKLM', null,
   'replacement@example.invalid', repeat('x',43), gen_random_uuid()
 );
 select public.enroll_account_recovery_code_command(
@@ -164,7 +164,7 @@ select public.enroll_account_recovery_code_command(
 select is((select count(*) from app_private.account_recovery_claims), 0::bigint,
   'code rotation invalidates and deletes unverified requests');
 select public.initiate_account_recovery_claim_command(
-  'recovery-owner@example.invalid', 'ABCD-EFGH-JKLM-NPQR-STUV',
+  'recovery-owner@example.invalid', 'ABCD-EFGH-JKLM-NPQR-STUV', null,
   'replacement@example.invalid', repeat('x',43), gen_random_uuid()
 );
 select public.confirm_account_recovery_email_command(
@@ -176,7 +176,7 @@ select public.enroll_account_recovery_code_command(
 select is((select count(*) from app_private.account_recovery_claims), 0::bigint,
   'code rotation also deletes verified pending requests');
 select public.initiate_account_recovery_claim_command(
-  'recovery-owner@example.invalid', '2345-6789-ABCD-EFGH-JKLM',
+  'recovery-owner@example.invalid', '2345-6789-ABCD-EFGH-JKLM', null,
   'replacement@example.invalid', repeat('x',43), gen_random_uuid()
 );
 update app_private.account_recovery_claims set
