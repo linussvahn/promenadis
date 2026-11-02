@@ -2,6 +2,8 @@ import { PromenadisApiError } from "@promenadis/api-client";
 import type {
   DraftEventSummary,
   EventSellers as EventSellersData,
+  LocationReviewRequest,
+  PinCorrectionRequest,
   SellerParticipation,
 } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
@@ -10,6 +12,8 @@ import { getPromenadisApiClient } from "../lib/supabase";
 
 const errorKeys = {
   conflict_of_interest: "sellers.ownApplication",
+  correction_too_large: "sellers.correctionTooLarge",
+  recent_auth_required: "sellers.recentAuth",
   places_full: "sellers.placesFull",
   version_conflict: "sellers.changed",
 } as const;
@@ -195,6 +199,31 @@ export function EventSellers({
                   {seller.location.locality ? ` ${seller.location.locality}` : ""}
                 </p>
               ) : null}
+              {seller.location ? (
+                <LocationTools
+                  busy={busy}
+                  canReview={canManage}
+                  locale={locale}
+                  location={seller.location}
+                  otherLocations={data.sellers.flatMap((other) =>
+                    other.location &&
+                    other.location.id !== seller.location?.id &&
+                    other.location.addressLine.toLowerCase() ===
+                      seller.location?.addressLine.toLowerCase()
+                      ? [other.location]
+                      : [],
+                  )}
+                  onCorrect={(input) =>
+                    run(({ api, token }) =>
+                      api.correctLocationPin(token, seller.location?.id ?? "", input),
+                    )
+                  }
+                  onReview={(input) =>
+                    run(({ api, token }) => api.reviewEventLocation(token, event.id, input))
+                  }
+                  participationId={seller.id}
+                />
+              ) : null}
               <p className="field-help">
                 {translate(locale, "sellers.appliedAt")}{" "}
                 {formatDateTime(locale, seller.appliedAt, event.timezone)}
@@ -206,16 +235,18 @@ export function EventSellers({
                   </label>
                   <textarea id={`seller-reason-${seller.id}`} maxLength={500} name="reason" />
                   <div className="form-actions">
+                    {open || seller.state === "pending_address_change" ? (
+                      <button
+                        className="primary-button"
+                        disabled={busy}
+                        type="submit"
+                        value="approve"
+                      >
+                        {translate(locale, open ? "sellers.approve" : "sellers.approveAddress")}
+                      </button>
+                    ) : null}
                     {open ? (
                       <>
-                        <button
-                          className="primary-button"
-                          disabled={busy}
-                          type="submit"
-                          value="approve"
-                        >
-                          {translate(locale, "sellers.approve")}
-                        </button>
                         {seller.state === "pending" ? (
                           <button
                             className="secondary-button"
@@ -255,6 +286,124 @@ export function EventSellers({
       <p aria-live="polite" className="form-status">
         {status}
       </p>
+    </div>
+  );
+}
+
+function LocationTools({
+  busy,
+  canReview,
+  locale,
+  location,
+  onCorrect,
+  onReview,
+  otherLocations,
+  participationId,
+}: {
+  readonly busy: boolean;
+  readonly canReview: boolean;
+  readonly locale: Locale;
+  readonly location: NonNullable<SellerParticipation["location"]>;
+  readonly onCorrect: (input: PinCorrectionRequest) => Promise<void>;
+  readonly onReview: (input: LocationReviewRequest) => Promise<void>;
+  readonly otherLocations: readonly NonNullable<SellerParticipation["location"]>[];
+  readonly participationId: string;
+}) {
+  const prefix = `location-${participationId}`;
+  const targets = [...new Map(otherLocations.map((item) => [item.id, item])).values()];
+  return (
+    <div className="location-tools">
+      <p className="field-help">
+        {location.sellerCount > 1
+          ? translate(locale, "sellers.sharedStop").replace("{count}", String(location.sellerCount))
+          : translate(locale, "sellers.ownStop")}
+        {" · "}
+        {translate(locale, `placement.${location.placement}`)}
+      </p>
+      {location.needsReview ? (
+        <p className="notice">{translate(locale, "sellers.needsReview")}</p>
+      ) : null}
+      {canReview && location.needsReview ? (
+        <div className="form-actions">
+          <button
+            className="secondary-button"
+            disabled={busy}
+            onClick={() => void onReview({ action: "confirm_separate", locationId: location.id })}
+            type="button"
+          >
+            {translate(locale, "sellers.confirmSeparate")}
+          </button>
+          {targets.map((target) => (
+            <button
+              className="secondary-button"
+              disabled={busy}
+              key={target.id}
+              onClick={() =>
+                void onReview({
+                  action: "merge",
+                  locationId: location.id,
+                  targetLocationId: target.id,
+                })
+              }
+              type="button"
+            >
+              {translate(locale, "sellers.mergeInto")}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {canReview && location.sellerCount > 1 ? (
+        <button
+          className="secondary-button"
+          disabled={busy}
+          onClick={() =>
+            void onReview({ action: "split", locationId: location.id, participationId })
+          }
+          type="button"
+        >
+          {translate(locale, "sellers.split")}
+        </button>
+      ) : null}
+      <details className="settings-details">
+        <summary>{translate(locale, "sellers.correctPin")}</summary>
+        <form
+          className="details-form"
+          onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
+            formEvent.preventDefault();
+            const form = new FormData(formEvent.currentTarget);
+            void onCorrect({
+              latitude: Number(form.get("latitude")),
+              longitude: Number(form.get("longitude")),
+              reason: String(form.get("reason") ?? ""),
+            });
+          }}
+        >
+          <p className="field-help">{translate(locale, "sellers.correctPinHelp")}</p>
+          <label htmlFor={`${prefix}-latitude`}>{translate(locale, "boundary.latitude")}</label>
+          <input
+            defaultValue={location.latitude}
+            id={`${prefix}-latitude`}
+            inputMode="decimal"
+            name="latitude"
+            required
+          />
+          <label htmlFor={`${prefix}-longitude`}>{translate(locale, "boundary.longitude")}</label>
+          <input
+            defaultValue={location.longitude}
+            id={`${prefix}-longitude`}
+            inputMode="decimal"
+            name="longitude"
+            required
+          />
+          <label htmlFor={`${prefix}-reason`}>
+            {translate(locale, "sellers.correctionReason")}
+          </label>
+          <textarea id={`${prefix}-reason`} maxLength={500} minLength={3} name="reason" required />
+          <button className="secondary-button" disabled={busy} type="submit">
+            {translate(locale, "sellers.saveCorrection")}
+          </button>
+        </form>
+      </details>
     </div>
   );
 }

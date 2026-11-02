@@ -461,7 +461,7 @@ Treat those documents as canonical rather than relying on chat memory.
 Planned slices, each its own commit:
 
 1. Seller applications and admission (done, below).
-2. Geocoding adapter (local fixture, Geoapify later), shared locations
+2. (done) Geocoding adapter (local fixture, Geoapify later), shared locations
    (exact-address prompt, host merge/split), address-change reapproval, pin
    correction up to 25 m.
 3. Taxonomy `flea-market-v1`, event taxonomy subset, seller listing content
@@ -471,6 +471,39 @@ Planned slices, each its own commit:
    invite-only seller invitations.
 5. Event-relative retention: non-public at end/cancel, 14-day erasure,
    tombstones, heartbeats; postponement and reschedule confirmation.
+
+Slice 2, `20261103000200_shared_locations_address_change.sql`:
+
+- Geocoding: `supabase/functions/api-v1/geocoder.ts` adapter. Local default is
+  a deterministic fixture ("Testgatan N"/"Provgatan N"; anything else is not
+  found). Hosted gets no geocoder unless `GEOCODER_PROVIDER=geoapify` and
+  `GEOAPIFY_API_KEY` are set (code written, never called: no keys, no spend).
+  `POST /events/{id}/geocode` checks a 7-day cache keyed by a SHA-256 of the
+  normalized query (coordinates only), then the budget
+  (`reserve_geocode_request_command`: 10/min, 30/day per account, 750/day per
+  event, 2,500/day platform), then the provider. Failure degrades to the
+  manual pin. Hourly purge of cache and request rows.
+- Apply now takes `placement` (`geocoded` only when the seller kept the
+  proposed point) and `sharesEntrance`. An exact normalized-address match
+  with another active stop returns 409 `shared_entrance_question`; "yes"
+  joins that stop, "no" creates a new stop flagged `needs_review`.
+- `change_participation_address_command`: pending/waitlisted follow normal
+  admission; approved or pending_address_change become
+  `pending_address_change` (keeps the place; approve needs no free place).
+  Other sellers at a shared stop keep it.
+- `review_event_location_command` (owner/co-host): merge, split,
+  confirm_separate. `correct_location_pin_command` (team incl. moderator):
+  recent auth, reason, at most 25 m; before/after points live in
+  `app_private.location_pin_corrections` (cascade-deleted with the
+  location), the audit keeps only distance. Placement becomes `corrected`.
+- Web: shared `SellerAddressForm` (find on map, pin, shared-entrance
+  question, attestation) for applying and changing address; team
+  `LocationTools` (shared/own stop, review buttons, split, pin correction).
+- Deferred to Milestone 5 (mail): seller notice of pin corrections and
+  decisions. Urgent snapshot/route invalidation arrives with publication
+  (Milestone 3).
+- Verified: pgTAP 290 (28; 683 total), component tests (167 total), full
+  verify, DB rebuild, 14/14 local-auth e2e, 5 smoke, integration scripts.
 
 Slice 1, `20261103000100_seller_admission.sql`:
 

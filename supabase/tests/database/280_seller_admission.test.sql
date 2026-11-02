@@ -4,7 +4,7 @@ select plan(34);
 select ok(not has_table_privilege('authenticated','public.seller_participations','SELECT'),'participations private');
 select ok(not has_table_privilege('authenticated','public.event_locations','SELECT'),'addresses private');
 select ok(not has_table_privilege('anon','public.event_locations','SELECT'),'addresses hidden from anonymous');
-select ok(not has_function_privilege('authenticated','public.apply_to_event_command(uuid,uuid,text,text,text,text,double precision,double precision,boolean,uuid)','EXECUTE'),'browser cannot apply directly');
+select ok(not has_function_privilege('authenticated','public.apply_to_event_command(uuid,uuid,text,text,text,text,double precision,double precision,text,boolean,boolean,uuid)','EXECUTE'),'browser cannot apply directly');
 select ok(not has_function_privilege('authenticated','public.decide_seller_participation_command(uuid,uuid,integer,text,text,uuid)','EXECUTE'),'browser cannot decide directly');
 
 insert into auth.users(id,email,email_confirmed_at,created_at,updated_at)
@@ -22,7 +22,7 @@ insert into public.event_memberships(event_id,account_id,role,display_name) valu
 -- Inside: around (18.062, 59.331). Outside: (18.10, 59.35).
 create function pg_temp.apply(p_seller int, p_lng double precision, p_attest boolean default true) returns jsonb language sql as $$
 select public.apply_to_event_command(('01992026-1103-7000-8000-00000000000'||p_seller)::uuid,(select event_id from fixture),
-  'Seller '||p_seller,'Testgatan '||p_seller,'113 45','Stockholm',p_lng,59.331,p_attest,gen_random_uuid());
+  'Seller '||p_seller,'Testgatan '||p_seller,'113 45','Stockholm',p_lng,59.331,'manual',null,p_attest,gen_random_uuid());
 $$;
 create function pg_temp.p(p_seller int) returns public.seller_participations language sql as $$
 select * from public.seller_participations where account_id=('01992026-1103-7000-8000-00000000000'||p_seller)::uuid;

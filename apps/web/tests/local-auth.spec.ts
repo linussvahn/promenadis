@@ -932,8 +932,10 @@ test("sellers apply through the join page, fill seller places and move up from t
         latitude: 59.3315,
         locality: "",
         longitude: 18.0625,
+        placement: "manual",
         postalCode: "",
         rightToUseAttested: true,
+        sharesEntrance: null,
       },
     });
     expect(await applied.json()).toMatchObject({ state: "waitlisted" });
@@ -960,6 +962,136 @@ test("sellers apply through the join page, fill seller places and move up from t
     await deleteSyntheticAccount(firstEmail);
     await deleteSyntheticAccount(secondEmail);
     await deleteSyntheticAccount(ownerEmail);
+  }
+});
+
+test("geocoded pins, shared stops, address review and pin corrections", async ({ request }) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const emails = ["owner", "seller-a", "seller-b"].map(
+    (role) => `stops-${role}-${randomUUID()}@example.invalid`,
+  );
+  const password = `Local-test-${randomUUID()}`;
+  const headersFor = async (email: string) => {
+    const client = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return {
+      apikey: publicKey,
+      authorization: `Bearer ${data.session?.access_token}`,
+      origin: "http://127.0.0.1:5173",
+    };
+  };
+  for (const email of emails) {
+    const { error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
+    if (error) throw error;
+  }
+  try {
+    const [owner, sellerA, sellerB] = await Promise.all(emails.map(headersFor));
+    const created = await request.post(`${base}/events`, {
+      headers: owner,
+      data: {
+        description: "Synthetic stops",
+        endsAt: "2031-09-16T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic stops owner",
+        startsAt: "2031-09-16T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic stops market",
+        visibility: "unlisted",
+      },
+    });
+    const eventId = (await created.json()).id as string;
+    const ownerId = localSql(`select id from auth.users where email='${emails[0]}';`);
+    localSql(`select public.upsert_draft_event_boundary_command('${ownerId}','${eventId}',null,'Synthetic area',
+        '{"type":"Polygon","coordinates":[[[18.06,59.33],[18.064,59.33],[18.064,59.333],[18.06,59.333],[18.06,59.33]]]}'::jsonb,
+        gen_random_uuid());
+      update public.events set admission_mode='auto_inside' where id='${eventId}';`);
+
+    const lookup = await request.post(`${base}/events/${eventId}/geocode`, {
+      headers: sellerA,
+      data: { addressLine: "Testgatan 3", locality: "", postalCode: "" },
+    });
+    const point = await lookup.json();
+    expect(point).toMatchObject({ found: true, latitude: 59.331 });
+    const missing = await request.post(`${base}/events/${eventId}/geocode`, {
+      headers: sellerA,
+      data: { addressLine: "Okänd väg 1", locality: "", postalCode: "" },
+    });
+    expect(await missing.json()).toMatchObject({ found: false });
+
+    const application = (headers: Record<string, string>, sharesEntrance: boolean | null) =>
+      request.post(`${base}/events/${eventId}/participation`, {
+        headers,
+        data: {
+          addressLine: "Testgatan 3",
+          displayName: "Synthetic stop seller",
+          latitude: point.latitude,
+          locality: "",
+          longitude: point.longitude,
+          placement: "geocoded",
+          postalCode: "",
+          rightToUseAttested: true,
+          sharesEntrance,
+        },
+      });
+    const first = await (await application(sellerA, null)).json();
+    expect(first).toMatchObject({ location: { placement: "geocoded" }, state: "approved" });
+    const asked = await application(sellerB, null);
+    expect(asked.status()).toBe(409);
+    expect((await asked.json()).code).toBe("shared_entrance_question");
+    const second = await (await application(sellerB, true)).json();
+    expect(second.location).toMatchObject({ id: first.location.id, sellerCount: 2 });
+
+    const moved = await request.post(`${base}/participations/${first.id}/address`, {
+      headers: sellerA,
+      data: {
+        addressLine: "Provgatan 4",
+        expectedVersion: first.version,
+        latitude: 59.3322,
+        locality: "",
+        longitude: 18.0609,
+        placement: "manual",
+        postalCode: "",
+        rightToUseAttested: true,
+        sharesEntrance: null,
+      },
+    });
+    const movedBody = await moved.json();
+    expect(movedBody).toMatchObject({ state: "pending_address_change" });
+    const team = await (
+      await request.get(`${base}/events/${eventId}/sellers`, { headers: owner })
+    ).json();
+    expect(team).toMatchObject({ locationCount: 2, placesUsed: 2 });
+
+    const approved = await request.post(`${base}/participations/${first.id}/decision`, {
+      headers: owner,
+      data: { decision: "approve", expectedVersion: movedBody.version },
+    });
+    expect(await approved.json()).toMatchObject({ state: "approved" });
+    const tooFar = await request.post(`${base}/locations/${movedBody.location.id}/pin-correction`, {
+      headers: owner,
+      data: { latitude: 59.3322, longitude: 18.0619, reason: "Wrong house" },
+    });
+    expect((await tooFar.json()).code).toBe("correction_too_large");
+    const corrected = await request.post(
+      `${base}/locations/${movedBody.location.id}/pin-correction`,
+      {
+        headers: owner,
+        data: { latitude: 59.3322, longitude: 18.0611, reason: "Pin across the street" },
+      },
+    );
+    const sellers = (await corrected.json()).sellers as {
+      id: string;
+      location: { placement: string };
+    }[];
+    expect(sellers.find((item) => item.id === first.id)?.location.placement).toBe("corrected");
+  } finally {
+    for (const email of emails) await deleteSyntheticAccount(email);
   }
 });
 

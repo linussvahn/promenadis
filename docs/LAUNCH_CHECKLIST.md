@@ -136,8 +136,10 @@ Milestone 2 state: **in progress**. Slice 1 (seller applications, admission
 modes, seller places, waiting list and promotion, host decisions, withdrawal)
 is complete locally as of 2026-11-03: pgTAP 280, domain `seller-admission`
 tests, seller-join and event-sellers component tests, and the e2e "sellers
-apply through the join page…". Geocoding, shared locations, address changes,
-listing content, moderation and event-relative retention remain.
+apply through the join page…". Slice 2 (geocoding adapter and budget, shared
+stops with host merge/split, address-change reapproval, 25 m pin corrections)
+is complete locally: pgTAP 290 and the e2e "geocoded pins, shared stops…".
+Listing content, moderation and event-relative retention remain.
 
 - Seller application, entitlement/waitlist/promotion, address/geocode/manual pin,
   shared-location merge/split, and address-change reapproval.

@@ -6,6 +6,11 @@ import {
   type DecideFirstEventReviewRequest,
   type CancelEventRequest,
   type ApplyToEventRequest,
+  type ChangeParticipationAddressRequest,
+  type GeocodeRequest,
+  type LocationReviewRequest,
+  type PinCorrectionRequest,
+  geocodeResultSchema,
   type DecideSellerRequest,
   type UpdateEventAdmissionRequest,
   eventForSellerSchema,
@@ -328,6 +333,36 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     },
     applyToEvent(accessToken: string, eventId: string, input: ApplyToEventRequest) {
       return request(`/events/${eventId}/participation`, accessToken, sellerParticipationSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    geocodeAddress(accessToken: string, eventId: string, input: GeocodeRequest) {
+      return request(`/events/${eventId}/geocode`, accessToken, geocodeResultSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    changeParticipationAddress(
+      accessToken: string,
+      participationId: string,
+      input: ChangeParticipationAddressRequest,
+    ) {
+      return request(
+        `/participations/${participationId}/address`,
+        accessToken,
+        sellerParticipationSchema,
+        { body: input, method: "POST" },
+      );
+    },
+    reviewEventLocation(accessToken: string, eventId: string, input: LocationReviewRequest) {
+      return request(`/events/${eventId}/location-review`, accessToken, eventSellersSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    correctLocationPin(accessToken: string, locationId: string, input: PinCorrectionRequest) {
+      return request(`/locations/${locationId}/pin-correction`, accessToken, eventSellersSchema, {
         body: input,
         method: "POST",
       });

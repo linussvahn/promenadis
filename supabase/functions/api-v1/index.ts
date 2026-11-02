@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { createBrowserSessionGateway } from "./browser-sessions.ts";
+import { configuredGeocoder, normalizedGeocodeKey } from "./geocoder.ts";
 import { sessionFromVerifiedAccessToken } from "../../../packages/domain/src/auth-session.ts";
 import { normalizeOrganizationNumber } from "../../../packages/domain/src/organization-number.ts";
 import {
@@ -9,6 +10,11 @@ import {
   adminElevationRequestSchema,
   adminEventInterventionRequestSchema,
   applyToEventRequestSchema,
+  changeParticipationAddressRequestSchema,
+  geocodeRequestSchema,
+  geocodeResultSchema,
+  locationReviewRequestSchema,
+  pinCorrectionRequestSchema,
   decideSellerRequestSchema,
   eventForSellerSchema,
   eventSellersSchema,
@@ -2332,6 +2338,25 @@ Deno.serve(async (request) => {
       ["Admission can no longer change", ["invalid_state", "Admission can no longer change.", 409]],
       ["Event version conflict", ["version_conflict", "The event changed. Reload.", 409]],
       ["Invalid admission settings", ["invalid_request", "Check the admission settings.", 400]],
+      [
+        "Shared entrance question",
+        ["shared_entrance_question", "Someone already sells at this address.", 409],
+      ],
+      ["Address cannot change now", ["invalid_state", "The address cannot change now.", 409]],
+      [
+        "Actor cannot review locations",
+        ["forbidden", "Only the owner or a co-host can do this.", 403],
+      ],
+      ["Location not found", ["not_found", "Location not found.", 404]],
+      ["Location cannot be split", ["invalid_request", "Only a shared stop can be split.", 400]],
+      ["Invalid location review", ["invalid_request", "Check the location review.", 400]],
+      ["Recent authentication required", ["recent_auth_required", "Sign in again first.", 403]],
+      ["Invalid pin correction", ["invalid_request", "Give a reason and a point.", 400]],
+      [
+        "Pin correction too large",
+        ["correction_too_large", "Larger moves need a new address.", 400],
+      ],
+      ["Geocoding limit reached", ["rate_limited", "Place the pin by hand for now.", 429]],
     ]);
     const sellerResult = <T>(
       result: { data: unknown; error: { message: string } | null },
@@ -2351,7 +2376,7 @@ Deno.serve(async (request) => {
     };
 
     const sellerEventRoute = route.match(
-      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(seller-view|participation|sellers|admission)$/iu,
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(seller-view|participation|sellers|admission|geocode|location-review)$/iu,
     );
     if (sellerEventRoute) {
       const [, eventId, action] = sellerEventRoute;
@@ -2388,11 +2413,92 @@ Deno.serve(async (request) => {
             p_latitude: input.data.latitude,
             p_locality: input.data.locality,
             p_longitude: input.data.longitude,
+            p_placement: input.data.placement,
             p_postal_code: input.data.postalCode,
             p_right_to_use_attested: input.data.rightToUseAttested,
+            p_shares_entrance: input.data.sharesEntrance,
           }),
           sellerParticipationSchema,
           201,
+        );
+      }
+      if (request.method === "POST" && action === "geocode") {
+        operation = "seller.geocode";
+        const input = geocodeRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError("invalid_request", "Check the address.", 400, correlationId, origin);
+        }
+        const geocoder = configuredGeocoder((name) => Deno.env.get(name));
+        const notFound = { found: false, latitude: null, longitude: null };
+        if (!geocoder) {
+          status = "succeeded";
+          return json(notFound, 200, correlationId, origin);
+        }
+        const digest = await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(`${geocoder.provider}|${normalizedGeocodeKey(input.data)}`),
+        );
+        const queryHash = [...new Uint8Array(digest)]
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("");
+        const cached = await admin.rpc("read_geocode_cache_command", { p_query_hash: queryHash });
+        if (cached.error) throw cached.error;
+        if (cached.data) {
+          const { found, latitude, longitude } = cached.data as Record<string, unknown>;
+          return sellerResult(
+            { data: { found, latitude, longitude }, error: null },
+            geocodeResultSchema,
+          );
+        }
+        const reserved = await admin.rpc("reserve_geocode_request_command", {
+          p_actor_id: actorId,
+          p_event_id: eventId,
+        });
+        if (reserved.error) return sellerResult(reserved, geocodeResultSchema);
+        let point: { longitude: number; latitude: number } | null;
+        try {
+          point = await geocoder.lookup(input.data);
+        } catch {
+          // Provider trouble degrades to the manual pin and is not cached.
+          status = "succeeded";
+          return json(notFound, 200, correlationId, origin);
+        }
+        const stored = await admin.rpc("store_geocode_cache_command", {
+          p_latitude: point?.latitude ?? null,
+          p_longitude: point?.longitude ?? null,
+          p_provider: geocoder.provider,
+          p_query_hash: queryHash,
+        });
+        if (stored.error) throw stored.error;
+        status = "succeeded";
+        return json(point ? { found: true, ...point } : notFound, 200, correlationId, origin);
+      }
+      if (request.method === "POST" && action === "location-review") {
+        operation = "location.review";
+        const input = locationReviewRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError(
+            "invalid_request",
+            "Check the location review.",
+            400,
+            correlationId,
+            origin,
+          );
+        }
+        return sellerResult(
+          await admin.rpc("review_event_location_command", {
+            p_action: input.data.action,
+            p_actor_id: actorId,
+            p_correlation_id: correlationId,
+            p_event_id: eventId,
+            p_location_id: input.data.locationId,
+            p_participation_id: input.data.action === "split" ? input.data.participationId : null,
+            p_target_location_id:
+              input.data.action === "merge" ? input.data.targetLocationId : null,
+          }),
+          eventSellersSchema,
         );
       }
       if (request.method === "GET" && action === "sellers") {
@@ -2440,8 +2546,38 @@ Deno.serve(async (request) => {
       );
     }
 
+    const pinRoute = route.match(
+      /^\/locations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/pin-correction$/iu,
+    );
+    if (request.method === "POST" && pinRoute) {
+      operation = "location.pin_correct";
+      const input = pinCorrectionRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError(
+          "invalid_request",
+          "Give a reason and a point.",
+          400,
+          correlationId,
+          origin,
+        );
+      }
+      return sellerResult(
+        await admin.rpc("correct_location_pin_command", {
+          p_actor_id: actorId,
+          p_authenticated_at: actor.authenticatedAt,
+          p_correlation_id: correlationId,
+          p_latitude: input.data.latitude,
+          p_location_id: pinRoute[1],
+          p_longitude: input.data.longitude,
+          p_reason: input.data.reason,
+        }),
+        eventSellersSchema,
+      );
+    }
+
     const participationRoute = route.match(
-      /^\/participations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(withdraw|decision)$/iu,
+      /^\/participations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(withdraw|decision|address)$/iu,
     );
     if (request.method === "POST" && participationRoute) {
       const [, participationId, action] = participationRoute;
@@ -2459,6 +2595,37 @@ Deno.serve(async (request) => {
             p_correlation_id: correlationId,
             p_expected_version: input.data.expectedVersion,
             p_participation_id: participationId,
+          }),
+          sellerParticipationSchema,
+        );
+      }
+      if (action === "address") {
+        operation = "seller.address_change";
+        const input = changeParticipationAddressRequestSchema.safeParse(body);
+        if (!input.success) {
+          status = "denied";
+          return apiError(
+            "invalid_request",
+            "Check the address fields.",
+            400,
+            correlationId,
+            origin,
+          );
+        }
+        return sellerResult(
+          await admin.rpc("change_participation_address_command", {
+            p_actor_id: actorId,
+            p_address_line: input.data.addressLine,
+            p_correlation_id: correlationId,
+            p_expected_version: input.data.expectedVersion,
+            p_latitude: input.data.latitude,
+            p_locality: input.data.locality,
+            p_longitude: input.data.longitude,
+            p_participation_id: participationId,
+            p_placement: input.data.placement,
+            p_postal_code: input.data.postalCode,
+            p_right_to_use_attested: input.data.rightToUseAttested,
+            p_shares_entrance: input.data.sharesEntrance,
           }),
           sellerParticipationSchema,
         );

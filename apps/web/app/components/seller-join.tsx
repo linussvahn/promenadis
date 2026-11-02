@@ -1,12 +1,12 @@
 import { PromenadisApiError } from "@promenadis/api-client";
-import type { BoundaryPoint, EventForSeller } from "@promenadis/contracts";
+import type { EventForSeller } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
-import { PinPicker } from "./pin-picker";
+import { SellerAddressForm, type SellerAddressInput } from "./seller-address-form";
 
 export function SellerJoin() {
   return <AccountShell>{({ locale }) => <SellerJoinContent locale={locale} />}</AccountShell>;
@@ -26,7 +26,6 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
   const { accessToken, dashboard } = useAccountData();
   const [event, setEvent] = useState<EventForSeller | null>(null);
   const [failed, setFailed] = useState(false);
-  const [pin, setPin] = useState<BoundaryPoint | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -55,33 +54,26 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
     return translate(locale, errorKeys[code as keyof typeof errorKeys] ?? "seller.error");
   };
 
-  const apply = async (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const form = new FormData(formEvent.currentTarget);
-    if (!pin) {
-      setStatus(translate(locale, "seller.pinRequired"));
-      return;
-    }
+  const apply = async (input: SellerAddressInput, form: FormData) => {
     const client = await call();
     if (!client) return;
-    setBusy(true);
-    setStatus("");
-    try {
-      await client.api.applyToEvent(client.token, eventId, {
-        addressLine: String(form.get("addressLine") ?? ""),
-        displayName: String(form.get("displayName") ?? ""),
-        latitude: pin[1],
-        locality: String(form.get("locality") ?? ""),
-        longitude: pin[0],
-        postalCode: String(form.get("postalCode") ?? "").trim(),
-        rightToUseAttested: true,
-      });
-      await load();
-    } catch (error) {
-      setStatus(errorText(error));
-    } finally {
-      setBusy(false);
-    }
+    await client.api.applyToEvent(client.token, eventId, {
+      ...input,
+      displayName: String(form.get("displayName") ?? ""),
+    });
+    await load();
+  };
+
+  const changeAddress = async (input: SellerAddressInput) => {
+    const participation = event?.participation;
+    const client = await call();
+    if (!participation || !client) return;
+    await client.api.changeParticipationAddress(client.token, participation.id, {
+      ...input,
+      expectedVersion: participation.version,
+    });
+    await load();
+    setStatus(translate(locale, "seller.addressChanged"));
   };
 
   const withdraw = async () => {
@@ -173,6 +165,37 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
           {participation.geographicException && !closed ? (
             <p className="field-help">{translate(locale, "seller.outsideHelp")}</p>
           ) : null}
+          {participation.location?.sellerCount && participation.location.sellerCount > 1 ? (
+            <p className="field-help">{translate(locale, "seller.sharedStop")}</p>
+          ) : null}
+          {!closed &&
+          ["pending", "waitlisted", "approved", "pending_address_change"].includes(
+            participation.state,
+          ) &&
+          ["draft", "published", "active"].includes(event.state) ? (
+            <details className="settings-details">
+              <summary>{translate(locale, "seller.changeAddress")}</summary>
+              <p className="field-help">
+                {translate(
+                  locale,
+                  ["approved", "pending_address_change"].includes(participation.state)
+                    ? "seller.changeAddressReview"
+                    : "seller.changeAddressHelp",
+                )}
+              </p>
+              <SellerAddressForm
+                call={call}
+                eventBoundary={event.boundary}
+                eventId={eventId}
+                idPrefix="change"
+                initial={participation.location}
+                key={participation.version}
+                locale={locale}
+                onSubmit={changeAddress}
+                submitLabel={translate(locale, "seller.saveAddress")}
+              />
+            </details>
+          ) : null}
           {!closed ? (
             <button
               className="secondary-button"
@@ -185,67 +208,35 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
           ) : null}
         </section>
       ) : event.registrationOpen ? (
-        <form className="panel form-panel creation-form" onSubmit={apply}>
-          <h2>{translate(locale, "seller.applyTitle")}</h2>
+        <section aria-labelledby="apply-heading" className="panel">
+          <h2 id="apply-heading">{translate(locale, "seller.applyTitle")}</h2>
           <p>{translate(locale, "seller.applyIntro")}</p>
           {event.placesFull ? (
             <p className="notice">{translate(locale, "seller.placesFull")}</p>
           ) : null}
-          <label htmlFor="seller-display-name">{translate(locale, "seller.publicName")}</label>
-          <input
-            aria-describedby="seller-display-name-help"
-            defaultValue={dashboard?.profile.displayName ?? ""}
-            id="seller-display-name"
-            maxLength={80}
-            name="displayName"
-            required
-          />
-          <p className="field-help" id="seller-display-name-help">
-            {translate(locale, "seller.publicNameHelp")}
-          </p>
-          <label htmlFor="seller-address">{translate(locale, "seller.address")}</label>
-          <input
-            autoComplete="street-address"
-            id="seller-address"
-            maxLength={200}
-            minLength={3}
-            name="addressLine"
-            required
-          />
-          <div className="schedule-fields">
-            <div>
-              <label htmlFor="seller-postal-code">{translate(locale, "seller.postalCode")}</label>
-              <input
-                autoComplete="postal-code"
-                id="seller-postal-code"
-                inputMode="numeric"
-                maxLength={6}
-                name="postalCode"
-                pattern="[0-9]{3} ?[0-9]{2}"
-              />
-            </div>
-            <div>
-              <label htmlFor="seller-locality">{translate(locale, "seller.locality")}</label>
-              <input
-                autoComplete="address-level2"
-                id="seller-locality"
-                maxLength={100}
-                name="locality"
-              />
-            </div>
-          </div>
-          <p className="field-help">{translate(locale, "seller.privateAddressHelp")}</p>
-          <h3>{translate(locale, "seller.pinTitle")}</h3>
-          <p className="field-help">{translate(locale, "seller.pinHelp")}</p>
-          <PinPicker boundary={event.boundary} locale={locale} onChange={setPin} value={pin} />
-          <label className="checkbox-field">
-            <input name="rightToUse" required type="checkbox" />
-            <span>{translate(locale, "seller.attestation")}</span>
-          </label>
-          <button className="primary-button" disabled={busy} type="submit">
-            {busy ? translate(locale, "common.saving") : translate(locale, "seller.submit")}
-          </button>
-        </form>
+          <SellerAddressForm
+            call={call}
+            eventBoundary={event.boundary}
+            eventId={eventId}
+            idPrefix="seller"
+            locale={locale}
+            onSubmit={apply}
+            submitLabel={translate(locale, "seller.submit")}
+          >
+            <label htmlFor="seller-display-name">{translate(locale, "seller.publicName")}</label>
+            <input
+              aria-describedby="seller-display-name-help"
+              defaultValue={dashboard?.profile.displayName ?? ""}
+              id="seller-display-name"
+              maxLength={80}
+              name="displayName"
+              required
+            />
+            <p className="field-help" id="seller-display-name-help">
+              {translate(locale, "seller.publicNameHelp")}
+            </p>
+          </SellerAddressForm>
+        </section>
       ) : (
         <p className="notice">
           {translate(

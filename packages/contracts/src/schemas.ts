@@ -661,12 +661,15 @@ export const participationStateSchema = z.enum([
 
 export const sellerLocationSchema = z.strictObject({
   addressLine: z.string().min(3).max(200),
+  id: opaqueUuid,
   insideBoundary: z.boolean(),
   latitude: z.number().min(-90).max(90),
   locality: z.string().max(100).nullable(),
   longitude: z.number().min(-180).max(180),
-  placement: z.enum(["manual", "geocoded"]),
+  needsReview: z.boolean(),
+  placement: z.enum(["manual", "geocoded", "corrected"]),
   postalCode: z.string().max(6).nullable(),
+  sellerCount: z.number().int().positive(),
 });
 
 export const sellerParticipationSchema = z.strictObject({
@@ -713,23 +716,82 @@ export const eventForSellerSchema = z.strictObject({
 
 export type EventForSeller = z.infer<typeof eventForSellerSchema>;
 
-export const applyToEventRequestSchema = z.strictObject({
+const postalCodeInput = z.union([
+  z.literal(""),
+  z
+    .string()
+    .trim()
+    .regex(/^[0-9]{3} ?[0-9]{2}$/u),
+]);
+
+const sellerAddressFields = {
   addressLine: z.string().trim().min(3).max(200),
-  displayName: z.string().trim().min(1).max(80),
   latitude: z.number().min(-90).max(90),
   locality: z.string().trim().max(100),
   longitude: z.number().min(-180).max(180),
-  postalCode: z.union([
-    z.literal(""),
-    z
-      .string()
-      .trim()
-      .regex(/^[0-9]{3} ?[0-9]{2}$/u),
-  ]),
+  // "geocoded" when the seller kept the proposed point unchanged.
+  placement: z.enum(["manual", "geocoded"]),
+  postalCode: postalCodeInput,
   rightToUseAttested: z.literal(true),
+  // Answer to the shared-entrance question; null until it is asked.
+  sharesEntrance: z.boolean().nullable(),
+};
+
+export const applyToEventRequestSchema = z.strictObject({
+  ...sellerAddressFields,
+  displayName: z.string().trim().min(1).max(80),
 });
 
 export type ApplyToEventRequest = z.infer<typeof applyToEventRequestSchema>;
+
+export const changeParticipationAddressRequestSchema = z.strictObject({
+  ...sellerAddressFields,
+  expectedVersion: z.number().int().positive(),
+});
+
+export type ChangeParticipationAddressRequest = z.infer<
+  typeof changeParticipationAddressRequestSchema
+>;
+
+export const geocodeRequestSchema = z.strictObject({
+  addressLine: z.string().trim().min(3).max(200),
+  locality: z.string().trim().max(100),
+  postalCode: postalCodeInput,
+});
+
+export type GeocodeRequest = z.infer<typeof geocodeRequestSchema>;
+
+export const geocodeResultSchema = z.strictObject({
+  found: z.boolean(),
+  latitude: z.number().min(-90).max(90).nullable(),
+  longitude: z.number().min(-180).max(180).nullable(),
+});
+
+export type GeocodeResult = z.infer<typeof geocodeResultSchema>;
+
+export const locationReviewRequestSchema = z.discriminatedUnion("action", [
+  z.strictObject({
+    action: z.literal("merge"),
+    locationId: opaqueUuid,
+    targetLocationId: opaqueUuid,
+  }),
+  z.strictObject({
+    action: z.literal("split"),
+    locationId: opaqueUuid,
+    participationId: opaqueUuid,
+  }),
+  z.strictObject({ action: z.literal("confirm_separate"), locationId: opaqueUuid }),
+]);
+
+export type LocationReviewRequest = z.infer<typeof locationReviewRequestSchema>;
+
+export const pinCorrectionRequestSchema = z.strictObject({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export type PinCorrectionRequest = z.infer<typeof pinCorrectionRequestSchema>;
 
 export const participationVersionRequestSchema = z.strictObject({
   expectedVersion: z.number().int().positive(),
@@ -993,6 +1055,11 @@ export const boundarySchemas = {
   MyParticipations: myParticipationsSchema,
   EventForSeller: eventForSellerSchema,
   ApplyToEventRequest: applyToEventRequestSchema,
+  ChangeParticipationAddressRequest: changeParticipationAddressRequestSchema,
+  GeocodeRequest: geocodeRequestSchema,
+  GeocodeResult: geocodeResultSchema,
+  LocationReviewRequest: locationReviewRequestSchema,
+  PinCorrectionRequest: pinCorrectionRequestSchema,
   ParticipationVersionRequest: participationVersionRequestSchema,
   EventSellers: eventSellersSchema,
   DecideSellerRequest: decideSellerRequestSchema,

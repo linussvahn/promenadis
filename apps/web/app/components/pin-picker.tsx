@@ -8,11 +8,13 @@ import { DEFAULT_CENTER, MAP_STYLE, MapErrorBoundary } from "./boundary-editor";
 // Click the map or type coordinates; the typed fields are the non-map path.
 export function PinPicker({
   boundary,
+  idPrefix = "pin",
   locale,
   onChange,
   value,
 }: {
   readonly boundary: readonly BoundaryPoint[] | null;
+  readonly idPrefix?: string;
   readonly locale: Locale;
   readonly onChange: (point: BoundaryPoint) => void;
   readonly value: BoundaryPoint | null;
@@ -70,16 +72,16 @@ export function PinPicker({
                     properties: {},
                     type: "Feature",
                   }}
-                  id="seller-event-area"
+                  id={`${idPrefix}-event-area`}
                   type="geojson"
                 >
                   <Layer
-                    id="seller-event-area-fill"
+                    id={`${idPrefix}-event-area-fill`}
                     paint={{ "fill-color": "#bd5b35", "fill-opacity": 0.12 }}
                     type="fill"
                   />
                   <Layer
-                    id="seller-event-area-line"
+                    id={`${idPrefix}-event-area-line`}
                     paint={{ "line-color": "#8d3d22", "line-width": 2 }}
                     type="line"
                   />
@@ -92,11 +94,11 @@ export function PinPicker({
                     properties: {},
                     type: "Feature",
                   }}
-                  id="seller-pin"
+                  id={`${idPrefix}-marker`}
                   type="geojson"
                 >
                   <Layer
-                    id="seller-pin-circle"
+                    id={`${idPrefix}-marker-circle`}
                     paint={{
                       "circle-color": "#8d3d22",
                       "circle-radius": 8,
@@ -114,16 +116,16 @@ export function PinPicker({
       <fieldset className="coordinate-fields">
         <legend>{translate(locale, "seller.coordinates")}</legend>
         <p className="field-help">{translate(locale, "seller.coordinatesHelp")}</p>
-        <label htmlFor="pin-latitude">{translate(locale, "boundary.latitude")}</label>
+        <label htmlFor={`${idPrefix}-latitude`}>{translate(locale, "boundary.latitude")}</label>
         <input
-          id="pin-latitude"
+          id={`${idPrefix}-latitude`}
           inputMode="decimal"
           onChange={(event) => setCoordinate(1, event.currentTarget.value)}
           value={text[1]}
         />
-        <label htmlFor="pin-longitude">{translate(locale, "boundary.longitude")}</label>
+        <label htmlFor={`${idPrefix}-longitude`}>{translate(locale, "boundary.longitude")}</label>
         <input
-          id="pin-longitude"
+          id={`${idPrefix}-longitude`}
           inputMode="decimal"
           onChange={(event) => setCoordinate(0, event.currentTarget.value)}
           value={text[0]}

@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventSellers } from "./event-sellers";
 
 const mocks = vi.hoisted(() => ({
+  correctLocationPin: vi.fn(),
   decideSeller: vi.fn(),
+  reviewEventLocation: vi.fn(),
   listEventSellers: vi.fn(),
   updateEventAdmission: vi.fn(),
 }));
@@ -21,7 +23,10 @@ const seller = (id: string, state: string, name: string) => ({
   id,
   location: {
     addressLine: `${name}gatan 1`,
+    id: `${id.slice(0, -2)}9${id.slice(-1)}`,
     insideBoundary: state !== "pending",
+    needsReview: false,
+    sellerCount: 1,
     latitude: 59.331,
     locality: null,
     longitude: 18.062,
@@ -112,6 +117,37 @@ describe("EventSellers", () => {
         expectedVersion: 5,
         waitlistPromotionPaused: false,
       }),
+    );
+  });
+
+  it("confirms a flagged separate stop and corrects a pin", async () => {
+    const flagged = seller("01992026-1103-7000-8000-000000000013", "approved", "Cia");
+    mocks.listEventSellers.mockResolvedValue({
+      ...data,
+      sellers: [{ ...flagged, location: { ...flagged.location, needsReview: true } }],
+    });
+    mocks.reviewEventLocation.mockResolvedValue(data);
+    mocks.correctLocationPin.mockResolvedValue(data);
+    render(
+      <EventSellers accessToken={accessToken} event={event} locale="en" onChanged={onChanged} />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm separate stop" }));
+    await waitFor(() =>
+      expect(mocks.reviewEventLocation).toHaveBeenCalledWith("owner", eventId, {
+        action: "confirm_separate",
+        locationId: "01992026-1103-7000-8000-000000000093",
+      }),
+    );
+    fireEvent.click(screen.getByText("Correct the pin (25 m at most)"));
+    fireEvent.change(screen.getByLabelText("Longitude"), { target: { value: "18.0621" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Wrong side" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save correction" }));
+    await waitFor(() =>
+      expect(mocks.correctLocationPin).toHaveBeenCalledWith(
+        "owner",
+        "01992026-1103-7000-8000-000000000093",
+        { latitude: 59.331, longitude: 18.0621, reason: "Wrong side" },
+      ),
     );
   });
 

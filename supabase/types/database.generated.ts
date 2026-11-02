@@ -356,6 +356,54 @@ export type Database = {
         }
         Relationships: []
       }
+      geocode_cache: {
+        Row: {
+          expires_at: string
+          found: boolean
+          latitude: number | null
+          longitude: number | null
+          provider: string
+          query_hash: string
+        }
+        Insert: {
+          expires_at: string
+          found: boolean
+          latitude?: number | null
+          longitude?: number | null
+          provider: string
+          query_hash: string
+        }
+        Update: {
+          expires_at?: string
+          found?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          provider?: string
+          query_hash?: string
+        }
+        Relationships: []
+      }
+      geocode_requests: {
+        Row: {
+          account_id: string
+          event_id: string
+          id: number
+          requested_at: string
+        }
+        Insert: {
+          account_id: string
+          event_id: string
+          id?: never
+          requested_at?: string
+        }
+        Update: {
+          account_id?: string
+          event_id?: string
+          id?: never
+          requested_at?: string
+        }
+        Relationships: []
+      }
       local_recovery_budget: {
         Row: {
           attempts: number
@@ -371,6 +419,39 @@ export type Database = {
           attempts?: number
           singleton?: boolean
           window_started_at?: string
+        }
+        Relationships: []
+      }
+      location_pin_corrections: {
+        Row: {
+          actor_account_id: string | null
+          after_point: unknown
+          before_point: unknown
+          created_at: string
+          distance_meters: number
+          id: string
+          location_id: string
+          reason: string
+        }
+        Insert: {
+          actor_account_id?: string | null
+          after_point: unknown
+          before_point: unknown
+          created_at?: string
+          distance_meters: number
+          id?: string
+          location_id: string
+          reason: string
+        }
+        Update: {
+          actor_account_id?: string | null
+          after_point?: unknown
+          before_point?: unknown
+          created_at?: string
+          distance_meters?: number
+          id?: string
+          location_id?: string
+          reason?: string
         }
         Relationships: []
       }
@@ -650,6 +731,24 @@ export type Database = {
         Args: { p_organizer_profile_id: string }
         Returns: Json
       }
+      place_participation_location: {
+        Args: {
+          p_address_line: string
+          p_event_id: string
+          p_exclude_participation_id: string
+          p_latitude: number
+          p_locality: string
+          p_longitude: number
+          p_placement: string
+          p_postal_code: string
+          p_shares_entrance: boolean
+        }
+        Returns: {
+          placed_inside: boolean
+          placed_location_id: string
+          placed_shared: boolean
+        }[]
+      }
       promote_waitlisted_sellers: {
         Args: { p_correlation_id: string; p_event_id: string }
         Returns: number
@@ -671,6 +770,7 @@ export type Database = {
         Args: never
         Returns: undefined
       }
+      purge_geocode_records_command: { Args: never; Returns: undefined }
       require_admin_elevation: {
         Args: { p_actor_id: string; p_auth_session_id: string }
         Returns: undefined
@@ -981,6 +1081,7 @@ export type Database = {
           id: string
           inside_boundary: boolean
           locality: string | null
+          needs_review: boolean
           normalized_address: string
           placement: string
           point: unknown
@@ -994,6 +1095,7 @@ export type Database = {
           id?: string
           inside_boundary: boolean
           locality?: string | null
+          needs_review?: boolean
           normalized_address: string
           placement: string
           point: unknown
@@ -1007,6 +1109,7 @@ export type Database = {
           id?: string
           inside_boundary?: boolean
           locality?: string | null
+          needs_review?: boolean
           normalized_address?: string
           placement?: string
           point?: unknown
@@ -1593,8 +1696,10 @@ export type Database = {
           p_latitude: number
           p_locality: string
           p_longitude: number
+          p_placement: string
           p_postal_code: string
           p_right_to_use_attested: boolean
+          p_shares_entrance: boolean
         }
         Returns: Json
       }
@@ -1693,6 +1798,23 @@ export type Database = {
         }
         Returns: Json
       }
+      change_participation_address_command: {
+        Args: {
+          p_actor_id: string
+          p_address_line: string
+          p_correlation_id: string
+          p_expected_version: number
+          p_latitude: number
+          p_locality: string
+          p_longitude: number
+          p_participation_id: string
+          p_placement: string
+          p_postal_code: string
+          p_right_to_use_attested: boolean
+          p_shares_entrance: boolean
+        }
+        Returns: Json
+      }
       claim_security_notification_jobs: {
         Args: { p_limit?: number }
         Returns: {
@@ -1736,6 +1858,18 @@ export type Database = {
         Returns: Json
       }
       consume_local_recovery_budget_command: { Args: never; Returns: boolean }
+      correct_location_pin_command: {
+        Args: {
+          p_actor_id: string
+          p_authenticated_at: string
+          p_correlation_id: string
+          p_latitude: number
+          p_location_id: string
+          p_longitude: number
+          p_reason: string
+        }
+        Returns: Json
+      }
       create_draft_event_command: {
         Args: {
           p_actor_id: string
@@ -2045,6 +2179,10 @@ export type Database = {
         Args: { p_claim_id: string; p_verification_token: string }
         Returns: Json
       }
+      read_geocode_cache_command: {
+        Args: { p_query_hash: string }
+        Returns: Json
+      }
       reconcile_account_recovery_dispatches_command: {
         Args: never
         Returns: number
@@ -2108,8 +2246,24 @@ export type Database = {
         }
         Returns: Json
       }
+      reserve_geocode_request_command: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: undefined
+      }
       resolve_security_notification_recipient: {
         Args: { p_job_id: string; p_lease_id: string }
+        Returns: Json
+      }
+      review_event_location_command: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_correlation_id: string
+          p_event_id: string
+          p_location_id: string
+          p_participation_id: string
+          p_target_location_id: string
+        }
         Returns: Json
       }
       set_event_emergency_successor_command: {
@@ -2139,6 +2293,15 @@ export type Database = {
           p_hash: string
           p_kind: string
           p_payload: string
+        }
+        Returns: undefined
+      }
+      store_geocode_cache_command: {
+        Args: {
+          p_latitude: number
+          p_longitude: number
+          p_provider: string
+          p_query_hash: string
         }
         Returns: undefined
       }
