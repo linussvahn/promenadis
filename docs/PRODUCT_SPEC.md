@@ -353,7 +353,9 @@ categories, and branding. It does not copy dates, sellers, addresses, listings,
 reports, visitor routes, or audit records.
 
 The duplicate is owner-only by default. A checkbox may copy/invite the previous
-event team.
+event team (not built yet; the duplicate is always owner-only for now). The
+duplicating owner or co-host must manage the organizer the copy is created
+under.
 
 ### Ownership transfer and owner deletion
 

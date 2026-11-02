@@ -254,6 +254,7 @@ export const organizerProfileSummarySchema = z.strictObject({
   locality: z.string().trim().min(1).max(100).nullable(),
   organizerType: organizerTypeSchema,
   role: z.enum(["owner", "manager"]),
+  version: z.number().int().positive(),
   website: z.url().startsWith("https://").max(500).nullable(),
 });
 
@@ -442,6 +443,19 @@ export const createOrganizerProfileRequestSchema = z.strictObject({
 
 export type CreateOrganizerProfileRequest = z.infer<typeof createOrganizerProfileRequestSchema>;
 
+export const updateOrganizerProfileRequestSchema = z.strictObject({
+  displayName: z.string().trim().min(1).max(100),
+  expectedVersion: z.number().int().positive(),
+  locality: z.string().trim().max(100),
+  website: z.union([z.literal(""), z.url().startsWith("https://").max(500)]),
+});
+
+export type UpdateOrganizerProfileRequest = z.infer<typeof updateOrganizerProfileRequestSchema>;
+
+export const organizerProfileDetailsSchema = organizerProfileSummarySchema.omit({ role: true });
+
+export type OrganizerProfileDetails = z.infer<typeof organizerProfileDetailsSchema>;
+
 export const createDraftEventRequestSchema = z
   .strictObject({
     description: z.string().trim().max(2000),
@@ -463,6 +477,45 @@ export const createDraftEventRequestSchema = z
   });
 
 export type CreateDraftEventRequest = z.infer<typeof createDraftEventRequestSchema>;
+
+const endsAfterStart = {
+  message: "Event end must be after its start",
+  path: ["endsAt"],
+};
+
+export const updateDraftEventDetailsRequestSchema = z
+  .strictObject({
+    description: z.string().trim().max(2000),
+    endsAt: isoInstant,
+    expectedVersion: z.number().int().positive(),
+    startsAt: isoInstant,
+    timezone: z.string().trim().min(1).max(100),
+    title: z.string().trim().min(1).max(120),
+  })
+  .refine((value) => new Date(value.endsAt) > new Date(value.startsAt), endsAfterStart);
+
+export type UpdateDraftEventDetailsRequest = z.infer<typeof updateDraftEventDetailsRequestSchema>;
+
+export const eventDetailsResultSchema = z.strictObject({
+  id: opaqueUuid,
+  registrationReset: z.boolean().optional(),
+  state: z.literal("draft"),
+  version: z.number().int().positive(),
+  visibility: eventVisibilitySchema,
+});
+
+export type EventDetailsResult = z.infer<typeof eventDetailsResultSchema>;
+
+export const duplicateEventRequestSchema = z
+  .strictObject({
+    endsAt: isoInstant,
+    organizerProfileId: opaqueUuid.nullable(),
+    startsAt: isoInstant,
+    title: z.string().trim().min(1).max(120),
+  })
+  .refine((value) => new Date(value.endsAt) > new Date(value.startsAt), endsAfterStart);
+
+export type DuplicateEventRequest = z.infer<typeof duplicateEventRequestSchema>;
 
 export const saveEventBoundaryRequestSchema = z
   .strictObject({
@@ -600,6 +653,36 @@ export const adminStatusSchema = z.strictObject({
 });
 
 export type AdminStatus = z.infer<typeof adminStatusSchema>;
+
+export const adminEventSummarySchema = z.strictObject({
+  endsAt: isoInstant.nullable(),
+  id: opaqueUuid,
+  organizerDisplayName: z.string().max(100),
+  startsAt: isoInstant.nullable(),
+  state: eventStateSchema,
+  timezone: z.string().min(1).max(100),
+  title: z.string().max(120),
+  version: z.number().int().positive(),
+  visibility: eventVisibilitySchema,
+});
+
+export type AdminEventSummary = z.infer<typeof adminEventSummarySchema>;
+
+export const adminEventInterventionRequestSchema = z.discriminatedUnion("action", [
+  z.strictObject({
+    action: z.literal("cancel"),
+    expectedEventVersion: z.number().int().positive(),
+    internalReason: z.string().trim().min(3).max(500),
+    publicReason: z.string().trim().min(3).max(500),
+  }),
+  z.strictObject({
+    action: z.literal("end_early"),
+    expectedEventVersion: z.number().int().positive(),
+    internalReason: z.string().trim().min(3).max(500),
+  }),
+]);
+
+export type AdminEventInterventionRequest = z.infer<typeof adminEventInterventionRequestSchema>;
 
 export const adminElevationRequestSchema = z.strictObject({
   code: z.string().regex(/^[0-9]{6}$/u),
@@ -788,6 +871,13 @@ export const boundarySchemas = {
   DecideOrganizerVerification: decideOrganizerVerificationSchema,
   PublishEventRequest: publishEventRequestSchema,
   CancelEventRequest: cancelEventRequestSchema,
+  UpdateDraftEventDetailsRequest: updateDraftEventDetailsRequestSchema,
+  EventDetailsResult: eventDetailsResultSchema,
+  DuplicateEventRequest: duplicateEventRequestSchema,
+  UpdateOrganizerProfileRequest: updateOrganizerProfileRequestSchema,
+  OrganizerProfileDetails: organizerProfileDetailsSchema,
+  AdminEventSummary: adminEventSummarySchema,
+  AdminEventInterventionRequest: adminEventInterventionRequestSchema,
   EventLifecycleResult: eventLifecycleResultSchema,
   FirstEventReviewStatus: firstEventReviewStatusSchema,
   RequestFirstEventReview: requestFirstEventReviewSchema,

@@ -105,9 +105,12 @@ that hosting step is not required to begin Milestone 1.
 - Event lifecycle, intervals, visibility, boundary configuration, registration,
   revisions, postponement/cancellation/archival, and duplication shell.
 
-Milestone 1 state: **in progress**. The initial local identity-to-draft vertical
-slice is complete as of 2026-09-07; team/recovery/deletion and the full event
-lifecycle remain pending.
+Milestone 1 state: **complete locally, 2026-11-02**, except items that depend on
+later milestones: postponement and published boundary/schedule revisions (need
+seller reconfirmation and impact, Milestone 2), the routing and public-delivery
+publication gates (Milestones 3–4), team copy on duplication, and hosted Auth
+abuse controls (Turnstile and production limits, ALPHA-03/PILOT-DATA-08).
+Per-slice notes and evidence are in `NEXT_SESSION.md`.
 
 | Evidence | State | Result |
 | --- | --- | --- |
@@ -115,10 +118,17 @@ lifecycle remain pending.
 | Organizer membership and exactly-one-owner draft creation | Complete for initial slice | Transactional service-only commands create organizer/event owner memberships and restricted audit records |
 | Browser/BFF/database trust boundary | Complete for initial slice | Direct `anon`/`authenticated` table and command privileges denied; Edge BFF validates Auth JWT, origin, size, request, and response contracts |
 | Runtime contracts and generated artifacts | Complete for initial slice | Zod request/response contracts, typed browser client, OpenAPI/JSON Schema, and database types pass drift checks |
-| Database verification | Complete for initial slice | Zero-state rebuild and strict lint passed; 25/25 pgTAP tests passed 2026-09-07 |
+| Database verification | Complete | Zero-state rebuild, strict lint and type drift check passed; 621/621 pgTAP assertions across `supabase/tests/database/000`–`270` passed 2026-11-02 |
 | End-to-end synthetic command path | Complete for initial slice | `pnpm test:local-slice` passed Auth → BFF → profile/organizer/draft → dashboard plus direct-table denial |
 | Accessible bilingual web surface | Complete for initial slice | Responsive sign-in/dashboard UI; unit accessibility checks and 3/3 mobile Chromium/PWA/sign-in smoke tests passed |
-| Full Milestone 1 ownership, recovery, deletion, lifecycle, retention, concurrency, and stale-session scope | Pending | Required before Milestone 1 completion |
+| Event team, invitations, ownership transfer, emergency successor | Complete | pgTAP 060–110; event-team and organizer-team component tests |
+| Account recovery (code or TOTP), Auth dispatch fence, completion and notices | Complete locally; hosted recovery disabled | pgTAP 120, 160–200, 260; `pnpm test:local-recovery-dispatch`; local-auth e2e |
+| Session freshness, opaque browser sessions, stale-write fences | Complete locally; hosted browser auth disabled | pgTAP 130–140; `pnpm test:local-session-security`; local-auth e2e |
+| Account deletion with seven-day window, erasure and tombstones | Complete | pgTAP 210; account-deletion component and e2e tests |
+| Optional TOTP, admin elevation, first-event review, organizer verification | Complete | pgTAP 220–250; admin-console, two-step and organizer-verification tests; e2e |
+| Event lifecycle: publish (gated), cancel, end early, activate/end/archive jobs | Complete; publication gates closed until Milestones 3–4 | pgTAP 240; event-lifecycle tests; e2e |
+| Draft detail editing, organizer editing, event duplication, admin intervention | Complete | pgTAP 270; component tests; e2e "owners edit drafts and organizers…" |
+| Postponement and published boundary/schedule revisions | Deferred to Milestone 2 | Need seller reconfirmation and seller-impact preview |
 
 ### Milestone 2 — sellers and safety lifecycle
 

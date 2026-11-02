@@ -256,6 +256,8 @@ test("a ready recovery changes the sign-in email, ends old sessions and notifies
     expect(link).toBeTruthy();
 
     await page.goto(link ?? "");
+    // The page has read the token once it drops the fragment from the URL.
+    await expect(page).toHaveURL(/\/recover-account$/u);
     await page.getByRole("button", { name: "Verifiera ny e-postadress" }).click();
     await expect(page.getByText("Väntetiden pågår")).toBeVisible();
     await expect(page.getByRole("button", { name: "Slutför återställning" })).toHaveCount(0);
@@ -268,6 +270,7 @@ test("a ready recovery changes the sign-in email, ends old sessions and notifies
       where source_id='${claim.id}' and template_key='account_recovery_started';`);
 
     await page.goto(link ?? "");
+    await expect(page).toHaveURL(/\/recover-account$/u);
     await expect(page.getByRole("button", { name: "Verifiera ny e-postadress" })).toHaveCount(0);
     await page.getByRole("button", { name: "Slutför återställning" }).click();
     await expect(page.getByText(/Återställningen är klar/u)).toBeVisible();
@@ -690,6 +693,161 @@ test("publication stays gated while owners cancel published events and co-hosts 
   }
 });
 
+test("owners edit drafts and organizers, copy events, and elevated admins can cancel", async ({
+  request,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const ownerEmail = `edit-owner-${randomUUID()}@example.invalid`;
+  const adminEmail = `edit-admin-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const signIn = async (email: string) => {
+    const client = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return { client, token: data.session?.access_token };
+  };
+  const headersFor = (token: string | undefined) => ({
+    apikey: publicKey,
+    authorization: `Bearer ${token}`,
+    origin: "http://127.0.0.1:5173",
+  });
+  for (const email of [ownerEmail, adminEmail]) {
+    const { error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
+    if (error) throw error;
+  }
+  try {
+    const owner = headersFor((await signIn(ownerEmail)).token);
+    const created = await request.post(`${base}/events`, {
+      headers: owner,
+      data: {
+        description: "Synthetic edit fixture",
+        endsAt: "2031-09-14T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic edit owner",
+        startsAt: "2031-09-14T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic edit walk",
+        visibility: "unlisted",
+      },
+    });
+    const eventId = (await created.json()).id as string;
+    const dashboard = async () =>
+      (await request.get(`${base}/dashboard`, { headers: owner })).json();
+    const before = await dashboard();
+    const event = before.events.find((candidate: { id: string }) => candidate.id === eventId);
+
+    const edited = await request.put(`${base}/events/${eventId}/details`, {
+      headers: owner,
+      data: {
+        description: "Edited description",
+        endsAt: "2031-09-07T15:00:00+02:00",
+        expectedVersion: event.version,
+        startsAt: "2031-09-07T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic edited walk",
+      },
+    });
+    expect(await edited.json()).toMatchObject({ registrationReset: true, state: "draft" });
+    const stale = await request.put(`${base}/events/${eventId}/details`, {
+      headers: owner,
+      data: {
+        description: "",
+        endsAt: "2031-09-07T15:00:00+02:00",
+        expectedVersion: event.version,
+        startsAt: "2031-09-07T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Stale",
+      },
+    });
+    expect(stale.status()).toBe(409);
+
+    const organizer = before.organizers[0];
+    const renamed = await request.put(`${base}/organizers/${organizer.id}`, {
+      headers: owner,
+      data: {
+        displayName: "Synthetic renamed owner",
+        expectedVersion: organizer.version,
+        locality: "Uppsala",
+        website: "",
+      },
+    });
+    expect(await renamed.json()).toMatchObject({
+      displayName: "Synthetic renamed owner",
+      version: 2,
+    });
+
+    const copied = await request.post(`${base}/events/${eventId}/duplicate`, {
+      headers: owner,
+      data: {
+        endsAt: "2032-09-07T15:00:00+02:00",
+        organizerProfileId: null,
+        startsAt: "2032-09-07T10:00:00+02:00",
+        title: "Synthetic copied walk",
+      },
+    });
+    expect(copied.status()).toBe(201);
+    const copyId = (await copied.json()).id as string;
+    const copy = (await dashboard()).events.find(
+      (candidate: { id: string }) => candidate.id === copyId,
+    );
+    expect(copy).toMatchObject({
+      description: "Edited description",
+      organizerDisplayName: "Synthetic renamed owner",
+      role: "owner",
+      state: "draft",
+    });
+
+    // Admin: elevate with a fresh code, then cancel the published original.
+    const adminSession = await signIn(adminEmail);
+    const enrolled = await (
+      await request.post(`${base}/account/mfa/totp`, {
+        headers: headersFor(adminSession.token),
+        data: {},
+      })
+    ).json();
+    const upgraded = await adminSession.client.auth.mfa.challengeAndVerify({
+      factorId: enrolled.factorId,
+      code: totp(enrolled.secret),
+    });
+    const adminHeaders = headersFor(upgraded.data?.access_token);
+    execFileSync("node", ["scripts/grant-local-admin.mjs", adminEmail], {
+      cwd: repositoryRoot,
+      stdio: "ignore",
+    });
+    expect(
+      (await request.get(`${base}/admin/events/${eventId}`, { headers: adminHeaders })).status(),
+    ).toBe(403);
+    await request.post(`${base}/admin/elevation`, {
+      headers: adminHeaders,
+      data: { code: totp(enrolled.secret) },
+    });
+    // Fixture only: publication gates are still closed, so set the state directly.
+    localSql(`update public.events set state='published' where id='${eventId}';`);
+    const found = await (
+      await request.get(`${base}/admin/events/${eventId}`, { headers: adminHeaders })
+    ).json();
+    expect(found).toMatchObject({ state: "published", title: "Synthetic edited walk" });
+    const cancelled = await request.post(`${base}/admin/events/${eventId}/intervention`, {
+      headers: adminHeaders,
+      data: {
+        action: "cancel",
+        expectedEventVersion: found.version,
+        internalReason: "Synthetic report",
+        publicReason: "Unsafe area",
+      },
+    });
+    expect(await cancelled.json()).toMatchObject({ state: "cancelled" });
+  } finally {
+    await deleteSyntheticAccount(adminEmail);
+    await deleteSyntheticAccount(ownerEmail);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {
@@ -1008,7 +1166,7 @@ test("the visible email OTP signs in", async ({ page, request }) => {
     ).toBeVisible();
     await expect(page.getByText("Testperson", { exact: true })).toBeVisible();
     await page.getByText("Lägg till en annan arrangör").click();
-    await page.getByLabel("Arrangörens visningsnamn").fill("Syntetisk kvartersgrupp");
+    await page.locator("#organizer-name").fill("Syntetisk kvartersgrupp");
     await page.getByRole("button", { name: "Skapa arrangör" }).click();
     await expect(page.getByText("Syntetisk kvartersgrupp", { exact: true }).first()).toBeVisible();
     await expect(

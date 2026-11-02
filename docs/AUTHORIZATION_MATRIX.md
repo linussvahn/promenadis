@@ -72,7 +72,7 @@ or attendee identity.
 | Command | USER | MOD | COHOST | OWNER | ADMIN | Conditions |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create organizer profile | Yes | Yes | Yes | Yes | Normal-user mode | Actor becomes its initial manager |
-| Edit organizer profile | Manager | Manager | Manager | Manager | Elevated only for enforcement | Organizer membership is separate from event role |
+| Edit organizer profile | Manager | Manager | Manager | Manager | Elevated only for enforcement | Organizer membership is separate from event role; current organizer version; type fixed after creation; a rename of a verified organization returns it to review |
 | Invite/cancel/remove shared-organizer managers | Organizer owner | Organizer owner | Organizer owner | Organizer owner | Enforcement only | Recent auth; organizer team version; individual identities reject managers; audit excludes email |
 | Accept organizer-manager invitation | Intended verified account | Intended verified account | Intended verified account | Intended verified account | No | Matching verified email; invitation unexpired; recipient chooses organizer-team display name |
 | Request organization verification | Manager | Manager | Manager | Manager | Review | Official registry/control evidence only |

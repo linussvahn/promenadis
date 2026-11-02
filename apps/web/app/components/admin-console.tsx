@@ -9,6 +9,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
+import { AdminEventIntervention } from "./admin-event-intervention";
 
 export function AdminConsole() {
   return <AccountShell>{({ locale }) => <AdminContent locale={locale} />}</AccountShell>;
@@ -315,6 +316,7 @@ export function AdminContent({ locale }: { readonly locale: Locale }) {
               </article>
             ))}
           </section>
+          <AdminEventIntervention call={call} locale={locale} />
         </>
       )}
       <p aria-live="polite" className="form-status">

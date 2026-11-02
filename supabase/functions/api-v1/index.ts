@@ -7,6 +7,13 @@ import {
   accountProfileSchema,
   accountDeletionStatusSchema,
   adminElevationRequestSchema,
+  adminEventInterventionRequestSchema,
+  adminEventSummarySchema,
+  duplicateEventRequestSchema,
+  eventDetailsResultSchema,
+  organizerProfileDetailsSchema,
+  updateDraftEventDetailsRequestSchema,
+  updateOrganizerProfileRequestSchema,
   decideOrganizerVerificationSchema,
   organizerVerificationQueueSchema,
   organizerVerificationStatusSchema,
@@ -1028,6 +1035,52 @@ Deno.serve(async (request) => {
       return json(parsed.data, 201, correlationId, origin);
     }
 
+    const organizerRoute = route.match(
+      /^\/organizers\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/iu,
+    );
+    if (request.method === "PUT" && organizerRoute) {
+      operation = "organizer.profile_update";
+      const input = updateOrganizerProfileRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError(
+          "invalid_request",
+          "Check the organizer fields.",
+          400,
+          correlationId,
+          origin,
+        );
+      }
+      const { data, error } = await admin.rpc("update_organizer_profile_command", {
+        p_actor_id: actorId,
+        p_correlation_id: correlationId,
+        p_display_name: input.data.displayName,
+        p_expected_version: input.data.expectedVersion,
+        p_locality: input.data.locality,
+        p_organizer_profile_id: organizerRoute[1],
+        p_website: input.data.website,
+      });
+      if (error) {
+        const mapped = new Map<string, [string, string, number]>([
+          ["Organizer profile not found", ["not_found", "Organizer not found.", 404]],
+          [
+            "Organizer version conflict",
+            ["version_conflict", "The organizer changed. Reload.", 409],
+          ],
+          ["Invalid organizer profile", ["invalid_request", "Check the organizer fields.", 400]],
+        ]).get(error.message);
+        if (mapped) {
+          status = "denied";
+          return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+        }
+        throw error;
+      }
+      const parsed = organizerProfileDetailsSchema.safeParse(data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
+
     if (request.method === "GET" && route === "/organizer-invites") {
       operation = "organizer.incoming_invites_read";
       const { data, error } = await admin.rpc("get_incoming_organizer_invites_command", {
@@ -1776,6 +1829,67 @@ Deno.serve(async (request) => {
         status = "succeeded";
         return json(await adminStatus(), 200, correlationId, origin);
       }
+      const adminEventRoute = route.match(
+        /^\/admin\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/intervention)?$/iu,
+      );
+      if (adminEventRoute && request.method === "GET" && !adminEventRoute[2]) {
+        operation = "admin.event_read";
+        const { data, error } = await admin.rpc("admin_get_event_command", {
+          p_actor_id: actorId,
+          p_auth_session_id: actor.sessionId,
+          p_correlation_id: correlationId,
+          p_event_id: adminEventRoute[1],
+        });
+        if (error) {
+          if (error.message === "Admin elevation required") {
+            return denied("elevation_required", "Enter admin mode first.", 403);
+          }
+          if (error.message === "Event not found")
+            return denied("not_found", "No such event.", 404);
+          throw error;
+        }
+        const parsed = adminEventSummarySchema.safeParse(data);
+        if (!parsed.success) throw new Error("invalid_internal_response");
+        status = "succeeded";
+        return json(parsed.data, 200, correlationId, origin);
+      }
+      if (adminEventRoute && request.method === "POST" && adminEventRoute[2]) {
+        operation = "admin.event_intervention";
+        const input = adminEventInterventionRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) return denied("invalid_request", "Give the required reasons.", 400);
+        const { data, error } = await admin.rpc("admin_intervene_event_command", {
+          p_action: input.data.action,
+          p_actor_id: actorId,
+          p_auth_session_id: actor.sessionId,
+          p_correlation_id: correlationId,
+          p_event_id: adminEventRoute[1],
+          p_expected_event_version: input.data.expectedEventVersion,
+          p_internal_reason: input.data.internalReason,
+          p_public_reason: input.data.action === "cancel" ? input.data.publicReason : null,
+        });
+        if (error) {
+          const mapped = new Map<string, [string, string, number]>([
+            ["Admin elevation required", ["elevation_required", "Enter admin mode first.", 403]],
+            ["Event not found", ["not_found", "No such event.", 404]],
+            ["Event version conflict", ["version_conflict", "The event changed. Reload.", 409]],
+            [
+              "Only published events can be cancelled",
+              ["invalid_state", "Only published events can be cancelled.", 409],
+            ],
+            [
+              "Only active events can end early",
+              ["invalid_state", "Only live events can end early.", 409],
+            ],
+            ["Invalid intervention", ["invalid_request", "Give the required reasons.", 400]],
+          ]).get(error.message);
+          if (mapped) return denied(mapped[0], mapped[1], mapped[2]);
+          throw error;
+        }
+        const parsed = eventLifecycleResultSchema.safeParse(data);
+        if (!parsed.success) throw new Error("invalid_internal_response");
+        status = "succeeded";
+        return json(parsed.data, 200, correlationId, origin);
+      }
       const decisionRoute = route.match(
         /^\/admin\/reviews\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/decision$/iu,
       );
@@ -2169,6 +2283,99 @@ Deno.serve(async (request) => {
       if (!parsed.success) throw new Error("invalid_internal_response");
       status = "succeeded";
       return json(parsed.data, 200, correlationId, origin);
+    }
+
+    const detailsRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/details$/iu,
+    );
+    if (request.method === "PUT" && detailsRoute) {
+      operation = "event.details_update";
+      const input = updateDraftEventDetailsRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Check the event fields.", 400, correlationId, origin);
+      }
+      const { data, error } = await admin.rpc("update_draft_event_details_command", {
+        p_actor_id: actorId,
+        p_correlation_id: correlationId,
+        p_description: input.data.description,
+        p_ends_at: input.data.endsAt,
+        p_event_id: detailsRoute[1],
+        p_expected_version: input.data.expectedVersion,
+        p_starts_at: input.data.startsAt,
+        p_timezone: input.data.timezone,
+        p_title: input.data.title,
+      });
+      if (error) {
+        const mapped = new Map<string, [string, string, number]>([
+          ["Actor cannot edit this event", ["forbidden", "You cannot edit this event.", 403]],
+          [
+            "Only draft event details can be edited directly",
+            ["invalid_state", "Only drafts can be edited here.", 409],
+          ],
+          ["Event version conflict", ["version_conflict", "The event changed. Reload.", 409]],
+          ["Event title is required", ["invalid_request", "Check the event fields.", 400]],
+          ["Event description is too long", ["invalid_request", "Check the event fields.", 400]],
+          ["Unsupported event timezone", ["invalid_request", "Check the event fields.", 400]],
+          [
+            "Event end must be after its start",
+            ["invalid_request", "Check the event fields.", 400],
+          ],
+        ]).get(error.message);
+        if (mapped) {
+          status = "denied";
+          return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+        }
+        throw error;
+      }
+      const parsed = eventDetailsResultSchema.safeParse(data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
+
+    const duplicateRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/duplicate$/iu,
+    );
+    if (request.method === "POST" && duplicateRoute) {
+      operation = "event.duplicate";
+      const input = duplicateEventRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Check the event fields.", 400, correlationId, origin);
+      }
+      const { data, error } = await admin.rpc("duplicate_event_command", {
+        p_actor_id: actorId,
+        p_correlation_id: correlationId,
+        p_ends_at: input.data.endsAt,
+        p_organizer_profile_id: input.data.organizerProfileId,
+        p_source_event_id: duplicateRoute[1],
+        p_starts_at: input.data.startsAt,
+        p_title: input.data.title,
+      });
+      if (error) {
+        const mapped = new Map<string, [string, string, number]>([
+          ["Actor cannot duplicate this event", ["forbidden", "You cannot copy this event.", 403]],
+          [
+            "Actor is not an organizer manager",
+            ["organizer_required", "Choose an organizer you manage.", 403],
+          ],
+          ["Event title is required", ["invalid_request", "Check the event fields.", 400]],
+          [
+            "Event end must be after its start",
+            ["invalid_request", "Check the event fields.", 400],
+          ],
+        ]).get(error.message);
+        if (mapped) {
+          status = "denied";
+          return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+        }
+        throw error;
+      }
+      const parsed = commandResourceResponseSchema.safeParse({ id: data, schemaVersion: "1.0" });
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 201, correlationId, origin);
     }
 
     const visibilityRoute = route.match(

@@ -79,7 +79,7 @@ No data is retained merely because it might become useful later.
 | Report without contact | C3 | Authorized event reviewer/platform admin according to scope | Ordinary: 6 months after final decision; serious: 12 months after closure, review at 6 months | Case cleanup preserving only irreversible aggregate |
 | Reporter contact/evidence | C3 | Restricted reviewers only; never reported user/event owner unless independently authorized | Same case limit, but delete earlier when no longer needed | Field-level deletion or case cleanup; legal hold only for linked case |
 | Moderation decision and appeal | C3 | Affected party receives scoped reason/status; reviewers see case | Ordinary: 6 months after final decision; serious: 12 months after closure | Delete personal evidence; non-personal counts may remain |
-| Platform-admin audit history | C3 | Restricted admins; access itself audited | 12 months | Scheduled deletion/pseudonymization unless linked legal hold |
+| Platform-admin audit history (including the internal reason for an event intervention) | C3 | Restricted admins; access itself audited | 12 months | Scheduled deletion/pseudonymization unless linked legal hold |
 | Ordinary auth/security events | C3 | Security operations only | 30 days unless attached to active incident | Partition/TTL deletion; case promotion copies only minimal evidence |
 | Allowlisted operational logs/alert records | C3/P0 metrics | Operators only; external monitor receives generic status | 30 days raw | Provider/app TTL; no bodies, addresses, coordinates, email, UGC, tokens, full URLs |
 | Public non-personal status history | P0 | Public status page | 12 months | Status-provider lifecycle |

@@ -1261,6 +1261,7 @@ export type Database = {
           organizer_type: string
           team_version: number
           updated_at: string
+          version: number
           website: string | null
         }
         Insert: {
@@ -1273,6 +1274,7 @@ export type Database = {
           organizer_type: string
           team_version?: number
           updated_at?: string
+          version?: number
           website?: string | null
         }
         Update: {
@@ -1285,6 +1287,7 @@ export type Database = {
           organizer_type?: string
           team_version?: number
           updated_at?: string
+          version?: number
           website?: string | null
         }
         Relationships: [
@@ -1361,6 +1364,28 @@ export type Database = {
       account_recovery_notices_accepted: {
         Args: { p_claim_id: string }
         Returns: boolean
+      }
+      admin_get_event_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_event_id: string
+        }
+        Returns: Json
+      }
+      admin_intervene_event_command: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+          p_event_id: string
+          p_expected_event_version: number
+          p_internal_reason: string
+          p_public_reason: string
+        }
+        Returns: Json
       }
       assert_recent_authentication_command: {
         Args: { p_authenticated_at: string }
@@ -1576,6 +1601,18 @@ export type Database = {
           p_correlation_id: string
           p_event_id: string
           p_expected_version: number
+        }
+        Returns: string
+      }
+      duplicate_event_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_ends_at: string
+          p_organizer_profile_id: string
+          p_source_event_id: string
+          p_starts_at: string
+          p_title: string
         }
         Returns: string
       }
@@ -1875,6 +1912,20 @@ export type Database = {
         Args: { p_hash: string; p_kind: string; p_lease: string }
         Returns: Json
       }
+      update_draft_event_details_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_description: string
+          p_ends_at: string
+          p_event_id: string
+          p_expected_version: number
+          p_starts_at: string
+          p_timezone: string
+          p_title: string
+        }
+        Returns: Json
+      }
       update_draft_event_visibility_command: {
         Args: {
           p_actor_id: string
@@ -1894,6 +1945,18 @@ export type Database = {
           p_expected_team_version: number
           p_membership_id: string
           p_role: string
+        }
+        Returns: Json
+      }
+      update_organizer_profile_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_display_name: string
+          p_expected_version: number
+          p_locality: string
+          p_organizer_profile_id: string
+          p_website: string
         }
         Returns: Json
       }

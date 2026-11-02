@@ -5,6 +5,8 @@ import { AccountShell } from "./account-shell";
 import { BoundaryEditor } from "./boundary-editor";
 import { CreationProgress } from "./creation-progress";
 import { EventControls } from "./event-controls";
+import { EventDetailsEditor } from "./event-details-editor";
+import { EventDuplicate } from "./event-duplicate";
 import { EventLifecycle } from "./event-lifecycle";
 import { EventTeam } from "./event-team";
 import { PublicationReadiness } from "./publication-readiness";
@@ -30,7 +32,7 @@ function EventWorkspaceContent({
   const navigate = useNavigate();
   const { eventId = "" } = useParams();
   const [searchParams] = useSearchParams();
-  const { dashboard, loadDashboard, loadFailed } = useAccountData();
+  const { accessToken, dashboard, loadDashboard, loadFailed } = useAccountData();
   const event = dashboard?.events.find((candidate) => candidate.id === eventId);
   const isCreationFlow = searchParams.get("new") === "1";
 
@@ -217,6 +219,12 @@ function EventWorkspaceContent({
               </dd>
             </div>
           </dl>
+          <EventDetailsEditor
+            accessToken={accessToken}
+            event={event}
+            locale={locale}
+            onSaved={loadDashboard}
+          />
           <EventControls
             event={event}
             locale={locale}
@@ -231,6 +239,16 @@ function EventWorkspaceContent({
             <PublicationReadiness event={event} locale={locale} onPublished={loadDashboard} />
           ) : null}
           <EventTeam actorRole={event.role} eventId={event.id} locale={locale} />
+          <EventDuplicate
+            accessToken={accessToken}
+            event={event}
+            locale={locale}
+            onCreated={async (createdId) => {
+              await loadDashboard();
+              await navigate(`/events/${createdId}`);
+            }}
+            organizers={dashboard.organizers}
+          />
         </section>
 
         <aside aria-labelledby="setup-heading" className="setup-panel">

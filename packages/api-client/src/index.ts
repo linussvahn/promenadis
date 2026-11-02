@@ -5,6 +5,13 @@ import {
   type RequestAccountDeletionRequest,
   type DecideFirstEventReviewRequest,
   type CancelEventRequest,
+  type AdminEventInterventionRequest,
+  type DuplicateEventRequest,
+  type UpdateDraftEventDetailsRequest,
+  type UpdateOrganizerProfileRequest,
+  adminEventSummarySchema,
+  eventDetailsResultSchema,
+  organizerProfileDetailsSchema,
   type DecideOrganizerVerificationRequest,
   type RequestOrganizerVerificationRequest,
   accountDeletionStatusSchema,
@@ -281,6 +288,34 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         method: "POST",
       });
     },
+    updateOrganizer(
+      accessToken: string,
+      organizerProfileId: string,
+      input: UpdateOrganizerProfileRequest,
+    ) {
+      return request(
+        `/organizers/${organizerProfileId}`,
+        accessToken,
+        organizerProfileDetailsSchema,
+        { body: input, method: "PUT" },
+      );
+    },
+    updateDraftEventDetails(
+      accessToken: string,
+      eventId: string,
+      input: UpdateDraftEventDetailsRequest,
+    ) {
+      return request(`/events/${eventId}/details`, accessToken, eventDetailsResultSchema, {
+        body: input,
+        method: "PUT",
+      });
+    },
+    duplicateEvent(accessToken: string, eventId: string, input: DuplicateEventRequest) {
+      return request(`/events/${eventId}/duplicate`, accessToken, commandResourceResponseSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
     publishEvent(accessToken: string, eventId: string, expectedEventVersion: number) {
       return request(`/events/${eventId}/publish`, accessToken, eventLifecycleResultSchema, {
         body: { expectedEventVersion },
@@ -415,6 +450,17 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         body: {},
         method: "POST",
       });
+    },
+    getAdminEvent(accessToken: string, eventId: string) {
+      return request(`/admin/events/${eventId}`, accessToken, adminEventSummarySchema);
+    },
+    interveneInEvent(accessToken: string, eventId: string, input: AdminEventInterventionRequest) {
+      return request(
+        `/admin/events/${eventId}/intervention`,
+        accessToken,
+        eventLifecycleResultSchema,
+        { body: input, method: "POST" },
+      );
     },
     listFirstEventReviews(accessToken: string) {
       return request("/admin/reviews", accessToken, firstEventReviewQueueSchema);

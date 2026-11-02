@@ -1,6 +1,6 @@
 # Promenadis implementation handoff
 
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## How to resume
 
@@ -455,6 +455,51 @@ Treat those documents as canonical rather than relying on chat memory.
   and contract artifacts are current.
 
 ## Recommended next work
+
+### Milestone 1 completion gaps (2026-11-02)
+
+A review against `docs/LAUNCH_CHECKLIST.md` found four Milestone 1 items with
+no command. All four are now built:
+
+- `20261102000400_event_editing_duplication.sql`:
+  - `update_draft_event_details_command`: owner/co-host, drafts only; edits
+    title, description, time zone and the first interval. Registration settings
+    that no longer fit the new schedule reset to the defaults (reported as
+    `registrationReset`). The version bump invalidates attestation and review.
+  - `update_organizer_profile_command`: managers; name, locality, website.
+    Type is fixed after creation. New `organizer_profiles.version`. A rename
+    of a verified organization goes back to review (existing trigger).
+  - `duplicate_event_command`: owner/co-host of any state; reuses
+    `create_scheduled_draft_event_command` so the actor must manage the target
+    organizer. Copies description, time zone, visibility and boundary; never
+    dates, team, registration, sellers or history. The copy is owner-only.
+  - `admin_get_event_command` and `admin_intervene_event_command`: elevated
+    admin looks up an event by ID, then cancels a published/postponed event
+    (public notice) or ends a live one. The internal reason goes into the
+    restricted audit record.
+- BFF: `PUT /organizers/{id}`, `PUT /events/{id}/details`,
+  `POST /events/{id}/duplicate`, `GET /admin/events/{id}`,
+  `POST /admin/events/{id}/intervention`.
+- Web: `EventDetailsEditor` and `EventDuplicate` on the event overview,
+  `OrganizerProfileEditor` in Settings (including the personal organizer),
+  `AdminEventIntervention` on `/admin`. Event-time-zone wall-time helpers moved
+  to `apps/web/app/lib/wall-time.ts`.
+- Flaky e2e fixes: Settings no longer resets a typed display name when the
+  dashboard reloads in the background (it now keys on the stored value). The
+  recovery-completion e2e waits for the page to read the link token before
+  clicking.
+- Verified: pgTAP 270 (35; 621 total), component tests (151 total), full
+  verify, DB rebuild, 12/12 local-auth e2e (twice), 5 smoke, all local
+  integration scripts. Repeated recovery runs hit the local recovery rate
+  limit (429); clear `app_private.local_recovery_budget` between repeats.
+- Still deferred, all waiting on later milestones: postponement (seller
+  reconfirmation), published boundary/schedule revisions (seller impact),
+  admin postponement, copying/inviting the previous team on duplication,
+  routing/public-delivery publication gates, Turnstile and production Auth
+  limits.
+
+Milestone 1 is complete locally for everything that does not depend on a
+later milestone. Next: Milestone 2 (sellers and safety lifecycle).
 
 ### Batch (2026-11-01): deletion, TOTP, admin review
 

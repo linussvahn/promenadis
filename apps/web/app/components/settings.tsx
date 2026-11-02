@@ -6,6 +6,7 @@ import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountDeletion } from "./account-deletion";
 import { AccountShell } from "./account-shell";
+import { OrganizerProfileEditor } from "./organizer-profile-editor";
 import { OrganizerTeam } from "./organizer-team";
 import { OrganizerVerification } from "./organizer-verification";
 import { RecoveryCode } from "./recovery-code";
@@ -23,10 +24,16 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState<BusyAction>(null);
   const [status, setStatus] = useState("");
+  const personalOrganizer = dashboard?.organizers.find(
+    (organizer) => organizer.organizerType === "individual",
+  );
 
+  // Keyed on the stored value, not the dashboard object: a background reload
+  // must not wipe what the user is typing.
+  const storedDisplayName = dashboard ? (dashboard.profile.displayName ?? "") : null;
   useEffect(() => {
-    if (dashboard) setDisplayName(dashboard.profile.displayName ?? "");
-  }, [dashboard]);
+    if (storedDisplayName !== null) setDisplayName(storedDisplayName);
+  }, [storedDisplayName]);
 
   const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -118,16 +125,16 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
             <div className="personal-organizer">
               <h3>{translate(locale, "settings.personalOrganizerTitle")}</h3>
               <p>{translate(locale, "settings.personalOrganizerHelp")}</p>
-              {dashboard.organizers.find(
-                (organizer) => organizer.organizerType === "individual",
-              ) ? (
-                <strong>
-                  {
-                    dashboard.organizers.find(
-                      (organizer) => organizer.organizerType === "individual",
-                    )?.displayName
-                  }
-                </strong>
+              {personalOrganizer ? (
+                <>
+                  <strong>{personalOrganizer.displayName}</strong>
+                  <OrganizerProfileEditor
+                    accessToken={accessToken}
+                    locale={locale}
+                    onSaved={loadDashboard}
+                    organizer={personalOrganizer}
+                  />
+                </>
               ) : (
                 <form className="form-panel" onSubmit={createOrganizer}>
                   <input name="organizerType" type="hidden" value="individual" />
@@ -149,7 +156,9 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
             <h2 id="organizers-heading">{translate(locale, "settings.organizersTitle")}</h2>
             <p>{translate(locale, "dashboard.additionalOrganizersHelp")}</p>
             <OrganizerList
+              accessToken={accessToken}
               locale={locale}
+              onSaved={loadDashboard}
               organizers={dashboard.organizers.filter(
                 (organizer) => organizer.organizerType !== "individual",
               )}
@@ -202,10 +211,14 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
 }
 
 function OrganizerList({
+  accessToken,
   locale,
+  onSaved,
   organizers,
 }: {
+  readonly accessToken: () => Promise<string | null>;
   readonly locale: Locale;
+  readonly onSaved: () => Promise<void>;
   readonly organizers: readonly OrganizerProfileSummary[];
 }) {
   if (organizers.length === 0) {
@@ -218,6 +231,12 @@ function OrganizerList({
           <strong>{organizer.displayName}</strong>
           <span>{translate(locale, `organizerType.${organizer.organizerType}`)}</span>
           {organizer.locality ? <span>{organizer.locality}</span> : null}
+          <OrganizerProfileEditor
+            accessToken={accessToken}
+            locale={locale}
+            onSaved={onSaved}
+            organizer={organizer}
+          />
           <OrganizerTeam
             locale={locale}
             organizerProfileId={organizer.id}
