@@ -425,7 +425,16 @@ Names are conceptual and can change during schema design.
   official-source and control-proof method, reviewer, verification/recheck/
   revocation timestamps, and narrowly scoped badge state. Do not store uploaded
   identity documents as the ordinary verification path; delete confirmation
-  correspondence on the short legal-policy schedule.
+  correspondence on the short legal-policy schedule. Implemented locally
+  2026-11-02 as `app_private.organizer_verifications`: association/company
+  managers submit a checksum-valid organization number (personal identity
+  numbers rejected in TS and SQL) plus a control method and reference; an
+  elevated admin who does not manage the organizer records the
+  Bolagsverket-registered name, active status and control confirmation, or
+  rejects/revokes with a reason. The badge holds only while `verified` and
+  before the one-year recheck date; a rename or type change sends it back to
+  pending. Rejected/revoked rows are purged after 30 days. The registry lookup
+  itself is manual; no registry API is integrated.
 - `events`: lifecycle, visibility, timezone, configuration, publication state.
 - `event_intervals`: one or more scheduled opening intervals.
 - `event_reschedule_confirmations`: seller acceptance/decline/expiry for a

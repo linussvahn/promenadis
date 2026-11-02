@@ -7,6 +7,7 @@ import { useAccountData } from "../lib/use-account-data";
 import { AccountDeletion } from "./account-deletion";
 import { AccountShell } from "./account-shell";
 import { OrganizerTeam } from "./organizer-team";
+import { OrganizerVerification } from "./organizer-verification";
 import { RecoveryCode } from "./recovery-code";
 import { TwoStep } from "./two-step";
 
@@ -222,6 +223,9 @@ function OrganizerList({
             organizerProfileId={organizer.id}
             owner={organizer.role === "owner"}
           />
+          {organizer.organizerType === "association" || organizer.organizerType === "company" ? (
+            <OrganizerVerification locale={locale} organizerProfileId={organizer.id} />
+          ) : null}
         </li>
       ))}
     </ul>

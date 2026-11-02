@@ -93,6 +93,64 @@ export const accountRecoveryStatusSchema = z.strictObject({
 
 export type AccountRecoveryStatus = z.infer<typeof accountRecoveryStatusSchema>;
 
+export const organizerVerificationStatusSchema = z.strictObject({
+  badge: z.boolean(),
+  organizationNumber: z
+    .string()
+    .regex(/^[0-9]{6}-[0-9]{4}$/u)
+    .nullable(),
+  reason: z.string().max(500).nullable(),
+  recheckDueAt: isoInstant.nullable(),
+  registeredName: z.string().max(200).nullable(),
+  status: z.enum(["none", "pending", "verified", "rejected", "revoked"]),
+});
+
+export type OrganizerVerificationStatus = z.infer<typeof organizerVerificationStatusSchema>;
+
+const verificationControlMethodSchema = z.enum([
+  "organization_email",
+  "official_website",
+  "official_contact",
+]);
+
+export const requestOrganizerVerificationSchema = z.strictObject({
+  controlMethod: verificationControlMethodSchema,
+  controlReference: z.string().trim().min(3).max(200),
+  organizationNumber: z.string().trim().max(16),
+});
+
+export type RequestOrganizerVerificationRequest = z.infer<
+  typeof requestOrganizerVerificationSchema
+>;
+
+export const organizerVerificationQueueItemSchema = z.strictObject({
+  controlMethod: verificationControlMethodSchema,
+  controlReference: z.string().max(200),
+  displayName: z.string().max(100),
+  organizationNumber: z.string().regex(/^[0-9]{6}-[0-9]{4}$/u),
+  organizerProfileId: opaqueUuid,
+  organizerType: organizerTypeSchema,
+  ownOrganizer: z.boolean(),
+  requestedAt: isoInstant,
+  website: z.string().max(500).nullable(),
+});
+
+export const organizerVerificationQueueSchema = z
+  .array(organizerVerificationQueueItemSchema)
+  .max(500);
+
+export type OrganizerVerificationQueueItem = z.infer<typeof organizerVerificationQueueItemSchema>;
+
+export const decideOrganizerVerificationSchema = z.strictObject({
+  controlConfirmed: z.boolean().optional(),
+  decision: z.enum(["verified", "rejected", "revoked"]),
+  reason: z.string().trim().max(500).optional(),
+  registeredName: z.string().trim().max(200).optional(),
+  registryActive: z.boolean().optional(),
+});
+
+export type DecideOrganizerVerificationRequest = z.infer<typeof decideOrganizerVerificationSchema>;
+
 export const mfaStatusSchema = z.strictObject({
   assuranceLevel: z.enum(["aal1", "aal2"]),
   totpEnabled: z.boolean(),
@@ -713,6 +771,10 @@ export const boundarySchemas = {
   AccountRecoveryStatus: accountRecoveryStatusSchema,
   AccountDeletionStatus: accountDeletionStatusSchema,
   MfaStatus: mfaStatusSchema,
+  OrganizerVerificationStatus: organizerVerificationStatusSchema,
+  RequestOrganizerVerification: requestOrganizerVerificationSchema,
+  OrganizerVerificationQueue: organizerVerificationQueueSchema,
+  DecideOrganizerVerification: decideOrganizerVerificationSchema,
   PublishEventRequest: publishEventRequestSchema,
   CancelEventRequest: cancelEventRequestSchema,
   EventLifecycleResult: eventLifecycleResultSchema,

@@ -379,6 +379,215 @@
     ],
     "additionalProperties": false
   },
+  "OrganizerVerificationStatus": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "badge": {
+        "type": "boolean"
+      },
+      "organizationNumber": {
+        "anyOf": [
+          {
+            "type": "string",
+            "pattern": "^[0-9]{6}-[0-9]{4}$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "reason": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 500
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "recheckDueAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "registeredName": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 200
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "none",
+          "pending",
+          "verified",
+          "rejected",
+          "revoked"
+        ]
+      }
+    },
+    "required": [
+      "badge",
+      "organizationNumber",
+      "reason",
+      "recheckDueAt",
+      "registeredName",
+      "status"
+    ],
+    "additionalProperties": false
+  },
+  "RequestOrganizerVerification": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "controlMethod": {
+        "type": "string",
+        "enum": [
+          "organization_email",
+          "official_website",
+          "official_contact"
+        ]
+      },
+      "controlReference": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 200
+      },
+      "organizationNumber": {
+        "type": "string",
+        "maxLength": 16
+      }
+    },
+    "required": [
+      "controlMethod",
+      "controlReference",
+      "organizationNumber"
+    ],
+    "additionalProperties": false
+  },
+  "OrganizerVerificationQueue": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "maxItems": 500,
+    "type": "array",
+    "items": {
+      "type": "object",
+      "properties": {
+        "controlMethod": {
+          "type": "string",
+          "enum": [
+            "organization_email",
+            "official_website",
+            "official_contact"
+          ]
+        },
+        "controlReference": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "organizationNumber": {
+          "type": "string",
+          "pattern": "^[0-9]{6}-[0-9]{4}$"
+        },
+        "organizerProfileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizerType": {
+          "type": "string",
+          "enum": [
+            "individual",
+            "informal_group",
+            "association",
+            "company"
+          ]
+        },
+        "ownOrganizer": {
+          "type": "boolean"
+        },
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "website": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "controlMethod",
+        "controlReference",
+        "displayName",
+        "organizationNumber",
+        "organizerProfileId",
+        "organizerType",
+        "ownOrganizer",
+        "requestedAt",
+        "website"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "DecideOrganizerVerification": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "controlConfirmed": {
+        "type": "boolean"
+      },
+      "decision": {
+        "type": "string",
+        "enum": [
+          "verified",
+          "rejected",
+          "revoked"
+        ]
+      },
+      "reason": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "registeredName": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "registryActive": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "decision"
+    ],
+    "additionalProperties": false
+  },
   "PublishEventRequest": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",

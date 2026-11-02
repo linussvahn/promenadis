@@ -463,6 +463,30 @@ commit and push each, ask only on real blockers. Order: account deletion
 (done), optional owner TOTP, then platform-admin elevation plus first-event
 review.
 
+### Organizer verification (2026-11-02)
+
+- `20261102000200_organizer_verification.sql` + domain
+  `normalizeOrganizationNumber` (Luhn, third digit >= 2 so personnummer are
+  refused; SQL mirror `valid_organization_number`). Request (association/
+  company members), elevated-admin queue and decision (verify needs registry
+  name + active + control confirmed; reject/revoke need a reason; no self-
+  review), badge = verified and before the one-year recheck, rename/type
+  change returns it to pending, closed outcomes purged after 30 days.
+- BFF `GET/POST /organizers/{id}/verification`,
+  `GET /admin/organizer-verifications`,
+  `POST /admin/organizer-verifications/{id}/decision`. Web: verification block
+  per association/company in Settings; second queue on `/admin`.
+- Gotcha: the Supabase CLI bind-mounts each imported shared file separately
+  when the stack starts, so a NEW import from `packages/*` 503s until
+  `pnpm db:stop && pnpm db:start`.
+- Verified: pgTAP 250 (22), domain tests, component tests, e2e, full verify,
+  DB rebuild, slice, all 10 local-auth and 5 smoke e2e.
+- Not done: showing the badge publicly (Milestone 3), enforcing verification
+  for events above the free entitlement (no entitlements yet), an organizer
+  edit command (the material-change trigger is ready for it).
+
+Next: TOTP as an account-recovery factor, then Milestone 2 (sellers).
+
 ### Event lifecycle (2026-11-02)
 
 - `20261102000100_event_lifecycle.sql`: transition trigger (same table as the

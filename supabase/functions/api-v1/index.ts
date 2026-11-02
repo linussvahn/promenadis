@@ -1,11 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 import { createBrowserSessionGateway } from "./browser-sessions.ts";
 import { sessionFromVerifiedAccessToken } from "../../../packages/domain/src/auth-session.ts";
+import { normalizeOrganizationNumber } from "../../../packages/domain/src/organization-number.ts";
 import {
   acceptEventTeamInviteRequestSchema,
   accountProfileSchema,
   accountDeletionStatusSchema,
   adminElevationRequestSchema,
+  decideOrganizerVerificationSchema,
+  organizerVerificationQueueSchema,
+  organizerVerificationStatusSchema,
+  requestOrganizerVerificationSchema,
   cancelEventRequestSchema,
   eventLifecycleResultSchema,
   publishEventRequestSchema,
@@ -1434,6 +1439,68 @@ Deno.serve(async (request) => {
       return json(parsed.data, 200, correlationId, origin);
     }
 
+    const verificationRoute = route.match(
+      /^\/organizers\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/verification$/iu,
+    );
+    if (verificationRoute && (request.method === "GET" || request.method === "POST")) {
+      const organizerProfileId = verificationRoute[1];
+      let rpc: { data: unknown; error: { message: string } | null };
+      if (request.method === "GET") {
+        operation = "organizer.verification_read";
+        rpc = await admin.rpc("get_organizer_verification_command", {
+          p_actor_id: actorId,
+          p_organizer_profile_id: organizerProfileId,
+        });
+      } else {
+        operation = "organizer.verification_request";
+        const input = requestOrganizerVerificationSchema.safeParse(await requestBody(request));
+        const organizationNumber = input.success
+          ? normalizeOrganizationNumber(input.data.organizationNumber)
+          : null;
+        if (!input.success || !organizationNumber) {
+          status = "denied";
+          return apiError(
+            "invalid_organization_number",
+            "Check the organization number.",
+            400,
+            correlationId,
+            origin,
+          );
+        }
+        rpc = await admin.rpc("request_organizer_verification_command", {
+          p_actor_id: actorId,
+          p_control_method: input.data.controlMethod,
+          p_control_reference: input.data.controlReference,
+          p_correlation_id: correlationId,
+          p_organization_number: organizationNumber,
+          p_organizer_profile_id: organizerProfileId,
+        });
+      }
+      if (rpc.error) {
+        const mapped = new Map<string, [string, string, number]>([
+          ["Organizer profile not found", ["not_found", "Organizer not found.", 404]],
+          [
+            "Only associations and companies can be verified",
+            ["not_eligible", "Only associations and companies can be verified.", 409],
+          ],
+          [
+            "Invalid organization number",
+            ["invalid_organization_number", "Check the number.", 400],
+          ],
+          ["Verification already requested", ["already_requested", "Already requested.", 409]],
+        ]).get(rpc.error.message);
+        if (mapped) {
+          status = "denied";
+          return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+        }
+        throw rpc.error;
+      }
+      const parsed = organizerVerificationStatusSchema.safeParse(rpc.data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
+
     const lifecycleRoute = route.match(
       /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(publish|cancel|end-early)$/iu,
     );
@@ -1653,6 +1720,58 @@ Deno.serve(async (request) => {
         if (!parsed.success) throw new Error("invalid_internal_response");
         status = "succeeded";
         return json(parsed.data, 200, correlationId, origin);
+      }
+      if (request.method === "GET" && route === "/admin/organizer-verifications") {
+        operation = "admin.organizer_verification_queue_read";
+        const { data, error } = await admin.rpc("list_organizer_verifications_command", {
+          p_actor_id: actorId,
+          p_auth_session_id: actor.sessionId,
+          p_correlation_id: correlationId,
+        });
+        if (error) {
+          if (error.message === "Admin elevation required") {
+            return denied("elevation_required", "Enter admin mode first.", 403);
+          }
+          throw error;
+        }
+        const parsed = organizerVerificationQueueSchema.safeParse(data);
+        if (!parsed.success) throw new Error("invalid_internal_response");
+        status = "succeeded";
+        return json(parsed.data, 200, correlationId, origin);
+      }
+      const verificationDecision = route.match(
+        /^\/admin\/organizer-verifications\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/decision$/iu,
+      );
+      if (request.method === "POST" && verificationDecision) {
+        operation = "admin.organizer_verification_decide";
+        const input = decideOrganizerVerificationSchema.safeParse(await requestBody(request));
+        if (!input.success) return denied("invalid_request", "Complete the decision.", 400);
+        const { error } = await admin.rpc("decide_organizer_verification_command", {
+          p_actor_id: actorId,
+          p_auth_session_id: actor.sessionId,
+          p_control_confirmed: input.data.controlConfirmed ?? null,
+          p_correlation_id: correlationId,
+          p_decision: input.data.decision,
+          p_organizer_profile_id: verificationDecision[1],
+          p_reason: input.data.reason ?? null,
+          p_registered_name: input.data.registeredName ?? null,
+          p_registry_active: input.data.registryActive ?? null,
+        });
+        if (error) {
+          const mapped = new Map<string, [string, string, number]>([
+            ["Admin elevation required", ["elevation_required", "Enter admin mode first.", 403]],
+            [
+              "Cannot review own organizer",
+              ["conflict_of_interest", "You manage this organizer.", 403],
+            ],
+            ["Verification unavailable", ["review_unavailable", "No such verification.", 409]],
+            ["Invalid verification decision", ["invalid_request", "Complete the decision.", 400]],
+          ]).get(error.message);
+          if (mapped) return denied(mapped[0], mapped[1], mapped[2]);
+          throw error;
+        }
+        status = "succeeded";
+        return json(await adminStatus(), 200, correlationId, origin);
       }
       const decisionRoute = route.match(
         /^\/admin\/reviews\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/decision$/iu,

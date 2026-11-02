@@ -690,6 +690,130 @@ test("publication stays gated while owners cancel published events and co-hosts 
   }
 });
 
+test("organization verification needs a valid number and an elevated reviewer", async ({
+  request,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const managerEmail = `verify-manager-${randomUUID()}@example.invalid`;
+  const adminEmail = `verify-admin-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const signIn = async (email: string) => {
+    const client = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return { client, token: data.session?.access_token };
+  };
+  const headersFor = (token: string | undefined) => ({
+    apikey: publicKey,
+    authorization: `Bearer ${token}`,
+    origin: "http://127.0.0.1:5173",
+  });
+  for (const email of [managerEmail, adminEmail]) {
+    const { error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
+    if (error) throw error;
+  }
+  try {
+    const manager = headersFor((await signIn(managerEmail)).token);
+    const created = await request.post(`${base}/organizers`, {
+      headers: manager,
+      data: {
+        displayName: "Synthetic Association",
+        locality: "Stockholm",
+        organizerType: "association",
+        website: "https://example.invalid",
+      },
+    });
+    expect(created.status()).toBe(201);
+    const organizerId = (await created.json()).id as string;
+    const personal = await request.post(`${base}/organizers/${organizerId}/verification`, {
+      headers: manager,
+      data: {
+        controlMethod: "official_website",
+        controlReference: "https://example.invalid",
+        organizationNumber: "811218-9876",
+      },
+    });
+    expect(personal.status()).toBe(400);
+    const requested = await request.post(`${base}/organizers/${organizerId}/verification`, {
+      headers: manager,
+      data: {
+        controlMethod: "official_website",
+        controlReference: "https://example.invalid",
+        organizationNumber: "5560160680",
+      },
+    });
+    expect(await requested.json()).toMatchObject({
+      organizationNumber: "556016-0680",
+      status: "pending",
+    });
+
+    const adminSession = await signIn(adminEmail);
+    const enrolled = await (
+      await request.post(`${base}/account/mfa/totp`, {
+        headers: headersFor(adminSession.token),
+        data: {},
+      })
+    ).json();
+    const upgraded = await adminSession.client.auth.mfa.challengeAndVerify({
+      factorId: enrolled.factorId,
+      code: totp(enrolled.secret),
+    });
+    const adminHeaders = headersFor(upgraded.data?.access_token);
+    execFileSync("node", ["scripts/grant-local-admin.mjs", adminEmail], {
+      cwd: repositoryRoot,
+      stdio: "ignore",
+    });
+    expect(
+      (
+        await request.get(`${base}/admin/organizer-verifications`, { headers: adminHeaders })
+      ).status(),
+    ).toBe(403);
+    await request.post(`${base}/admin/elevation`, {
+      headers: adminHeaders,
+      data: { code: totp(enrolled.secret) },
+    });
+    const queue = await (
+      await request.get(`${base}/admin/organizer-verifications`, { headers: adminHeaders })
+    ).json();
+    expect(
+      queue.find((item: { organizerProfileId: string }) => item.organizerProfileId === organizerId),
+    ).toMatchObject({ organizationNumber: "556016-0680", ownOrganizer: false });
+    const unconfirmed = await request.post(
+      `${base}/admin/organizer-verifications/${organizerId}/decision`,
+      {
+        headers: adminHeaders,
+        data: { decision: "verified", registeredName: "Example Förening", registryActive: true },
+      },
+    );
+    expect(unconfirmed.status()).toBe(400);
+    const verified = await request.post(
+      `${base}/admin/organizer-verifications/${organizerId}/decision`,
+      {
+        headers: adminHeaders,
+        data: {
+          controlConfirmed: true,
+          decision: "verified",
+          registeredName: "Example Förening",
+          registryActive: true,
+        },
+      },
+    );
+    expect(verified.status()).toBe(200);
+    const status = await (
+      await request.get(`${base}/organizers/${organizerId}/verification`, { headers: manager })
+    ).json();
+    expect(status).toMatchObject({ badge: true, registeredName: "Example Förening" });
+  } finally {
+    await deleteSyntheticAccount(adminEmail);
+    await deleteSyntheticAccount(managerEmail);
+  }
+});
+
 test("the visible email OTP signs in", async ({ page, request }) => {
   test.setTimeout(90_000);
   const email = `otp-${randomUUID()}@example.invalid`;

@@ -433,6 +433,54 @@ export type Database = {
           },
         ]
       }
+      organizer_verifications: {
+        Row: {
+          control_method: string
+          control_reference: string
+          decided_at: string | null
+          organization_number: string
+          organizer_profile_id: string
+          reason: string | null
+          recheck_due_at: string | null
+          registered_name: string | null
+          registry_source: string | null
+          requested_at: string
+          requested_by_account_id: string | null
+          reviewer_account_id: string | null
+          status: string
+        }
+        Insert: {
+          control_method: string
+          control_reference: string
+          decided_at?: string | null
+          organization_number: string
+          organizer_profile_id: string
+          reason?: string | null
+          recheck_due_at?: string | null
+          registered_name?: string | null
+          registry_source?: string | null
+          requested_at?: string
+          requested_by_account_id?: string | null
+          reviewer_account_id?: string | null
+          status?: string
+        }
+        Update: {
+          control_method?: string
+          control_reference?: string
+          decided_at?: string | null
+          organization_number?: string
+          organizer_profile_id?: string
+          reason?: string | null
+          recheck_due_at?: string | null
+          registered_name?: string | null
+          registry_source?: string | null
+          requested_at?: string
+          requested_by_account_id?: string | null
+          reviewer_account_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       platform_admins: {
         Row: {
           account_id: string
@@ -554,9 +602,17 @@ export type Database = {
         }
         Returns: Json
       }
+      organizer_verification_status: {
+        Args: { p_organizer_profile_id: string }
+        Returns: Json
+      }
       publication_system_blockers: {
         Args: { p_event_id: string }
         Returns: Json
+      }
+      purge_closed_organizer_verifications_command: {
+        Args: never
+        Returns: undefined
       }
       purge_expired_account_recovery_claims_command: {
         Args: never
@@ -579,6 +635,7 @@ export type Database = {
         Args: { p_correlation_id: string; p_dispatch_id: string }
         Returns: string
       }
+      valid_organization_number: { Args: { p_value: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
@@ -1461,6 +1518,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      decide_organizer_verification_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_control_confirmed: boolean
+          p_correlation_id: string
+          p_decision: string
+          p_organizer_profile_id: string
+          p_reason: string
+          p_registered_name: string
+          p_registry_active: boolean
+        }
+        Returns: undefined
+      }
       delete_browser_session_command: {
         Args: { p_hash: string }
         Returns: undefined
@@ -1547,6 +1618,10 @@ export type Database = {
         Args: { p_actor_id: string; p_organizer_profile_id: string }
         Returns: Json
       }
+      get_organizer_verification_command: {
+        Args: { p_actor_id: string; p_organizer_profile_id: string }
+        Returns: Json
+      }
       initiate_account_recovery_claim_command: {
         Args: {
           p_correlation_id: string
@@ -1619,6 +1694,14 @@ export type Database = {
       }
       is_platform_admin: { Args: { p_account_id: string }; Returns: boolean }
       list_first_event_reviews_command: {
+        Args: {
+          p_actor_id: string
+          p_auth_session_id: string
+          p_correlation_id: string
+        }
+        Returns: Json
+      }
+      list_organizer_verifications_command: {
         Args: {
           p_actor_id: string
           p_auth_session_id: string
@@ -1707,6 +1790,17 @@ export type Database = {
           p_correlation_id: string
           p_event_id: string
           p_expected_event_version: number
+        }
+        Returns: Json
+      }
+      request_organizer_verification_command: {
+        Args: {
+          p_actor_id: string
+          p_control_method: string
+          p_control_reference: string
+          p_correlation_id: string
+          p_organization_number: string
+          p_organizer_profile_id: string
         }
         Returns: Json
       }

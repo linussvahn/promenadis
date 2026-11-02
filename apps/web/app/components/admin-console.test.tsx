@@ -1,13 +1,15 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminContent } from "./admin-console";
 
 const mocks = vi.hoisted(() => ({
   decideFirstEventReview: vi.fn(),
   endAdminElevation: vi.fn(),
   getAdminStatus: vi.fn(),
+  decideOrganizerVerification: vi.fn(),
   listFirstEventReviews: vi.fn(),
+  listOrganizerVerifications: vi.fn(),
   startAdminElevation: vi.fn(),
 }));
 vi.mock("../lib/supabase", () => ({ getPromenadisApiClient: () => mocks }));
@@ -29,6 +31,9 @@ const item = {
 };
 const elevated = { elevated: true, eligible: true, expiresAt: "2031-09-01T10:15:00Z" };
 
+beforeEach(() => {
+  mocks.listOrganizerVerifications.mockResolvedValue([]);
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -78,6 +83,43 @@ describe("AdminContent", () => {
     render(<AdminContent locale="en" />);
     await screen.findByText("You cannot review an event whose team you belong to.");
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
+  it("verifies an organization only with registry and control confirmations", async () => {
+    const organizerProfileId = "01992026-1102-7100-8000-000000000011";
+    mocks.getAdminStatus.mockResolvedValue(elevated);
+    mocks.listFirstEventReviews.mockResolvedValue([]);
+    mocks.listOrganizerVerifications.mockResolvedValueOnce([
+      {
+        controlMethod: "official_website",
+        controlReference: "https://example.invalid",
+        displayName: "Example Association",
+        organizationNumber: "556016-0680",
+        organizerProfileId,
+        organizerType: "association",
+        ownOrganizer: false,
+        requestedAt: "2031-09-01T10:00:00Z",
+        website: null,
+      },
+    ]);
+    mocks.decideOrganizerVerification.mockResolvedValue(elevated);
+    render(<AdminContent locale="en" />);
+    fireEvent.change(await screen.findByLabelText("Registered name at Bolagsverket"), {
+      target: { value: "Example Förening" },
+    });
+    fireEvent.click(screen.getByLabelText("Registered and active at Bolagsverket"));
+    fireEvent.click(screen.getByLabelText("The representative's control is confirmed"));
+    fireEvent.click(screen.getByRole("button", { name: "Verify" }));
+    await waitFor(() =>
+      expect(mocks.decideOrganizerVerification).toHaveBeenCalledWith("admin", organizerProfileId, {
+        controlConfirmed: true,
+        decision: "verified",
+        reason: undefined,
+        registeredName: "Example Förening",
+        registryActive: true,
+      }),
+    );
+    expect(await screen.findByText("The organization is verified.")).toBeVisible();
   });
 
   it("has no detectable automated accessibility violations", async () => {

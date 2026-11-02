@@ -5,8 +5,12 @@ import {
   type RequestAccountDeletionRequest,
   type DecideFirstEventReviewRequest,
   type CancelEventRequest,
+  type DecideOrganizerVerificationRequest,
+  type RequestOrganizerVerificationRequest,
   accountDeletionStatusSchema,
   adminStatusSchema,
+  organizerVerificationQueueSchema,
+  organizerVerificationStatusSchema,
   eventLifecycleResultSchema,
   firstEventReviewQueueSchema,
   firstEventReviewStatusSchema,
@@ -306,6 +310,44 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         body: input,
         method: "POST",
       });
+    },
+    getOrganizerVerification(accessToken: string, organizerProfileId: string) {
+      return request(
+        `/organizers/${organizerProfileId}/verification`,
+        accessToken,
+        organizerVerificationStatusSchema,
+      );
+    },
+    requestOrganizerVerification(
+      accessToken: string,
+      organizerProfileId: string,
+      input: RequestOrganizerVerificationRequest,
+    ) {
+      return request(
+        `/organizers/${organizerProfileId}/verification`,
+        accessToken,
+        organizerVerificationStatusSchema,
+        { body: input, method: "POST" },
+      );
+    },
+    listOrganizerVerifications(accessToken: string) {
+      return request(
+        "/admin/organizer-verifications",
+        accessToken,
+        organizerVerificationQueueSchema,
+      );
+    },
+    decideOrganizerVerification(
+      accessToken: string,
+      organizerProfileId: string,
+      input: DecideOrganizerVerificationRequest,
+    ) {
+      return request(
+        `/admin/organizer-verifications/${organizerProfileId}/decision`,
+        accessToken,
+        adminStatusSchema,
+        { body: input, method: "POST" },
+      );
     },
     getMfaStatus(accessToken: string) {
       return request("/account/mfa", accessToken, mfaStatusSchema);

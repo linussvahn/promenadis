@@ -1,5 +1,9 @@
 import { PromenadisApiError } from "@promenadis/api-client";
-import type { AdminStatus, FirstEventReviewQueueItem } from "@promenadis/contracts";
+import type {
+  AdminStatus,
+  FirstEventReviewQueueItem,
+  OrganizerVerificationQueueItem,
+} from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
@@ -14,6 +18,7 @@ export function AdminContent({ locale }: { readonly locale: Locale }) {
   const { accessToken } = useAccountData();
   const [admin, setAdmin] = useState<AdminStatus | null>(null);
   const [queue, setQueue] = useState<FirstEventReviewQueueItem[]>([]);
+  const [verifications, setVerifications] = useState<OrganizerVerificationQueueItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -30,6 +35,9 @@ export function AdminContent({ locale }: { readonly locale: Locale }) {
       const next = await client.api.getAdminStatus(client.token);
       setAdmin(next);
       setQueue(next.elevated ? await client.api.listFirstEventReviews(client.token) : []);
+      setVerifications(
+        next.elevated ? await client.api.listOrganizerVerifications(client.token) : [],
+      );
     } catch {
       setStatus(translate(locale, "admin.error"));
     }
@@ -81,6 +89,7 @@ export function AdminContent({ locale }: { readonly locale: Locale }) {
     try {
       setAdmin(await client.api.endAdminElevation(client.token));
       setQueue([]);
+      setVerifications([]);
     } catch (error) {
       setStatus(errorText(error));
     } finally {
@@ -104,6 +113,35 @@ export function AdminContent({ locale }: { readonly locale: Locale }) {
         reason: String(form.get("reason") ?? ""),
       });
       setStatus(translate(locale, decision === "approved" ? "admin.approved" : "admin.rejected"));
+      await load();
+    } catch (error) {
+      setStatus(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decideVerification = async (
+    item: OrganizerVerificationQueueItem,
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const decision = submitter?.value === "rejected" ? "rejected" : "verified";
+    const client = await call();
+    if (!client) return;
+    setBusy(true);
+    setStatus("");
+    try {
+      await client.api.decideOrganizerVerification(client.token, item.organizerProfileId, {
+        controlConfirmed: form.get("controlConfirmed") === "on",
+        decision,
+        reason: String(form.get("reason") ?? "") || undefined,
+        registeredName: String(form.get("registeredName") ?? "") || undefined,
+        registryActive: form.get("registryActive") === "on",
+      });
+      setStatus(translate(locale, decision === "verified" ? "admin.verified" : "admin.rejected"));
       await load();
     } catch (error) {
       setStatus(errorText(error));
@@ -194,6 +232,75 @@ export function AdminContent({ locale }: { readonly locale: Locale }) {
                       value="approved"
                     >
                       {translate(locale, "admin.approve")}
+                    </button>
+                    <button
+                      className="danger-button"
+                      disabled={busy}
+                      type="submit"
+                      value="rejected"
+                    >
+                      {translate(locale, "admin.reject")}
+                    </button>
+                  </form>
+                )}
+              </article>
+            ))}
+          </section>
+          <section aria-labelledby="verification-queue-heading" className="panel">
+            <h2 id="verification-queue-heading">{translate(locale, "admin.verificationTitle")}</h2>
+            <p className="field-help">{translate(locale, "admin.verificationHelp")}</p>
+            {verifications.length === 0 ? (
+              <p>{translate(locale, "admin.verificationEmpty")}</p>
+            ) : null}
+            {verifications.map((item) => (
+              <article className="panel" key={item.organizerProfileId}>
+                <h3>{item.displayName}</h3>
+                <p>
+                  {item.organizationNumber} ·{" "}
+                  {translate(locale, `organizerType.${item.organizerType}`)}
+                </p>
+                <p>
+                  {translate(locale, `verification.method.${item.controlMethod}`)}:{" "}
+                  {item.controlReference}
+                </p>
+                {item.ownOrganizer ? (
+                  <p className="notice">{translate(locale, "admin.ownOrganizer")}</p>
+                ) : (
+                  <form
+                    className="form-panel"
+                    onSubmit={(event) => void decideVerification(item, event)}
+                  >
+                    <label htmlFor={`registered-${item.organizerProfileId}`}>
+                      {translate(locale, "admin.registeredName")}
+                    </label>
+                    <input
+                      id={`registered-${item.organizerProfileId}`}
+                      maxLength={200}
+                      name="registeredName"
+                    />
+                    <label className="checkbox-field">
+                      <input name="registryActive" type="checkbox" />
+                      <span>{translate(locale, "admin.registryActive")}</span>
+                    </label>
+                    <label className="checkbox-field">
+                      <input name="controlConfirmed" type="checkbox" />
+                      <span>{translate(locale, "admin.controlConfirmed")}</span>
+                    </label>
+                    <label htmlFor={`verification-reason-${item.organizerProfileId}`}>
+                      {translate(locale, "admin.reason")}
+                    </label>
+                    <textarea
+                      id={`verification-reason-${item.organizerProfileId}`}
+                      maxLength={500}
+                      name="reason"
+                    />
+                    <button
+                      className="primary-button"
+                      disabled={busy}
+                      type="submit"
+                      value="verified"
+                    >
+                      {translate(locale, "admin.verify")}
                     </button>
                     <button
                       className="danger-button"
