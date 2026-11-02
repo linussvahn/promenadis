@@ -55,8 +55,14 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let message = "Försök igen. Om problemet kvarstår kan tjänsten vara tillfälligt otillgänglig.";
 
   if (isRouteErrorResponse(error)) {
-    heading = error.status === 404 ? "Sidan hittades inte" : `Fel ${error.status}`;
+    heading =
+      error.status === 404
+        ? "Sidan hittades inte"
+        : error.status === 410
+          ? "Sidan finns inte längre"
+          : `Fel ${error.status}`;
     message = error.statusText || message;
+    if (error.status === 410) message = "Länken har bytts ut eller evenemanget har tagits bort.";
   }
 
   return (

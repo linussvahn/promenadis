@@ -476,4 +476,29 @@ describe("Promenadis API client", () => {
       ],
     ]);
   });
+
+  it("reads public pages anonymously with GET and surfaces 410 as an API error", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: "gone",
+          correlationId: "01991dd3-a7c7-7ea2-aee5-43ec2cb5f606",
+          message: "This page is no longer available.",
+          schemaVersion: "1.0",
+        }),
+        { status: 410, headers: { "content-type": "application/json" } },
+      ),
+    );
+    globalThis.fetch = fetchMock;
+    const client = createPromenadisApiClient({ baseUrl: "/api", browserSession: true });
+    await expect(client.getPublicEvent("unlisted", "c".repeat(32))).rejects.toMatchObject({
+      code: "gone",
+      status: 410,
+    });
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe(`/api/public/unlisted/${"c".repeat(32)}`);
+    expect(init).toMatchObject({ method: "GET" });
+    expect(init.body).toBeUndefined();
+    expect(init.headers).not.toHaveProperty("x-account-id");
+  });
 });

@@ -1034,6 +1034,7 @@ export type Database = {
         Args: { p_organizer_profile_id: string }
         Returns: Json
       }
+      organizer_verified: { Args: { p_organizer_id: string }; Returns: boolean }
       place_participation_location: {
         Args: {
           p_address_line: string
@@ -1055,6 +1056,10 @@ export type Database = {
       promote_waitlisted_sellers: {
         Args: { p_correlation_id: string; p_event_id: string }
         Returns: number
+      }
+      public_event_summary: {
+        Args: { p_event: Database["public"]["Tables"]["events"]["Row"] }
+        Returns: Json
       }
       publication_system_blockers: {
         Args: { p_event_id: string }
@@ -1699,6 +1704,7 @@ export type Database = {
           organizer_profile_id: string
           original_starts_at: string | null
           postponed_at: string | null
+          public_key: string
           public_notice: string | null
           seller_history: Json | null
           state: string
@@ -1720,6 +1726,7 @@ export type Database = {
           organizer_profile_id: string
           original_starts_at?: string | null
           postponed_at?: string | null
+          public_key?: string
           public_notice?: string | null
           seller_history?: Json | null
           state?: string
@@ -1741,6 +1748,7 @@ export type Database = {
           organizer_profile_id?: string
           original_starts_at?: string | null
           postponed_at?: string | null
+          public_key?: string
           public_notice?: string | null
           seller_history?: Json | null
           state?: string
@@ -1914,6 +1922,7 @@ export type Database = {
           id: string
           locality: string | null
           organizer_type: string
+          public_key: string
           team_version: number
           updated_at: string
           version: number
@@ -1927,6 +1936,7 @@ export type Database = {
           id?: string
           locality?: string | null
           organizer_type: string
+          public_key?: string
           team_version?: number
           updated_at?: string
           version?: number
@@ -1940,6 +1950,7 @@ export type Database = {
           id?: string
           locality?: string | null
           organizer_type?: string
+          public_key?: string
           team_version?: number
           updated_at?: string
           version?: number
@@ -1978,6 +1989,35 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      retired_event_keys: {
+        Row: {
+          event_id: string | null
+          public_key: string
+          reason: string
+          retired_at: string
+        }
+        Insert: {
+          event_id?: string | null
+          public_key: string
+          reason: string
+          retired_at?: string
+        }
+        Update: {
+          event_id?: string | null
+          public_key?: string
+          reason?: string
+          retired_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retired_event_keys_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       seller_availability: {
         Row: {
@@ -2861,6 +2901,10 @@ export type Database = {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
       }
+      get_event_public_link_command: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: Json
+      }
       get_event_publication_readiness_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
@@ -3064,6 +3108,22 @@ export type Database = {
         }
         Returns: string
       }
+      public_event_landing_command: {
+        Args: { p_key: string; p_route: string }
+        Returns: Json
+      }
+      public_list_events_command: {
+        Args: {
+          p_after_id: string
+          p_after_starts_at: string
+          p_limit: number
+          p_live_only: boolean
+          p_query: string
+        }
+        Returns: Json
+      }
+      public_organizer_page_command: { Args: { p_key: string }; Returns: Json }
+      public_sitemap_command: { Args: never; Returns: Json }
       publish_event_command: {
         Args: {
           p_actor_id: string
@@ -3215,6 +3275,17 @@ export type Database = {
           p_correlation_id: string
           p_decision: string
           p_reason: string
+        }
+        Returns: Json
+      }
+      rotate_unlisted_link_command: {
+        Args: {
+          p_actor_id: string
+          p_authenticated_at: string
+          p_correlation_id: string
+          p_event_id: string
+          p_expected_event_version: number
+          p_safety_reason: string
         }
         Returns: Json
       }

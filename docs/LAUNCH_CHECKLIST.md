@@ -166,6 +166,15 @@ verification: 800/800 pgTAP assertions.
 
 ### Milestone 3 — public discovery
 
+Milestone 3 progress: slice 1 (128-bit route keys, sanitized public `/e/` and
+unlisted `/u/` landing pages, discovery search, organizer pages, sitemap,
+robots, canonical/Open Graph/JSON-LD, `X-Robots-Tag` and `no-referrer` on
+unlisted pages, `404`/`410`, owner rotation of leaked unlisted links) is
+complete locally as of 2026-11-04: pgTAP 340, public-pages and
+event-public-link component tests, and the e2e "public and unlisted landing
+pages…". Database verification: 828/828 pgTAP assertions. Not yet verified at a CDN edge; the canonical origin comes from the
+request until a configured site origin exists (hosted alpha).
+
 - Sanitized public/unlisted landing behavior, discovery, organizer pages,
   sitemap/canonical/robots/referrer/header rules, `404`/`410`, and safe previews.
 - Transactional content-addressed snapshot, manifest, and coordinate-free safety

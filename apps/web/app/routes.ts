@@ -14,6 +14,12 @@ export default [
   route("events/:eventId/sellers", "routes/event-sellers.tsx"),
   route("events/:eventId/join", "routes/event-join.tsx"),
   route("report", "routes/report.tsx"),
+  route("discover", "routes/discover.tsx"),
+  route("e/:key", "routes/public-event.tsx"),
+  route("u/:key", "routes/unlisted-event.tsx"),
+  route("o/:key", "routes/organizer.tsx"),
+  route("sitemap.xml", "routes/sitemap.tsx"),
+  route("robots.txt", "routes/robots.tsx"),
   route("settings", "routes/settings.tsx"),
   route("admin", "routes/admin.tsx"),
 ] satisfies RouteConfig;

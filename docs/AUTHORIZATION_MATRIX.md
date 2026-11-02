@@ -83,6 +83,8 @@ or attendee identity.
 | Publish event | No | No | No | Yes | Emergency/enforcement only | Recent auth, recovery code, readiness gates |
 | Apply published boundary/schedule revision | No | No | Yes | Yes | Elevated intervention | Impact preview and artifact readiness; date changes may require reconfirmation |
 | Change visibility before activation | No | No | Yes | Yes | Elevated intervention | Seller reconfirmation for unlisted-to-public after joining |
+| Read the event's visitor link | No | Yes | Yes | Yes | Elevated intervention | Event team only; the key is a 128-bit capability for unlisted events |
+| Rotate unlisted visitor link | No | No | No | Yes | Elevated intervention | Recent auth; before activation, or with a safety reason while active; old URL answers `410` with no redirect |
 | Postpone event | No | No | Yes | Yes | Yes | Recent auth, public reason, urgent unpublication |
 | End active event early | No | No | Yes | Yes | Yes | Urgent expiry/tombstone path |
 | Cancel published event | No | No | No | Yes | Yes | Recent auth; locations unpublished first |

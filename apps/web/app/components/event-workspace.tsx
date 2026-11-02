@@ -8,6 +8,7 @@ import { EventControls } from "./event-controls";
 import { EventDetailsEditor } from "./event-details-editor";
 import { EventDuplicate } from "./event-duplicate";
 import { EventLifecycle } from "./event-lifecycle";
+import { EventPublicLink } from "./event-public-link";
 import { EventSellers } from "./event-sellers";
 import { EventTeam } from "./event-team";
 import { PublicationReadiness } from "./publication-readiness";
@@ -257,6 +258,7 @@ function EventWorkspaceContent({
             onSaved={loadDashboard}
           />
           <EventLifecycle event={event} locale={locale} onChanged={loadDashboard} />
+          <EventPublicLink event={event} locale={locale} onChanged={loadDashboard} />
           {event.state === "draft" ? (
             <PublicationReadiness event={event} locale={locale} onPublished={loadDashboard} />
           ) : null}

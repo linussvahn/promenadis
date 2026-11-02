@@ -21,6 +21,9 @@ export function Welcome() {
         </a>
 
         <nav className="header-actions" aria-label={translate(locale, "app.name")}>
+          <a className="header-action" href="/discover">
+            {translate(locale, "nav.discover")}
+          </a>
           <a className="header-action" href="/sign-in">
             {translate(locale, "nav.signIn")}
           </a>
@@ -37,6 +40,11 @@ export function Welcome() {
             <p className="eyebrow">{translate(locale, "home.eyebrow")}</p>
             <h1 id="hero-title">{translate(locale, "home.title")}</h1>
             <p className="lede">{translate(locale, "home.intro")}</p>
+            <p>
+              <a className="button" href="/discover">
+                {translate(locale, "home.discover")}
+              </a>
+            </p>
           </div>
 
           <div className="route-illustration" aria-hidden="true">

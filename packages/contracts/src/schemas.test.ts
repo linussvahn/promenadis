@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  publicEventSummarySchema,
   attestEventPublicationRequestSchema,
   createDraftEventRequestSchema,
   deleteDraftEventRequestSchema,
@@ -319,5 +320,41 @@ describe("boundary contracts", () => {
         },
       }).success,
     ).toBe(false);
+  });
+
+  it("public event summaries reject any field outside the allowlist", () => {
+    const summary = {
+      areaLabel: "Södermalm",
+      description: "",
+      indexable: true,
+      intervals: [{ endsAt: "2031-09-09T13:00:00+00:00", startsAt: "2031-09-09T08:00:00+00:00" }],
+      organizer: {
+        displayName: "Club",
+        locality: null,
+        publicKey: "a".repeat(24),
+        verified: false,
+      },
+      originalStartsAt: null,
+      publicKey: "b".repeat(32),
+      publicNotice: null,
+      state: "published",
+      timezone: "Europe/Stockholm",
+      title: "Walk",
+      updatedAt: "2031-09-01T08:00:00+00:00",
+      visibility: "public",
+    };
+    expect(publicEventSummarySchema.safeParse(summary).success).toBe(true);
+    expect(
+      publicEventSummarySchema.safeParse({ ...summary, id: crypto.randomUUID() }).success,
+    ).toBe(false);
+    expect(
+      publicEventSummarySchema.safeParse({
+        ...summary,
+        organizer: { ...summary.organizer, createdByAccountId: crypto.randomUUID() },
+      }).success,
+    ).toBe(false);
+    expect(publicEventSummarySchema.safeParse({ ...summary, publicKey: "short" }).success).toBe(
+      false,
+    );
   });
 });

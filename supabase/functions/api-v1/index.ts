@@ -1,109 +1,115 @@
 import { createClient } from "@supabase/supabase-js";
-import { createBrowserSessionGateway } from "./browser-sessions.ts";
-import { configuredGeocoder, normalizedGeocodeKey } from "./geocoder.ts";
-import { sessionFromVerifiedAccessToken } from "../../../packages/domain/src/auth-session.ts";
-import { normalizeOrganizationNumber } from "../../../packages/domain/src/organization-number.ts";
 import {
   acceptEventTeamInviteRequestSchema,
-  accountProfileSchema,
   accountDeletionStatusSchema,
-  adminElevationRequestSchema,
-  adminEventInterventionRequestSchema,
-  applyToEventRequestSchema,
-  confirmRescheduleRequestSchema,
-  postponeEventRequestSchema,
-  rescheduleEventRequestSchema,
-  adminAccountSchema,
-  adminApprovalsSchema,
-  adminCasesSchema,
-  adminFindAccountRequestSchema,
-  adminReasonRequestSchema,
-  appealQueueSchema,
-  decideAdminApprovalRequestSchema,
-  decideAppealRequestSchema,
-  incomingSellerInvitesSchema,
-  inviteSellerRequestSchema,
-  reportContactSchema,
-  restrictionLiftResultSchema,
-  sellerInvitesSchema,
-  submitAppealRequestSchema,
-  moderateParticipationRequestSchema,
-  moderationCasesSchema,
-  myModerationSchema,
-  reviewCaseRequestSchema,
-  submitReportRequestSchema,
-  eventTaxonomySchema,
-  saveEventTaxonomyRequestSchema,
-  saveSellerListingRequestSchema,
-  sellerListingSchema,
-  setLiveStatusRequestSchema,
-  changeParticipationAddressRequestSchema,
-  geocodeRequestSchema,
-  geocodeResultSchema,
-  locationReviewRequestSchema,
-  pinCorrectionRequestSchema,
-  decideSellerRequestSchema,
-  eventForSellerSchema,
-  eventSellersSchema,
-  myParticipationsSchema,
-  participationVersionRequestSchema,
-  sellerParticipationSchema,
-  updateEventAdmissionRequestSchema,
-  adminEventSummarySchema,
-  duplicateEventRequestSchema,
-  eventDetailsResultSchema,
-  organizerProfileDetailsSchema,
-  updateDraftEventDetailsRequestSchema,
-  updateOrganizerProfileRequestSchema,
-  decideOrganizerVerificationSchema,
-  organizerVerificationQueueSchema,
-  organizerVerificationStatusSchema,
-  requestOrganizerVerificationSchema,
-  cancelEventRequestSchema,
-  eventLifecycleResultSchema,
-  publishEventRequestSchema,
-  adminStatusSchema,
-  decideFirstEventReviewSchema,
-  firstEventReviewQueueSchema,
-  firstEventReviewStatusSchema,
-  requestFirstEventReviewSchema,
-  mfaStatusSchema,
-  totpEnrollmentSchema,
+  accountProfileSchema,
   accountRecoveryClaimSchema,
   accountRecoveryCompletionSchema,
   accountRecoveryStatusSchema,
   accountRecoveryTokenRequestSchema,
+  adminAccountSchema,
+  adminApprovalsSchema,
+  adminCasesSchema,
+  adminElevationRequestSchema,
+  adminEventInterventionRequestSchema,
+  adminEventSummarySchema,
+  adminFindAccountRequestSchema,
+  adminReasonRequestSchema,
+  adminStatusSchema,
+  appealQueueSchema,
+  applyToEventRequestSchema,
   attestEventPublicationRequestSchema,
+  cancelEventRequestSchema,
+  changeParticipationAddressRequestSchema,
   commandResourceResponseSchema,
+  confirmRescheduleRequestSchema,
   createDraftEventRequestSchema,
   createOrganizerProfileRequestSchema,
+  decideAdminApprovalRequestSchema,
+  decideAppealRequestSchema,
+  decideFirstEventReviewSchema,
+  decideOrganizerVerificationSchema,
+  decideSellerRequestSchema,
   deleteDraftEventRequestSchema,
+  duplicateEventRequestSchema,
   enrollRecoveryCodeRequestSchema,
   eventBoundarySummarySchema,
   eventControlSummarySchema,
+  eventDetailsResultSchema,
+  eventForSellerSchema,
+  eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
+  eventPublicLinkSchema,
   eventRegistrationSummarySchema,
+  eventSellersSchema,
+  eventTaxonomySchema,
   eventTeamSummarySchema,
   eventTeamVersionRequestSchema,
+  firstEventReviewQueueSchema,
+  firstEventReviewStatusSchema,
+  geocodeRequestSchema,
+  geocodeResultSchema,
   identityDashboardSchema,
   incomingEventTeamInvitesSchema,
   incomingOrganizerInvitesSchema,
+  incomingSellerInvitesSchema,
   initiateAccountRecoveryRequestSchema,
-  requestAccountDeletionRequestSchema,
   initiateAccountRecoveryResponseSchema,
   initiateEventOwnershipTransferRequestSchema,
   inviteEventTeamMemberRequestSchema,
   inviteOrganizerManagerRequestSchema,
+  inviteSellerRequestSchema,
+  locationReviewRequestSchema,
+  mfaStatusSchema,
+  moderateParticipationRequestSchema,
+  moderationCasesSchema,
+  myModerationSchema,
+  myParticipationsSchema,
+  organizerProfileDetailsSchema,
   organizerTeamSummarySchema,
+  organizerVerificationQueueSchema,
+  organizerVerificationStatusSchema,
+  participationVersionRequestSchema,
+  pinCorrectionRequestSchema,
+  postponeEventRequestSchema,
+  publicEventListSchema,
+  publicEventSummarySchema,
+  publicOrganizerPageSchema,
+  publicSitemapSchema,
+  publishEventRequestSchema,
   readinessResponseSchema,
   recoveryCodeEnrollmentResponseSchema,
+  reportContactSchema,
+  requestAccountDeletionRequestSchema,
+  requestFirstEventReviewSchema,
+  requestOrganizerVerificationSchema,
+  rescheduleEventRequestSchema,
+  restrictionLiftResultSchema,
+  reviewCaseRequestSchema,
+  rotateUnlistedLinkRequestSchema,
   saveEventBoundaryRequestSchema,
   saveEventRegistrationRequestSchema,
+  saveEventTaxonomyRequestSchema,
+  saveSellerListingRequestSchema,
+  sellerInvitesSchema,
+  sellerListingSchema,
+  sellerParticipationSchema,
   setEmergencySuccessorRequestSchema,
+  setLiveStatusRequestSchema,
+  submitAppealRequestSchema,
+  submitReportRequestSchema,
+  totpEnrollmentSchema,
+  updateDraftEventDetailsRequestSchema,
   updateDraftEventVisibilityRequestSchema,
+  updateEventAdmissionRequestSchema,
   updateEventTeamMemberRoleRequestSchema,
+  updateOrganizerProfileRequestSchema,
   updateProfileRequestSchema,
 } from "../../../packages/contracts/src/schemas.ts";
+import { sessionFromVerifiedAccessToken } from "../../../packages/domain/src/auth-session.ts";
+import { normalizeOrganizationNumber } from "../../../packages/domain/src/organization-number.ts";
+import { createBrowserSessionGateway } from "./browser-sessions.ts";
+import { configuredGeocoder, normalizedGeocodeKey } from "./geocoder.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -149,6 +155,28 @@ function json(
       "x-content-type-options": "nosniff",
     },
   });
+}
+
+const noIndex = "noindex, nofollow, nosnippet, noimageindex";
+
+// Anonymous public reads: short shared caching; unlisted resources are never
+// indexed and never leak their URL through the referrer.
+function publicJson(
+  body: unknown,
+  correlationId: string,
+  origin: string | null,
+  options: { readonly unlisted?: boolean } = {},
+): Response {
+  const response = json(body, 200, correlationId, origin);
+  response.headers.set(
+    "cache-control",
+    options.unlisted ? "private, max-age=60" : "public, max-age=60, stale-while-revalidate=60",
+  );
+  if (options.unlisted) {
+    response.headers.set("x-robots-tag", noIndex);
+    response.headers.set("referrer-policy", "no-referrer");
+  }
+  return response;
 }
 
 function apiError(
@@ -742,6 +770,74 @@ Deno.serve(async (request) => {
       }
       status = outcome === "dispatching" ? "degraded" : "denied";
       return outcome === "dispatching" ? finishing() : unavailable();
+    }
+
+    if (request.method === "GET" && route.startsWith("/public/")) {
+      const notFound = () =>
+        apiError("not_found", "This page does not exist.", 404, correlationId, origin);
+      const gone = () =>
+        apiError("gone", "This page is no longer available.", 410, correlationId, origin);
+      const landing = route.match(/^\/public\/(events|unlisted)\/([0-9a-f]{32})$/u);
+      if (landing) {
+        operation = "public.event_landing";
+        const { data, error } = await admin.rpc("public_event_landing_command", {
+          p_key: landing[2],
+          p_route: landing[1] === "events" ? "public" : "unlisted",
+        });
+        if (error) throw error;
+        status = "succeeded";
+        if (data?.status === "gone") return gone();
+        if (data?.status !== "ok") return notFound();
+        return publicJson(publicEventSummarySchema.parse(data.event), correlationId, origin, {
+          unlisted: landing[1] === "unlisted",
+        });
+      }
+      if (route === "/public/events") {
+        operation = "public.event_discovery";
+        const params = new URL(request.url).searchParams;
+        const query = params.get("q") ?? "";
+        const after = params.get("after");
+        const [afterStartsAt, afterId] = after ? after.split("_") : [null, null];
+        const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+        if (
+          query.length > 100 ||
+          (after &&
+            (!afterId || !uuid.test(afterId) || Number.isNaN(Date.parse(afterStartsAt ?? ""))))
+        ) {
+          status = "denied";
+          return apiError("invalid_request", "Check the search.", 400, correlationId, origin);
+        }
+        const { data, error } = await admin.rpc("public_list_events_command", {
+          p_after_id: afterId,
+          p_after_starts_at: afterStartsAt,
+          p_limit: 20,
+          p_live_only: params.get("live") === "1",
+          p_query: query,
+        });
+        if (error) throw error;
+        status = "succeeded";
+        return publicJson(publicEventListSchema.parse(data), correlationId, origin);
+      }
+      const organizerPage = route.match(/^\/public\/organizers\/([0-9a-f]{24})$/u);
+      if (organizerPage) {
+        operation = "public.organizer_page";
+        const { data, error } = await admin.rpc("public_organizer_page_command", {
+          p_key: organizerPage[1],
+        });
+        if (error) throw error;
+        status = "succeeded";
+        if (data?.status !== "ok") return notFound();
+        return publicJson(publicOrganizerPageSchema.parse(data.organizer), correlationId, origin);
+      }
+      if (route === "/public/sitemap") {
+        operation = "public.sitemap";
+        const { data, error } = await admin.rpc("public_sitemap_command");
+        if (error) throw error;
+        status = "succeeded";
+        return publicJson(publicSitemapSchema.parse(data), correlationId, origin);
+      }
+      status = "denied";
+      return notFound();
     }
 
     if (route === "/reports" && request.method === "POST") {
@@ -1658,6 +1754,67 @@ Deno.serve(async (request) => {
       if (!parsed.success) throw new Error("invalid_internal_response");
       status = "succeeded";
       return json(parsed.data, 200, correlationId, origin);
+    }
+
+    const publicLinkRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(public-link|unlisted-link\/rotate)$/iu,
+    );
+    if (publicLinkRoute && (request.method === "GET" || request.method === "POST")) {
+      const [, eventId, action] = publicLinkRoute;
+      const rotating = action !== "public-link";
+      if (rotating !== (request.method === "POST")) {
+        status = "denied";
+        return apiError("not_found", "Route not found.", 404, correlationId, origin);
+      }
+      operation = rotating ? "event.unlisted_link_rotate" : "event.public_link_read";
+      const input = rotating
+        ? rotateUnlistedLinkRequestSchema.safeParse(await requestBody(request))
+        : null;
+      if (input && !input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Check the request.", 400, correlationId, origin);
+      }
+      const { data, error } = input?.success
+        ? await admin.rpc("rotate_unlisted_link_command", {
+            p_actor_id: actorId,
+            p_authenticated_at: actor.authenticatedAt,
+            p_correlation_id: correlationId,
+            p_event_id: eventId,
+            p_expected_event_version: input.data.expectedEventVersion,
+            p_safety_reason: input.data.safetyReason ?? null,
+          })
+        : await admin.rpc("get_event_public_link_command", {
+            p_actor_id: actorId,
+            p_event_id: eventId,
+          });
+      if (error) {
+        const mapped = new Map<string, [string, string, number]>([
+          [
+            "Actor is not an event team member",
+            ["forbidden", "You are not on this event team.", 403],
+          ],
+          [
+            "Only the event owner can rotate the link",
+            ["forbidden", "Only the owner can change the link.", 403],
+          ],
+          ["Recent authentication required", ["recent_auth_required", "Sign in again first.", 403]],
+          ["Event version conflict", ["version_conflict", "The event changed. Reload.", 409]],
+          [
+            "Only unlisted links can be rotated",
+            ["invalid_state", "Only unlisted links can be changed.", 409],
+          ],
+          [
+            "This link can no longer be rotated",
+            ["invalid_state", "This link can no longer be changed.", 409],
+          ],
+          ["Safety reason required", ["invalid_request", "Give the safety reason.", 400]],
+        ]).get(error.message);
+        if (!mapped) throw error;
+        status = "denied";
+        return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+      }
+      status = "succeeded";
+      return json(eventPublicLinkSchema.parse(data), 200, correlationId, origin);
     }
 
     const lifecycleRoute = route.match(

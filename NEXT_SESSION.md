@@ -1,6 +1,6 @@
 # Promenadis implementation handoff
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
 ## How to resume
 
@@ -455,6 +455,47 @@ Treat those documents as canonical rather than relying on chat memory.
   and contract artifacts are current.
 
 ## Recommended next work
+
+### Milestone 3 plan and slice 1 (2026-11-04)
+
+Plan: (1) public pages, discovery, organizer pages, sitemap; (2) snapshot,
+manifest and coordinate-free safety feed with urgent invalidation, opening
+the `public_delivery_not_ready` gate; (3) public map plus equivalent list,
+bilingual seller search/filter, status and cluster hints. Publication stays
+blocked on `routing_not_ready` until Milestone 4, so e2e fixtures still set
+`published` directly.
+
+Slice 1, `20261104000100_public_pages.sql`:
+
+- Every event has `public_key` (128 random bits, hex). A public event is
+  served at `/e/{key}`, an unlisted one at `/u/{key}`; a key never resolves
+  on the other path (`404`). A visibility change or an owner rotation moves
+  the old key to `retired_event_keys`, which answers `410` without redirect.
+  Deleting a once-published event also retires its key.
+- Organizers have `public_key` (96 bits). `/o/{key}` exists only while the
+  organizer has public, non-archived history; unlisted events never link it.
+- Service-only reads: `public_event_landing_command`,
+  `public_list_events_command` (public; published/active/postponed/cancelled;
+  every word must match title, description, organizer, locality or area;
+  keyset cursor), `public_organizer_page_command`, `public_sitemap_command`.
+  `app_private.public_event_summary` is the single field allowlist; archived
+  events return a minimal non-indexable shell.
+- Team: `get_event_public_link_command`; owner-only
+  `rotate_unlisted_link_command` (recent auth; a safety reason while active).
+  Rotation notices to participants wait for Milestone 5 mail.
+- BFF: anonymous `GET /public/events`, `/public/events/{key}`,
+  `/public/unlisted/{key}`, `/public/organizers/{key}`, `/public/sitemap`
+  before the auth gate (60 s shared cache; unlisted adds `X-Robots-Tag` and
+  `Referrer-Policy: no-referrer`, private cache). The browser gateway passes
+  `/public/*` GETs through anonymously. Team routes `GET
+  /events/{id}/public-link`, `POST /events/{id}/unlisted-link/rotate`.
+- Web (SSR loaders call the BFF directly): `/discover`, `/e/:key`,
+  `/u/:key`, `/o/:key`, `/sitemap.xml`, `/robots.txt`. Public landing pages
+  have a self-canonical link, Open Graph and allowlisted JSON-LD; unlisted
+  pages have a sanitized preview and no-index. Root error page handles `410`.
+  The workspace shows a "Visitor link" panel with copy and owner rotation.
+- Not yet: CDN-edge header verification and a configured canonical site origin
+  (hosted alpha); rate limits on anonymous search rely on caching for now.
 
 ### Milestone 2 complete locally (2026-11-03)
 

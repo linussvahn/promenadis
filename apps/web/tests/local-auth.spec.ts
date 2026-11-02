@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { type APIRequestContext, type Page, expect, test } from "@playwright/test";
+import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
 const localAuthEnabled = process.env.PROMENADIS_LOCAL_AUTH_E2E === "1";
@@ -1639,6 +1639,124 @@ test("postponement asks sellers to reconfirm and seller data is erased after the
     expect(localSql("select (public.retention_health_command()->>'stale');")).toBe("false");
   } finally {
     for (const email of emails) await deleteSyntheticAccount(email);
+  }
+});
+
+test("public and unlisted landing pages, discovery, sitemap and replaced links", async ({
+  page,
+  request,
+}) => {
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const email = `public-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const { error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password,
+  });
+  if (createError) throw createError;
+  const client = createClient(localStatus.API_URL, publicKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data } = await client.auth.signInWithPassword({ email, password });
+  const headers = {
+    apikey: publicKey,
+    authorization: `Bearer ${data.session?.access_token}`,
+    origin: "http://127.0.0.1:5173",
+  };
+  const marker = randomUUID().slice(0, 8);
+  const createEvent = async (title: string, visibility: "public" | "unlisted") => {
+    const response = await request.post(`${base}/events`, {
+      headers,
+      data: {
+        description: `Synthetic landing fixture ${marker}`,
+        endsAt: "2031-09-20T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: `Synthetic organizer ${marker}`,
+        startsAt: "2031-09-20T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title,
+        visibility,
+      },
+    });
+    expect(response.status()).toBe(201);
+    return (await response.json()).id as string;
+  };
+  const link = async (eventId: string) =>
+    (await (await request.get(`${base}/events/${eventId}/public-link`, { headers })).json()) as {
+      publicKey: string;
+      version: number;
+    };
+  try {
+    const publicId = await createEvent(`Synthetic public walk ${marker}`, "public");
+    const unlistedId = await createEvent(`Synthetic unlisted walk ${marker}`, "unlisted");
+    const publicLink = await link(publicId);
+    expect((await page.goto(`/e/${publicLink.publicKey}`))?.status()).toBe(404);
+
+    // Fixture only: routing is not built yet, so publication is set directly.
+    localSql(
+      `update public.events set state='published' where id in ('${publicId}','${unlistedId}');`,
+    );
+    const landing = await page.goto(`/e/${publicLink.publicKey}`);
+    expect(landing?.status()).toBe(200);
+    expect(landing?.headers()["x-robots-tag"]).toBeUndefined();
+    await expect(
+      page.getByRole("heading", { name: `Synthetic public walk ${marker}` }),
+    ).toBeVisible();
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      `http://127.0.0.1:5173/e/${publicLink.publicKey}`,
+    );
+
+    await page.goto(`/discover?q=${marker}`);
+    await expect(
+      page.getByRole("heading", { name: `Synthetic public walk ${marker}` }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: `Synthetic unlisted walk ${marker}` }),
+    ).toHaveCount(0);
+    const sitemap = await (await request.get("/sitemap.xml")).text();
+    expect(sitemap).toContain(`/e/${publicLink.publicKey}`);
+
+    const unlistedLink = await link(unlistedId);
+    expect(sitemap).not.toContain(unlistedLink.publicKey);
+    expect((await page.goto(`/e/${unlistedLink.publicKey}`))?.status()).toBe(404);
+    const unlisted = await page.goto(`/u/${unlistedLink.publicKey}`);
+    expect(unlisted?.headers()["x-robots-tag"]).toBe("noindex, nofollow, nosnippet, noimageindex");
+    expect(unlisted?.headers()["referrer-policy"]).toBe("no-referrer");
+    await expect(page.getByText(/Alla som har länken kan se det/u)).toBeVisible();
+
+    const rotated = await request.post(`${base}/events/${unlistedId}/unlisted-link/rotate`, {
+      headers,
+      data: { expectedEventVersion: unlistedLink.version },
+    });
+    expect(rotated.status()).toBe(200);
+    const replaced = (await rotated.json()).publicKey as string;
+    expect((await page.goto(`/u/${unlistedLink.publicKey}`))?.status()).toBe(410);
+    await expect(page.getByRole("heading", { name: "Sidan finns inte längre" })).toBeVisible();
+    expect((await page.goto(`/u/${replaced}`))?.status()).toBe(200);
+
+    // A public link cannot be replaced; cancellation keeps a sanitized notice.
+    const refused = await request.post(`${base}/events/${publicId}/unlisted-link/rotate`, {
+      headers,
+      data: { expectedEventVersion: publicLink.version + 1 },
+    });
+    expect(refused.status()).toBe(409);
+    const cancelled = await request.post(`${base}/events/${publicId}/cancel`, {
+      headers,
+      data: {
+        confirmTitle: `Synthetic public walk ${marker}`,
+        expectedEventVersion: (await link(publicId)).version,
+        publicReason: "Storm warning",
+      },
+    });
+    expect(cancelled.status()).toBe(200);
+    await page.goto(`/e/${publicLink.publicKey}`);
+    await expect(page.getByRole("status")).toContainText("Storm warning");
+  } finally {
+    await deleteSyntheticAccount(email);
   }
 });
 

@@ -1640,3 +1640,27 @@ select:disabled {
   font-weight: 600;
   margin-bottom: 0.25rem;
 }
+
+/* Public pages: discovery, landing and organizer pages. */
+.public-event,
+.public-discovery,
+.public-organizer {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.discovery-search {
+  max-width: none;
+}
+
+.public-interval {
+  display: block;
+}
+
+.verified-badge {
+  margin-inline-start: 0.5rem;
+}
+
+.public-link-url {
+  overflow-wrap: anywhere;
+}

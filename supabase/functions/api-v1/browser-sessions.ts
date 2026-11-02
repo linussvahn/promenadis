@@ -339,12 +339,13 @@ export function createBrowserSessionGateway(config: {
           await release(pending, "pending", lease);
         }
       }
-      // Recovery and reports remain public but keep the same-origin/CSRF boundary.
-      // Reports are anonymous by design: never attach the signed-in session.
+      // Recovery, reports and public pages remain public but keep the same-origin/CSRF
+      // boundary. They are anonymous by design: never attach the signed-in session.
       if (
         path === "/account-recovery" ||
         path.startsWith("/account-recovery/") ||
-        (path === "/reports" && request.method === "POST")
+        (path === "/reports" && request.method === "POST") ||
+        (path.startsWith("/public/") && request.method === "GET")
       ) {
         const cleaned = new Headers(request.headers);
         cleaned.delete("authorization");

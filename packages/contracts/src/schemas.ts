@@ -1394,7 +1394,79 @@ export const queueEnvelopeSchema = z.strictObject({
 
 export type QueueEnvelope = z.infer<typeof queueEnvelopeSchema>;
 
+// Public pages: sanitized event-level fields only. Never seller, location,
+// account or moderation data.
+const publicEventKey = z.string().regex(/^[0-9a-f]{32}$/u);
+const publicOrganizerKey = z.string().regex(/^[0-9a-f]{24}$/u);
+
+export const publicEventSummarySchema = z.strictObject({
+  areaLabel: z.string().max(120).nullable(),
+  description: z.string().max(4000),
+  firstStartsAt: isoInstant.optional(),
+  indexable: z.boolean(),
+  intervals: z.array(z.strictObject({ endsAt: isoInstant, startsAt: isoInstant })).max(14),
+  organizer: z.strictObject({
+    displayName: z.string().min(1).max(160),
+    locality: z.string().max(120).nullable(),
+    publicKey: publicOrganizerKey.nullable(),
+    verified: z.boolean(),
+  }),
+  originalStartsAt: isoInstant.nullable(),
+  publicKey: publicEventKey,
+  publicNotice: z.string().max(500).nullable(),
+  state: z.enum(["published", "active", "postponed", "ended", "cancelled", "archived"]),
+  timezone: z.string().min(1).max(64),
+  title: z.string().min(1).max(160),
+  updatedAt: isoInstant,
+  visibility: z.enum(["public", "unlisted"]),
+});
+export type PublicEventSummary = z.infer<typeof publicEventSummarySchema>;
+
+export const publicEventListSchema = z.strictObject({
+  events: z.array(publicEventSummarySchema).max(50),
+  nextCursor: z.strictObject({ afterId: opaqueUuid, afterStartsAt: isoInstant }).nullable(),
+});
+export type PublicEventList = z.infer<typeof publicEventListSchema>;
+
+export const publicOrganizerPageSchema = z.strictObject({
+  displayName: z.string().min(1).max(160),
+  events: z.array(publicEventSummarySchema).max(500),
+  locality: z.string().max(120).nullable(),
+  publicKey: publicOrganizerKey,
+  verified: z.boolean(),
+  website: z.string().max(500).nullable(),
+});
+export type PublicOrganizerPage = z.infer<typeof publicOrganizerPageSchema>;
+
+export const publicSitemapSchema = z.strictObject({
+  events: z.array(z.strictObject({ publicKey: publicEventKey, updatedAt: isoInstant })),
+  organizers: z.array(z.strictObject({ publicKey: publicOrganizerKey, updatedAt: isoInstant })),
+});
+export type PublicSitemap = z.infer<typeof publicSitemapSchema>;
+
+export const eventPublicLinkSchema = z.strictObject({
+  eventId: opaqueUuid,
+  live: z.boolean(),
+  publicKey: publicEventKey,
+  state: eventStateSchema,
+  version: z.number().int().positive(),
+  visibility: z.enum(["public", "unlisted"]),
+});
+export type EventPublicLink = z.infer<typeof eventPublicLinkSchema>;
+
+export const rotateUnlistedLinkRequestSchema = z.strictObject({
+  expectedEventVersion: z.number().int().positive(),
+  safetyReason: z.string().trim().max(500).optional(),
+});
+export type RotateUnlistedLinkRequest = z.infer<typeof rotateUnlistedLinkRequestSchema>;
+
 export const boundarySchemas = {
+  EventPublicLink: eventPublicLinkSchema,
+  PublicEventList: publicEventListSchema,
+  PublicEventSummary: publicEventSummarySchema,
+  PublicOrganizerPage: publicOrganizerPageSchema,
+  PublicSitemap: publicSitemapSchema,
+  RotateUnlistedLinkRequest: rotateUnlistedLinkRequestSchema,
   BrowserSessionResponse: browserSessionResponseSchema,
   BrowserOtpStart: browserOtpStartSchema,
   BrowserOtpVerify: browserOtpVerifySchema,
