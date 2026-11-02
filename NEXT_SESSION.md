@@ -456,6 +456,36 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Milestone 4 complete locally (2026-11-05)
+
+All three slices are built, tested and pushed. Left for later: real iPhone
+and Android hardware plus installed-PWA testing, quota/eviction on devices
+and service-worker updates during a walk (Milestone 6); the hosted weekly
+Geofabrik source and pinned compiler container (pilot gate); signed-in route
+sync (deferred: spec allows only chosen stops and progress, deleted within
+24 h after the event); an accuracy circle drawn on the map (today the
+accuracy is shown as text). Next: Milestone 5 (operations).
+
+Slice 3 (no migration):
+
+- `app/lib/geolocation.ts`: `requestPosition` (standard accuracy, 10 s,
+  60 s maximum age), `locationPermissionState` (wording only),
+  `useWatchedPosition` (high accuracy, cleared on hidden/end/unmount).
+  The planner's "My location" start keeps the point in memory only and
+  refuses fixes worse than 100 m.
+- `app/lib/offline-store.ts`: IndexedDB copies per event (manifest,
+  snapshot, feed, package), `planEviction` (50 MiB LRU, pinned active walk
+  never evicted), `isUsable` (hard expiry), `resetOfflineData` (copies,
+  saved routes, caches). The map hook admits an event when a walk starts,
+  keeps the copy fresh while it runs, unpins at the end, falls back to the
+  copy when fetches fail (banner with last refresh) and revalidates on
+  `online`.
+- `app/entry.server.tsx` (revealed default) adds
+  `Permissions-Policy: geolocation=(self), camera=(), microphone=()`.
+- `public/sw.js` v2: shell, built-asset and public-page caches (HTML only,
+  no data); `register-sw.js` offers updates in a dismissible notice and
+  reloads only after the visitor accepts.
+
 ### Milestone 4 plan and slice 1 (2026-11-05)
 
 Plan: (1) walking-network builds, host preview, overrides and the

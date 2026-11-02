@@ -3,6 +3,12 @@ import { type Locale, translate } from "@promenadis/i18n";
 import { MAX_ROUTE_STOPS, type Pace, visitMinutes } from "@promenadis/routing";
 import { useState } from "react";
 import type { ComputedPlan, ComputeResult } from "../lib/route-compute";
+import {
+  locationPermissionState,
+  MAX_START_ACCURACY_METERS,
+  type PositionResult,
+  requestPosition,
+} from "../lib/geolocation";
 import { planRoute } from "../lib/route-planner";
 import {
   clearRoute,
@@ -31,17 +37,27 @@ function clock(locale: Locale, time: number, timeZone: string) {
 export function RoutePlanner({
   blockedEdgeIds,
   graphVersion,
+  livePosition,
   locale,
+  locationStart,
   onChange,
+  onLocationStart,
+  onShowPosition,
   pkg,
   route,
+  showPosition,
   snapshot,
   stops,
 }: {
   readonly blockedEdgeIds: readonly string[];
   readonly graphVersion: string | null;
+  readonly livePosition: PositionResult | null;
   readonly locale: Locale;
+  readonly locationStart: readonly [number, number] | null;
   readonly onChange: (route: SavedRoute) => void;
+  readonly onLocationStart: (point: readonly [number, number] | null) => void;
+  readonly onShowPosition: (on: boolean) => void;
+  readonly showPosition: boolean;
   readonly pkg: RoutingPackageContract | null;
   readonly route: SavedRoute;
   readonly snapshot: PublicSnapshot;
@@ -50,6 +66,30 @@ export function RoutePlanner({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ComputeResult | null>(null);
   const [failed, setFailed] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationNote, setLocationNote] = useState("");
+  const locate = async () => {
+    setLocating(true);
+    setLocationNote("");
+    const result = await requestPosition();
+    setLocating(false);
+    if (result.kind === "ok" && result.accuracy <= MAX_START_ACCURACY_METERS) {
+      onLocationStart(result.point);
+      setLocationNote(`${translate(locale, "location.found")} ± ${result.accuracy} m`);
+      return;
+    }
+    onLocationStart(null);
+    if (result.kind === "ok") {
+      setLocationNote(`${translate(locale, "location.inaccurate")} (± ${result.accuracy} m)`);
+    } else if (result.kind === "denied") {
+      const state = await locationPermissionState();
+      setLocationNote(
+        translate(locale, state === "denied" ? "location.blocked" : "location.denied"),
+      );
+    } else {
+      setLocationNote(translate(locale, `location.${result.kind}`));
+    }
+  };
   const selected = new Set(route.selected);
   const selectedStops = stops.filter((stop) =>
     stop.sellers.some((seller) => selected.has(seller.id)),
@@ -67,14 +107,16 @@ export function RoutePlanner({
       const startStop =
         preferences.startKind === "stop" ? stopById.get(preferences.startStopId ?? "") : null;
       const start =
-        preferences.startKind === "map"
-          ? preferences.startPoint
-          : startStop
-            ? ([
-                startStop.entrance?.longitude ?? startStop.longitude,
-                startStop.entrance?.latitude ?? startStop.latitude,
-              ] as const)
-            : null;
+        preferences.startKind === "location"
+          ? locationStart
+          : preferences.startKind === "map"
+            ? preferences.startPoint
+            : startStop
+              ? ([
+                  startStop.entrance?.longitude ?? startStop.longitude,
+                  startStop.entrance?.latitude ?? startStop.latitude,
+                ] as const)
+              : null;
       const computed = await planRoute({
         blockedEdgeIds,
         includeUnreachable: route.includeUnreachable,
@@ -199,7 +241,7 @@ export function RoutePlanner({
             onChange={(event) => {
               const value = event.currentTarget.value;
               update(
-                value === "none" || value === "map"
+                value === "none" || value === "map" || value === "location"
                   ? { startKind: value, startStopId: null }
                   : { startKind: "stop", startStopId: value },
               );
@@ -212,6 +254,7 @@ export function RoutePlanner({
           >
             <option value="none">{translate(locale, "route.start.none")}</option>
             <option value="map">{translate(locale, "route.start.map")}</option>
+            <option value="location">{translate(locale, "route.start.location")}</option>
             {selectedStops.map((stop) => (
               <option key={stop.id} value={stop.id}>
                 {translate(locale, "map.stop")} {stop.number}
@@ -224,6 +267,22 @@ export function RoutePlanner({
                 ? translate(locale, "route.start.picked")
                 : translate(locale, "route.start.pickHint")}
             </p>
+          ) : null}
+          {preferences.startKind === "location" ? (
+            <div>
+              <p className="field-hint">{translate(locale, "location.purpose")}</p>
+              <button
+                className="secondary-button"
+                disabled={locating}
+                onClick={() => void locate()}
+                type="button"
+              >
+                {translate(locale, locationStart ? "location.retry" : "location.use")}
+              </button>
+              <p aria-live="polite" role="status">
+                {locating ? translate(locale, "location.locating") : locationNote}
+              </p>
+            </div>
           ) : null}
           {preferences.startKind === "none" ? (
             <p className="field-hint">{translate(locale, "route.start.noneHint")}</p>
@@ -318,6 +377,27 @@ export function RoutePlanner({
         </div>
       ) : null}
 
+      {route.active ? (
+        <div>
+          <label className="checkbox-field">
+            <input
+              checked={showPosition}
+              onChange={(event) => onShowPosition(event.currentTarget.checked)}
+              type="checkbox"
+            />
+            <span>{translate(locale, "location.show")}</span>
+          </label>
+          {showPosition ? (
+            <p aria-live="polite" className="field-hint">
+              {livePosition?.kind === "ok"
+                ? `${translate(locale, "location.you")} ± ${livePosition.accuracy} m`
+                : livePosition
+                  ? translate(locale, `location.${livePosition.kind}`)
+                  : translate(locale, "location.locating")}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {route.plan ? (
         <RouteSteps
           locale={locale}

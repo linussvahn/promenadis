@@ -7,7 +7,8 @@ export interface RoutePreferences {
   readonly mode: "availability" | "shortest";
   readonly pace: Pace;
   readonly returnToStart: boolean;
-  readonly startKind: "none" | "stop" | "map";
+  /** "location" uses an in-memory position that is never stored. */
+  readonly startKind: "none" | "stop" | "map" | "location";
   readonly startPoint: LngLat | null;
   readonly startStopId: string | null;
 }

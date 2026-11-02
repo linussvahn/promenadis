@@ -1848,8 +1848,12 @@ test("visitors search the public map, follow the safety feed and report a stop",
   }
 });
 
-test("hosts build, inspect, correct and approve the walking network", async ({ page, request }) => {
-  test.setTimeout(90_000);
+test("hosts build, inspect, correct and approve the walking network", async ({
+  context,
+  page,
+  request,
+}) => {
+  test.setTimeout(120_000);
   if (!admin || !localStatus) throw new Error("Local test configuration missing");
   const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
   const base = `${localStatus.API_URL}/functions/v1/api-v1`;
@@ -1994,7 +1998,8 @@ test("hosts build, inspect, correct and approve the walking network", async ({ p
     // A visitor plans and starts a walk; progress stays on the device.
     localSql(`update public.events set state='active' where id='${eventId}';
       select app_private.refresh_public_snapshots_command();`);
-    await page.goto(`/e/${eventKey}/map`);
+    const mapResponse = await page.goto(`/e/${eventKey}/map`);
+    expect(mapResponse?.headers()["permissions-policy"]).toContain("geolocation=(self)");
     const addToWalk = page.getByLabel("Lägg till i promenaden");
     await expect(addToWalk).toHaveCount(2);
     await addToWalk.nth(0).check();
@@ -2026,6 +2031,18 @@ test("hosts build, inspect, correct and approve the walking network", async ({ p
     await expect(
       page.getByRole("region", { name: "Planera en promenad" }).getByText(/· Besökt/u),
     ).toBeVisible();
+
+    // Connection loss: the started walk keeps working from the device copy,
+    // clearly marked; reconnecting validates fresh state first.
+    await context.setOffline(true);
+    await expect(page.getByText(/Du är offline/u)).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page
+        .getByRole("region", { name: "Lista över stoppen" })
+        .getByRole("heading", { name: "Stopp 1" }),
+    ).toBeVisible();
+    await context.setOffline(false);
+    await expect(page.getByText(/Du är offline/u)).toHaveCount(0, { timeout: 20_000 });
   } finally {
     await deleteSyntheticAccount(email);
     for (const sellerEmail of sellers) await deleteSyntheticAccount(sellerEmail);

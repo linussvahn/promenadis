@@ -1072,6 +1072,30 @@ const sv = {
   "route.notSaved":
     "Promenaden kunde inte sparas på enheten. Den försvinner om du laddar om sidan.",
   "route.manualAccess": "Nås manuellt enligt arrangören",
+  "route.start.location": "Min position",
+  "location.purpose":
+    "Positionen används bara här i webbläsaren för att räkna sträckan till första stoppet. Den sparas och skickas inte.",
+  "location.use": "Använd min position",
+  "location.retry": "Hämta position igen",
+  "location.locating": "Hämtar position…",
+  "location.found": "Position hittad",
+  "location.inaccurate": "Positionen är för osäker. Försök igen eller välj på kartan",
+  "location.denied":
+    "Du gav inte tillgång till positionen. Välj start på kartan eller vid ett stopp i stället.",
+  "location.blocked":
+    "Positionen är blockerad i webbläsarens inställningar. Välj start på kartan eller vid ett stopp.",
+  "location.unavailable": "Positionen kunde inte hämtas. Välj start på kartan eller vid ett stopp.",
+  "location.timeout":
+    "Det tog för lång tid att hitta positionen. Försök igen eller välj på kartan.",
+  "location.unsupported":
+    "Den här webbläsaren kan inte ge position. Välj start på kartan eller vid ett stopp.",
+  "location.show": "Visa min position på kartan",
+  "location.you": "Du är här",
+  "offline.banner":
+    "Du är offline. Kartan visar senast sparade uppgifter. Nya säkerhetsändringar kan inte kontrolleras, och hämtad information kan inte dras tillbaka.",
+  "offline.refused":
+    "Den här enheten kunde inte spara evenemanget för offline. Promenaden fungerar så länge du har uppkoppling.",
+  "offline.reset": "Rensa sparad data på enheten",
   "nav.discover": "Upptäck",
   "home.discover": "Upptäck evenemang",
   "public.discover.title": "Upptäck evenemang",
@@ -2185,6 +2209,28 @@ const en = {
   "route.startWalk": "Start the walk",
   "route.notSaved": "The walk could not be saved on this device. It will be lost if you reload.",
   "route.manualAccess": "Reached manually, per the organizer",
+  "route.start.location": "My location",
+  "location.purpose":
+    "Your position is used only here in the browser to measure the way to the first stop. It is not saved or sent.",
+  "location.use": "Use my location",
+  "location.retry": "Get my location again",
+  "location.locating": "Finding your position…",
+  "location.found": "Position found",
+  "location.inaccurate": "The position is too uncertain. Try again or pick on the map",
+  "location.denied": "You did not allow location. Pick a start on the map or at a stop instead.",
+  "location.blocked":
+    "Location is blocked in the browser settings. Pick a start on the map or at a stop.",
+  "location.unavailable": "Your position could not be found. Pick a start on the map or at a stop.",
+  "location.timeout": "Finding your position took too long. Try again or pick on the map.",
+  "location.unsupported":
+    "This browser cannot provide a position. Pick a start on the map or at a stop.",
+  "location.show": "Show my position on the map",
+  "location.you": "You are here",
+  "offline.banner":
+    "You are offline. The map shows the last saved details. New safety changes cannot be checked, and downloaded information cannot be withdrawn.",
+  "offline.refused":
+    "This device could not save the event for offline use. The walk works while you are connected.",
+  "offline.reset": "Clear saved data on this device",
   "nav.discover": "Discover",
   "home.discover": "Discover events",
   "public.discover.title": "Discover events",

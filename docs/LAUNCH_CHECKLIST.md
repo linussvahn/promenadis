@@ -220,7 +220,21 @@ per stop or seller, manual reorder with recalculation; route state on the
 device only, expiring with the event; live network changes offered, never
 applied silently) is complete locally: routing graph/order tests,
 route-state tests and the extended e2e "hosts build, inspect, correct and
-approve the walking network".
+approve the walking network". Slice 3 (location only after an explicit
+action with purpose text, 10-second standard fix, retry/manual choice above
+100 m accuracy, denied/blocked/timeout/unavailable handling with the
+Permissions API used only for wording, live position only while the walk
+view is visible, `Permissions-Policy: geolocation=(self)`; offline copy in
+IndexedDB admitted only by starting a walk, 50 MiB LRU with the active walk
+pinned, refusal after hard expiry, offline banner with last refresh,
+reconnect revalidation, "clear saved data" repair; service worker v2 with
+versioned shell/page/asset caches, no data caching, and user-accepted
+updates) is complete locally: offline-store and geolocation tests and the
+e2e walking test going offline and back. Milestone 4 is complete locally
+except real-device and installed-PWA testing (Milestone 6), the hosted graph
+source and compiler, and signed-in route sync. Offline reload of the page
+itself is verified only by reasoning in dev mode; the production build is
+needed for the asset cache.
 
 - Checksum-verified OSM acquisition, isolated graph build, immutable package,
   metadata/attribution, host preview, override and rollback lifecycle.

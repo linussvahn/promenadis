@@ -1,4 +1,5 @@
 import type {
+  PublicEventManifest,
   PublicSafetyFeed,
   PublicSnapshot,
   RoutingPackageContract,
@@ -17,6 +18,8 @@ import {
   type StopFilters,
   type VisibleStop,
 } from "../lib/public-stops";
+import { useWatchedPosition } from "../lib/geolocation";
+import { loadOffline, resetOfflineData, saveOffline, unpinOffline } from "../lib/offline-store";
 import {
   emptyRoute,
   loadRoute,
@@ -40,6 +43,8 @@ type LoadState =
       /** The walking network the manifest selects, when one is approved. */
       readonly pkg: RoutingPackageContract | null;
       readonly graphVersion: string | null;
+      /** Served from the device's offline copy; safety state is not current. */
+      readonly offline: boolean;
     };
 
 const FEED_INTERVAL_MS = 15_000;
@@ -51,6 +56,37 @@ const MANIFEST_INTERVAL_MS = 60_000;
 function usePublicStops(route: Route, eventKey: string) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const snapshotRef = useRef<PublicSnapshot | null>(null);
+  const manifestRef = useRef<PublicEventManifest | null>(null);
+  const feedRef = useRef<PublicSafetyFeed | null>(null);
+  // Set once the visitor starts a walk: fresh data is then kept offline too.
+  const admittedRef = useRef<{ pinned: boolean } | null>(null);
+  const [storageRefused, setStorageRefused] = useState(false);
+  const persist = useCallback(async () => {
+    const admitted = admittedRef.current;
+    const snapshot = snapshotRef.current;
+    const manifest = manifestRef.current;
+    const feed = feedRef.current;
+    if (!admitted || !snapshot || !manifest || !feed) return;
+    const saved = await saveOffline({
+      eventKey,
+      expiresAt: snapshot.expiresAt,
+      feed,
+      graphVersion: packageRef.current?.id ?? null,
+      manifest,
+      pinned: admitted.pinned,
+      pkg: packageRef.current?.pkg ?? null,
+      snapshot,
+    });
+    setStorageRefused(!saved);
+  }, [eventKey]);
+  const admit = useCallback(
+    (active: boolean) => {
+      admittedRef.current = active ? { pinned: true } : null;
+      if (active) void persist();
+      else void unpinOffline(eventKey);
+    },
+    [eventKey, persist],
+  );
   const packageRef = useRef<{ id: string; pkg: RoutingPackageContract } | null>(null);
   useEffect(() => {
     const api = getPromenadisApiClient();
@@ -67,6 +103,7 @@ function usePublicStops(route: Route, eventKey: string) {
         if (Date.now() - lastManifestAt >= MANIFEST_INTERVAL_MS || !snapshotRef.current) {
           const manifest = await api.getPublicManifest(route, eventKey);
           lastManifestAt = Date.now();
+          manifestRef.current = manifest;
           if (manifest.state !== "published" && manifest.state !== "active") {
             snapshotRef.current = null;
             if (!cancelled) setState({ kind: "ended" });
@@ -88,6 +125,7 @@ function usePublicStops(route: Route, eventKey: string) {
           }
         }
         const feed = await api.getPublicSafetyFeed(route, eventKey);
+        feedRef.current = feed;
         // A new safety sequence means a rebuilt snapshot is on its way; a new
         // required graph means a new walking network to fetch (and accept).
         if (lastSequence !== null && feed.sequence !== lastSequence) lastManifestAt = 0;
@@ -112,24 +150,49 @@ function usePublicStops(route: Route, eventKey: string) {
             feed,
             graphVersion: packageRef.current?.id ?? null,
             kind: "ready",
+            offline: false,
             pkg: packageRef.current?.pkg ?? null,
             snapshot,
           });
+          void persist();
         }
       } catch {
-        // Without a fresh feed, precise data is not shown.
+        // Without a fresh feed, precise data is shown only from a copy the
+        // visitor took for an active walk, and only before its hard expiry.
         snapshotRef.current = null;
-        if (!cancelled) setState({ kind: "unavailable" });
+        const copy = await loadOffline(eventKey);
+        if (cancelled) return;
+        if (copy) {
+          lastManifestAt = 0;
+          setState({
+            checkedAt: new Date(copy.savedAt),
+            feed: copy.feed,
+            graphVersion: copy.graphVersion,
+            kind: "ready",
+            offline: true,
+            pkg: copy.pkg,
+            snapshot: copy.snapshot,
+          });
+        } else {
+          setState({ kind: "unavailable" });
+        }
       }
     };
     void refresh();
     const timer = window.setInterval(() => void refresh(), FEED_INTERVAL_MS);
+    // On reconnect, validate the manifest and feed before anything else.
+    const onOnline = () => {
+      lastManifestAt = 0;
+      void refresh();
+    };
+    window.addEventListener("online", onOnline);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.removeEventListener("online", onOnline);
     };
-  }, [route, eventKey]);
-  return state;
+  }, [route, eventKey, persist]);
+  return { admit, state, storageRefused };
 }
 
 function categoryLabel(snapshot: PublicSnapshot, locale: Locale, id: string | null) {
@@ -240,13 +303,17 @@ function SellerDetails({
   );
 }
 
-function routeFeatures(walk: SavedRoute, stops: readonly VisibleStop[]) {
+function routeFeatures(
+  walk: SavedRoute,
+  stops: readonly VisibleStop[],
+  locationStart: readonly [number, number] | null,
+) {
   const plan = walk.plan;
   if (!plan || walk.planStale) return null;
   const byId = new Map(stops.map((stop) => [stop.id, stop]));
   const point = (id: string | null) => {
     const stop = id ? byId.get(id) : null;
-    return stop ? [stop.longitude, stop.latitude] : walk.preferences.startPoint;
+    return stop ? [stop.longitude, stop.latitude] : (locationStart ?? walk.preferences.startPoint);
   };
   return {
     features: plan.legs.flatMap((leg, index) => {
@@ -273,6 +340,8 @@ function StopsMap({
   onSelect,
   walk,
   onPick,
+  position,
+  start,
 }: {
   readonly stops: readonly VisibleStop[];
   readonly snapshot: PublicSnapshot;
@@ -280,9 +349,15 @@ function StopsMap({
   readonly onSelect: (stopId: string) => void;
   readonly walk: SavedRoute;
   readonly onPick: ((point: readonly [number, number]) => void) | null;
+  readonly position: {
+    readonly accuracy: number;
+    readonly point: readonly [number, number];
+  } | null;
+  readonly start: readonly [number, number] | null;
 }) {
-  const lines = routeFeatures(walk, stops);
-  const start = walk.preferences.startKind === "map" ? walk.preferences.startPoint : null;
+  const lines = routeFeatures(walk, stops, start);
+  const shownStart =
+    start ?? (walk.preferences.startKind === "map" ? walk.preferences.startPoint : null);
   const mapRef = useRef<MapRef | null>(null);
   const [zoom, setZoom] = useState(15);
   const ring = snapshot.event.boundary?.coordinates[0] ?? [];
@@ -317,11 +392,20 @@ function StopsMap({
           />
         </Source>
       ) : null}
-      {start ? (
-        <Marker latitude={start[1]} longitude={start[0]}>
+      {shownStart ? (
+        <Marker latitude={shownStart[1]} longitude={shownStart[0]}>
           <span
             aria-label={translate(locale, "route.start")}
             className="map-start-marker"
+            role="img"
+          />
+        </Marker>
+      ) : null}
+      {position ? (
+        <Marker latitude={position.point[1]} longitude={position.point[0]}>
+          <span
+            aria-label={`${translate(locale, "location.you")} ± ${position.accuracy} m`}
+            className="map-position-puck"
             role="img"
           />
         </Marker>
@@ -386,7 +470,7 @@ export function PublicEventMap({
   readonly eventKey: string;
   readonly locale: Locale;
 }) {
-  const state = usePublicStops(route, eventKey);
+  const { admit, state, storageRefused } = usePublicStops(route, eventKey);
   const [filters, setFilters] = useState<StopFilters>(noFilters);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -407,10 +491,25 @@ export function PublicEventMap({
   useEffect(() => {
     if (expiresAt) setWalk(loadRoute(eventKey, expiresAt));
   }, [eventKey, expiresAt]);
-  const changeWalk = useCallback((next: SavedRoute) => {
-    setWalk(next);
-    setStorageFailed(!saveRoute(next));
-  }, []);
+  const [locationStart, setLocationStart] = useState<readonly [number, number] | null>(null);
+  const [showPosition, setShowPosition] = useState(false);
+  const live = useWatchedPosition(showPosition && walk.active);
+  const changeWalk = useCallback(
+    (next: SavedRoute) => {
+      if (walk.active && !next.active) {
+        admit(false);
+        setShowPosition(false);
+      }
+      setWalk(next);
+      setStorageFailed(!saveRoute(next));
+    },
+    [admit, walk.active],
+  );
+  // Starting (or resuming) a walk is the explicit action that keeps the
+  // event's data on the device for offline use.
+  useEffect(() => {
+    if (walk.active) admit(true);
+  }, [walk.active, admit]);
   const select = (stopId: string) => {
     const element = document.getElementById(`stop-${stopId}`);
     element?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -443,6 +542,12 @@ export function PublicEventMap({
           minute: "2-digit",
         })}
       </p>
+      {state.offline ? (
+        <p className="notice" role="alert">
+          {translate(locale, "offline.banner")}
+        </p>
+      ) : null}
+      {storageRefused ? <p className="notice">{translate(locale, "offline.refused")}</p> : null}
       {!snapshot || allStops.length === 0 ? (
         <p className="notice">{translate(locale, "map.noStopsYet")}</p>
       ) : (
@@ -501,8 +606,13 @@ export function PublicEventMap({
           <RoutePlanner
             blockedEdgeIds={state.feed.blockedEdgeIds}
             graphVersion={state.graphVersion}
+            livePosition={live}
             locale={locale}
+            locationStart={locationStart}
             onChange={changeWalk}
+            onLocationStart={setLocationStart}
+            onShowPosition={setShowPosition}
+            showPosition={showPosition}
             pkg={state.pkg}
             route={walk}
             snapshot={snapshot}
@@ -531,7 +641,9 @@ export function PublicEventMap({
                       : null
                   }
                   onSelect={select}
+                  position={live?.kind === "ok" ? live : null}
                   snapshot={snapshot}
+                  start={walk.preferences.startKind === "location" ? locationStart : null}
                   stops={stops}
                   walk={walk}
                 />
@@ -572,6 +684,20 @@ export function PublicEventMap({
         </>
       )}
       <p className="field-hint">{translate(locale, "map.offlineNote")}</p>
+      <p>
+        <button
+          className="quiet-button"
+          onClick={() =>
+            void resetOfflineData().then(() => {
+              setWalk(emptyRoute(eventKey, walk.expiresAt));
+              setLocationStart(null);
+            })
+          }
+          type="button"
+        >
+          {translate(locale, "offline.reset")}
+        </button>
+      </p>
     </div>
   );
 }

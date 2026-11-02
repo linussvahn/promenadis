@@ -1764,3 +1764,36 @@ select:disabled {
   border-radius: 999rem;
   box-shadow: 0 0.2rem 0.6rem rgb(32 50 43 / 30%);
 }
+
+.map-position-puck {
+  display: block;
+  width: 1.1rem;
+  height: 1.1rem;
+  background: #2f6fd6;
+  border: 0.1875rem solid #ffffff;
+  border-radius: 999rem;
+  box-shadow: 0 0 0 0.5rem rgb(47 111 214 / 25%);
+}
+
+.update-notice {
+  position: fixed;
+  inset-inline: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 36rem;
+  margin-inline: auto;
+  padding: 1rem;
+  background: light-dark(#fffdf8, #213027);
+  border: 0.0625rem solid light-dark(#c9c4b9, #46564c);
+  border-radius: 1rem;
+  box-shadow: 0 0.8rem 2rem rgb(32 50 43 / 20%);
+}
+
+.update-notice p {
+  flex: 1 1 100%;
+  margin: 0;
+}
