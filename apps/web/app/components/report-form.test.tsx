@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReportForm } from "./report-form";
 
-const mocks = vi.hoisted(() => ({ submitReport: vi.fn() }));
+const mocks = vi.hoisted(() => ({ submitPublicReport: vi.fn(), submitReport: vi.fn() }));
 vi.mock("../lib/supabase", () => ({ getPromenadisApiClient: () => mocks }));
 
 const eventId = "01992026-1103-7300-8000-000000000001";
@@ -55,6 +55,27 @@ describe("ReportForm", () => {
       target: { value: "harassment" },
     });
     expect(screen.queryByLabelText("Your connection to the address")).not.toBeInTheDocument();
+  });
+
+  it("sends public-map reports with the event key and opaque public IDs", async () => {
+    mocks.submitPublicReport.mockResolvedValue({ received: true });
+    renderForm(`?key=${"a".repeat(32)}&type=participation&subject=${"b".repeat(24)}`);
+    fireEvent.change(screen.getByLabelText("What is it about?"), { target: { value: "fraud" } });
+    fireEvent.change(screen.getByLabelText("Describe what is wrong"), {
+      target: { value: "Sells fake goods." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send report" }));
+    await waitFor(() =>
+      expect(mocks.submitPublicReport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventKey: "a".repeat(32),
+          publicSubjectId: "b".repeat(24),
+          reason: "fraud",
+          subjectType: "participation",
+        }),
+      ),
+    );
+    expect(mocks.submitReport).not.toHaveBeenCalled();
   });
 
   it("rejects an incomplete link", () => {

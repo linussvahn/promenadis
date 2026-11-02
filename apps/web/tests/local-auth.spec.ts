@@ -1760,6 +1760,94 @@ test("public and unlisted landing pages, discovery, sitemap and replaced links",
   }
 });
 
+test("visitors search the public map, follow the safety feed and report a stop", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin) throw new Error("Local test configuration missing");
+  const marker = randomUUID().slice(0, 8);
+  const emails = ["owner", "books", "toys"].map((role) => `map-${role}-${marker}@example.invalid`);
+  const ids: string[] = [];
+  for (const email of emails) {
+    const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
+    if (error || !data.user) throw error ?? new Error("User missing");
+    ids.push(data.user.id);
+  }
+  const [owner, books, toys] = ids;
+  try {
+    // Fixture only: routing is not built yet, so publication is set directly.
+    const eventKey = localSql(`
+      select public.create_scheduled_draft_event_command('${owner}',null,'Map owner ${marker}','Map walk ${marker}','',
+        'Europe/Stockholm','public', now()+interval '3 hours', now()+interval '8 hours', gen_random_uuid());
+      select public.upsert_draft_event_boundary_command('${owner}',(select id from public.events where title='Map walk ${marker}'),null,'Area',
+        '{"type":"Polygon","coordinates":[[[18.0600,59.3100],[18.0700,59.3100],[18.0700,59.3150],[18.0600,59.3150],[18.0600,59.3100]]]}'::jsonb,
+        gen_random_uuid());
+      update public.events set admission_mode='auto_inside' where title='Map walk ${marker}';
+      select public.apply_to_event_command('${books}',(select id from public.events where title='Map walk ${marker}'),'Bokbord','Testgatan 1','','',
+        18.062,59.312,'manual',null,true,gen_random_uuid());
+      select public.apply_to_event_command('${toys}',(select id from public.events where title='Map walk ${marker}'),'Leksaksbord','Testgatan 2','','',
+        18.066,59.313,'manual',null,true,gen_random_uuid());
+      select public.save_seller_listing_command('${books}',(select id from public.seller_participations where account_id='${books}'),0,
+        'Deckare','Pocket och inbundet',array['0199a000-0000-7000-8000-000000000005'::uuid],'{}',true,null,null,null,null,false,'[]','[]',
+        gen_random_uuid());
+      select public.save_seller_listing_command('${toys}',(select id from public.seller_participations where account_id='${toys}'),0,
+        'Lego','',array['0199a000-0000-7000-8000-000000000006'::uuid],'{}',null,null,null,null,null,false,'[]','[]',gen_random_uuid());
+      update public.events set state='published' where title='Map walk ${marker}';
+      update public.events set state='active' where title='Map walk ${marker}';
+      select app_private.refresh_public_snapshots_command();
+      select public_key from public.events where title='Map walk ${marker}';`)
+      .split("\n")
+      .at(-1);
+    const mapPage = await page.goto(`/e/${eventKey}/map`);
+    expect(mapPage?.headers()["x-robots-tag"]).toBe("noindex, nofollow, nosnippet, noimageindex");
+    const list = page.getByRole("region", { name: "Lista över stoppen" });
+    await expect(list.getByRole("heading", { name: "Deckare" })).toBeVisible();
+    await expect(list.getByRole("heading", { name: "Lego" })).toBeVisible();
+    await expect(page.getByText("Testgatan")).toHaveCount(0);
+
+    // English search words find the Swedish-labelled category.
+    await page.getByLabel("Sök efter saker, kategorier eller säljare").fill("books");
+    await expect(list.getByRole("heading", { name: "Deckare" })).toBeVisible();
+    await expect(list.getByRole("heading", { name: "Lego" })).toHaveCount(0);
+    await page.getByLabel("Sök efter saker, kategorier eller säljare").fill("");
+    await page.getByLabel("Utan trappsteg").check();
+    await expect(list.getByRole("heading", { name: "Lego" })).toHaveCount(0);
+    await page.getByLabel("Utan trappsteg").uncheck();
+
+    // Closing early reaches the open page through the safety feed, before any rebuild.
+    localSql(`insert into public.seller_live_status(participation_id,status,set_by_account_id)
+      select id,'closed_early','${toys}' from public.seller_participations where account_id='${toys}'
+      on conflict (participation_id) do update set status='closed_early';`);
+    await expect(list.getByRole("heading", { name: "Lego" })).toHaveCount(0, { timeout: 20_000 });
+
+    // A visitor reports a stop by its public ID only. Fixture control: earlier
+    // runs within the hour share the local network's 3-per-hour report limit.
+    localSql("delete from app_private.report_rate_buckets;");
+    await list.getByRole("link", { name: "Anmäl" }).first().click();
+    await expect(page).toHaveURL(
+      new RegExp(
+        `/report\\?key=${eventKey}&route=public&type=participation&subject=[0-9a-f]{24}$`,
+        "u",
+      ),
+    );
+    await page.getByLabel("Vad gäller det?").selectOption("fraud");
+    await page.getByLabel("Beskriv vad som är fel").fill("Säljer förfalskade böcker.");
+    await page.getByRole("button", { name: "Skicka anmälan" }).click();
+    await expect(page.getByRole("status")).toBeVisible();
+    expect(
+      localSql(`select count(*) from app_private.reports r join app_private.moderation_cases c on c.id=r.case_id
+        where c.subject_id=(select id from public.seller_participations where account_id='${books}');`),
+    ).toBe("1");
+
+    // Ending the event tombstones the map at once.
+    localSql(`update public.events set state='ended' where title='Map walk ${marker}';`);
+    await page.goto(`/e/${eventKey}/map`);
+    await expect(page.getByText("Evenemanget pågår inte.")).toBeVisible();
+  } finally {
+    for (const email of emails) await deleteSyntheticAccount(email);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {

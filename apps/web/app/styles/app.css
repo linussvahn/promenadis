@@ -1396,6 +1396,7 @@ select:disabled {
 .checkbox-field input {
   width: 1.2rem;
   height: 1.2rem;
+  min-height: 0;
   margin-top: 0.1rem;
   accent-color: light-dark(#20322b, #a0dcb8);
 }
@@ -1663,4 +1664,78 @@ select:disabled {
 
 .public-link-url {
   overflow-wrap: anywhere;
+}
+
+.public-map {
+  min-height: 24rem;
+}
+
+.map-stop-marker {
+  display: grid;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  place-items: center;
+  padding: 0 0.4rem;
+  color: #fffdf8;
+  background: #8d3d22;
+  border: 0.1875rem solid #fffdf8;
+  border-radius: 999rem;
+  box-shadow: 0 0.2rem 0.6rem rgb(32 50 43 / 30%);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.map-cluster-marker {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  background: #20322b;
+}
+
+.stop-list {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.public-seller + .public-seller {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 0.0625rem solid light-dark(#ded9ce, #3a4b40);
+}
+
+.public-seller h4 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.public-seller-categories {
+  font-weight: 700;
+}
+
+.public-items {
+  margin: 0.5rem 0;
+  padding-inline-start: 1.25rem;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-list li {
+  padding: 0.15rem 0.6rem;
+  background: light-dark(#ece7da, #2b3b31);
+  border-radius: 999rem;
+  font-size: 0.88rem;
 }

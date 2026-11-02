@@ -179,7 +179,14 @@ handover; tombstones at postponement, end, cancellation and archive; host
 early-visibility choice; the `public_delivery_not_ready` gate removed) is
 complete locally: pgTAP 350 and contract tests; database verification 859/859. Snapshots are stored in
 Postgres and served by the BFF; object storage and CDN purge are hosted-alpha
-work. Not yet verified at a CDN edge; the canonical origin comes from the
+work. Slice 3 (public map and an equivalent structured stop list, bilingual
+search over labels, synonyms, tags and items, category/open-now/step-free/
+stroller filters, server cluster cells, counts, away badges, 15-second safety
+polling with refusal of expired or unverifiable data, reports by opaque public
+ID, and `pnpm demo:seed`) is complete locally: pgTAP 360, public-stops and
+public-event-map tests, and the e2e "visitors search the public map…"; database verification 868/868.
+Milestone 3 is complete locally except CDN/object storage, a configured site
+origin, and walking-route badges (Milestone 4). Not yet verified at a CDN edge; the canonical origin comes from the
 request until a configured site origin exists (hosted alpha).
 
 - Sanitized public/unlisted landing behavior, discovery, organizer pages,

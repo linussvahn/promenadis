@@ -456,6 +456,38 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Milestone 3 complete locally (2026-11-04)
+
+All three slices are built, tested and pushed. Left for later milestones:
+object storage plus CDN purge for snapshots and a configured canonical site
+origin (hosted alpha), header verification at the CDN edge, walking-route
+badges and server route decisions (Milestone 4), and participant notices for
+link rotation (Milestone 5). Next: Milestone 4 (walking and offline).
+
+Try it locally: `pnpm db:start`, `pnpm demo:seed` (prints the live demo
+event and map URLs), then `pnpm dev`.
+
+Slice 3, `20261104000300_public_map_reports.sql`:
+
+- Fix found in e2e: safety-feed removals are now relative to every public ID
+  the event has ever published (`published_seller_ids`/`published_stop_ids`
+  on the publication row), because an open page can still hold an older
+  snapshot after the worker rebuilt without the seller.
+- `resolve_public_report_subject_command` maps an event key plus opaque public
+  stop/seller ID to the private subject while the event is published/active.
+  BFF `POST /reports/public` (gateway passes it anonymously) then calls the
+  normal `submit_report_command`; the report form accepts `?key=…`.
+- Web: `/:route/:key/map` (`e` or `u`; no-index, unlisted no-referrer). The
+  browser validates manifest and feed with the strict contracts before
+  showing locations, refuses expired data and tombstones, polls the feed
+  every 15 s and the manifest every 60 s (sooner when the sequence changes),
+  and drops all precise data if the feed cannot be read.
+  `app/lib/public-stops.ts` holds the pure logic: feed application, bilingual
+  search (both languages' labels and synonyms, tags, item names), filters,
+  open-now, cluster cells (z13 below zoom 13, z15 below 15).
+- `pnpm demo:seed` creates a synthetic live public event with three sellers
+  for manual testing (publication set directly; local stack only).
+
 ### Milestone 3 plan and slice 1 (2026-11-04)
 
 Plan: (1) public pages, discovery, organizer pages, sitemap; (2) snapshot,

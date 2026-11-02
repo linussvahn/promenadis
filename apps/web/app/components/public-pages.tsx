@@ -206,6 +206,13 @@ export function EventLanding({
           </dd>
         </div>
       </dl>
+      {event.state === "published" || event.state === "active" ? (
+        <p>
+          <Link className="button" rel="nofollow" to={`${eventPath(event)}/map`}>
+            {translate(locale, "map.showMap")}
+          </Link>
+        </p>
+      ) : null}
       {event.visibility === "unlisted" ? (
         <p className="field-hint">{translate(locale, "public.unlistedNotice")}</p>
       ) : null}

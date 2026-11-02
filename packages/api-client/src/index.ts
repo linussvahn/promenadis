@@ -87,6 +87,7 @@ import {
   type SetEmergencySuccessorRequest,
   type SetLiveStatusRequest,
   type SubmitReportRequest,
+  type SubmitPublicReportRequest,
   sellerInvitesSchema,
   sellerListingSchema,
   sellerParticipationSchema,
@@ -500,6 +501,9 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     },
     submitReport(input: SubmitReportRequest) {
       return publicRequest("/reports", reportReceivedSchema, input);
+    },
+    submitPublicReport(input: SubmitPublicReportRequest) {
+      return publicRequest("/reports/public", reportReceivedSchema, input);
     },
     listEventCases(accessToken: string, eventId: string) {
       return request(`/events/${eventId}/cases`, accessToken, moderationCasesSchema);

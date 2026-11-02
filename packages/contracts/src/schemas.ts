@@ -974,6 +974,16 @@ export const submitReportRequestSchema = z.strictObject({
 
 export type SubmitReportRequest = z.infer<typeof submitReportRequestSchema>;
 
+// From the public map: the event key and an opaque public stop or seller ID.
+export const submitPublicReportRequestSchema = submitReportRequestSchema
+  .omit({ eventId: true, subjectId: true, subjectType: true })
+  .extend({
+    eventKey: z.string().regex(/^[0-9a-f]{32}$/u),
+    publicSubjectId: z.string().regex(/^[0-9a-f]{24}$/u),
+    subjectType: z.enum(["location", "participation"]),
+  });
+export type SubmitPublicReportRequest = z.infer<typeof submitPublicReportRequestSchema>;
+
 export const reportReceivedSchema = z.strictObject({ received: z.literal(true) });
 
 export const moderationCasesSchema = z.array(
@@ -1577,6 +1587,7 @@ export const rotateUnlistedLinkRequestSchema = z.strictObject({
 export type RotateUnlistedLinkRequest = z.infer<typeof rotateUnlistedLinkRequestSchema>;
 
 export const boundarySchemas = {
+  SubmitPublicReportRequest: submitPublicReportRequestSchema,
   EarlyLocationVisibility: earlyLocationVisibilitySchema,
   PublicSafetyFeed: publicSafetyFeedSchema,
   PublicSnapshot: publicSnapshotSchema,

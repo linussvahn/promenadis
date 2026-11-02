@@ -792,6 +792,8 @@ export type Database = {
           generated_at: string | null
           last_error: string | null
           public_revision: number
+          published_seller_ids: string[]
+          published_stop_ids: string[]
           safety_sequence: number
           state: string
           updated_at: string
@@ -805,6 +807,8 @@ export type Database = {
           generated_at?: string | null
           last_error?: string | null
           public_revision?: number
+          published_seller_ids?: string[]
+          published_stop_ids?: string[]
           safety_sequence?: number
           state: string
           updated_at?: string
@@ -818,6 +822,8 @@ export type Database = {
           generated_at?: string | null
           last_error?: string | null
           public_revision?: number
+          published_seller_ids?: string[]
+          published_stop_ids?: string[]
           safety_sequence?: number
           state?: string
           updated_at?: string
@@ -3390,6 +3396,14 @@ export type Database = {
       reserve_geocode_request_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: undefined
+      }
+      resolve_public_report_subject_command: {
+        Args: {
+          p_event_key: string
+          p_public_id: string
+          p_subject_type: string
+        }
+        Returns: Json
       }
       resolve_security_notification_recipient: {
         Args: { p_job_id: string; p_lease_id: string }

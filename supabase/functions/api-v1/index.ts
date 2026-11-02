@@ -103,6 +103,7 @@ import {
   setLiveStatusRequestSchema,
   submitAppealRequestSchema,
   submitReportRequestSchema,
+  submitPublicReportRequestSchema,
   totpEnrollmentSchema,
   updateDraftEventDetailsRequestSchema,
   updateDraftEventVisibilityRequestSchema,
@@ -908,9 +909,13 @@ Deno.serve(async (request) => {
       return notFound();
     }
 
-    if (route === "/reports" && request.method === "POST") {
+    if ((route === "/reports" || route === "/reports/public") && request.method === "POST") {
       operation = "report.submit";
-      const input = submitReportRequestSchema.safeParse(await requestBody(request));
+      const body = await requestBody(request);
+      const input =
+        route === "/reports"
+          ? submitReportRequestSchema.safeParse(body)
+          : submitPublicReportRequestSchema.safeParse(body);
       if (!input.success) {
         status = "denied";
         return apiError("invalid_request", "Check the report.", 400, correlationId, origin);
@@ -920,17 +925,46 @@ Deno.serve(async (request) => {
         status = "denied";
         return json({ received: true }, 202, correlationId, origin);
       }
+      let subject: { eventId: string; subjectId: string; subjectType: string } | null =
+        "eventId" in input.data ? input.data : null;
+      if ("eventKey" in input.data) {
+        const { data: resolved, error: resolveError } = await admin.rpc(
+          "resolve_public_report_subject_command",
+          {
+            p_event_key: input.data.eventKey,
+            p_public_id: input.data.publicSubjectId,
+            p_subject_type: input.data.subjectType,
+          },
+        );
+        if (resolveError) throw resolveError;
+        if (!resolved) {
+          status = "denied";
+          return apiError(
+            "not_found",
+            "That listing or location is gone.",
+            404,
+            correlationId,
+            origin,
+          );
+        }
+        subject = {
+          eventId: resolved.eventId,
+          subjectId: resolved.subjectId,
+          subjectType: input.data.subjectType,
+        };
+      }
+      if (!subject) throw new Error("invalid_internal_state");
       const { data, error } = await admin.rpc("submit_report_command", {
         p_confirms_no_consent: input.data.confirmsNoConsent,
         p_correlation_id: correlationId,
         p_details: input.data.details,
-        p_event_id: input.data.eventId,
+        p_event_id: subject.eventId,
         p_network_bucket: await networkBucket(request),
         p_reason: input.data.reason,
         p_relationship: input.data.relationship,
         p_reporter_contact: input.data.reporterContact || null,
-        p_subject_id: input.data.subjectId,
-        p_subject_type: input.data.subjectType,
+        p_subject_id: subject.subjectId,
+        p_subject_type: subject.subjectType,
       });
       if (error) {
         const mapped = new Map<string, [string, string, number]>([

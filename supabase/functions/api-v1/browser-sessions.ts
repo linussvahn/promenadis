@@ -344,7 +344,7 @@ export function createBrowserSessionGateway(config: {
       if (
         path === "/account-recovery" ||
         path.startsWith("/account-recovery/") ||
-        (path === "/reports" && request.method === "POST") ||
+        ((path === "/reports" || path === "/reports/public") && request.method === "POST") ||
         (path.startsWith("/public/") && request.method === "GET")
       ) {
         const cleaned = new Headers(request.headers);

@@ -35,6 +35,8 @@ export function ReportPage() {
 // never tells the reporter what happened to the subject.
 export function ReportForm({ locale }: { readonly locale: Locale }) {
   const [params] = useSearchParams();
+  // Links from the public map carry the event key and opaque public IDs.
+  const eventKey = params.get("key") ?? "";
   const eventId = params.get("event") ?? "";
   const subjectType = params.get("type") as SubmitReportRequest["subjectType"] | null;
   const subjectId = params.get("subject") ?? "";
@@ -51,20 +53,27 @@ export function ReportForm({ locale }: { readonly locale: Locale }) {
     setBusy(true);
     setStatus("");
     try {
-      await api.submitReport({
+      const report = {
         confirmsNoConsent: form.get("confirmsNoConsent") === "on",
         details: String(form.get("details") ?? ""),
-        eventId,
         reason,
         relationship:
           reason === "unauthorized_address"
             ? (String(form.get("relationship") ?? "other") as SubmitReportRequest["relationship"])
             : null,
         reporterContact: String(form.get("contact") ?? "").trim(),
-        subjectId,
-        subjectType,
         website: String(form.get("website") ?? ""),
-      });
+      };
+      if (eventKey && subjectType !== "item") {
+        await api.submitPublicReport({
+          ...report,
+          eventKey,
+          publicSubjectId: subjectId,
+          subjectType,
+        });
+      } else {
+        await api.submitReport({ ...report, eventId, subjectId, subjectType });
+      }
       setSent(true);
     } catch (error) {
       setStatus(
@@ -83,9 +92,11 @@ export function ReportForm({ locale }: { readonly locale: Locale }) {
   };
 
   if (
-    !eventId ||
+    !(eventId || eventKey) ||
     !subjectId ||
-    !["location", "participation", "item"].includes(subjectType ?? "")
+    !(eventKey ? ["location", "participation"] : ["location", "participation", "item"]).includes(
+      subjectType ?? "",
+    )
   ) {
     return (
       <main className="account-page" id="main">

@@ -17,6 +17,7 @@ export default [
   route("discover", "routes/discover.tsx"),
   route("e/:key", "routes/public-event.tsx"),
   route("u/:key", "routes/unlisted-event.tsx"),
+  route(":route/:key/map", "routes/public-event-map.tsx"),
   route("o/:key", "routes/organizer.tsx"),
   route("sitemap.xml", "routes/sitemap.tsx"),
   route("robots.txt", "routes/robots.tsx"),
