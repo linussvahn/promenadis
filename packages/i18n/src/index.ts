@@ -693,6 +693,24 @@ const sv = {
   "adminModeration.differentReviewer": "En annan administratör måste granska överklagandet.",
   "adminModeration.notFound": "Hittades inte.",
   "adminModeration.liftFirst": "Häv plattformsspärren först.",
+  "lifecycle.postpone": "Skjut upp evenemanget",
+  "lifecycle.postponeHelp":
+    "Vid till exempel storm. Alla säljplatser döljs direkt, anmälan pausas och säljarna får bekräfta det nya datumet. Ange ett nytt datum inom 14 dagar, annars ställs evenemanget in.",
+  "lifecycle.confirmPostpone": "Skjut upp",
+  "lifecycle.postponed": "Evenemanget är uppskjutet.",
+  "lifecycle.reschedule": "Sätt nytt datum",
+  "lifecycle.rescheduleHelp":
+    "Det nya datumet får ligga högst 30 dagar efter det ursprungliga. Senare datum kräver att evenemanget ställs in och kopieras.",
+  "lifecycle.confirmReschedule": "Spara nytt datum",
+  "lifecycle.rescheduled": "Det nya datumet är satt. Säljarna behöver bekräfta.",
+  "lifecycle.recentAuthAny": "Logga ut och in igen först.",
+  "lifecycle.invalidReplacement":
+    "Välj ett datum i framtiden, högst 30 dagar efter det ursprungliga.",
+  "lifecycle.rescheduleClosed": "De 14 dagarna för att sätta ett nytt datum har gått.",
+  "seller.acceptNewDate": "Jag kan det nya datumet",
+  "seller.declineNewDate": "Jag kan inte – lämna platsen",
+  "seller.eventPostponed":
+    "Evenemanget är uppskjutet. Din plats är dold tills ett nytt datum är satt och du har bekräftat det.",
   "details.title": "Redigera uppgifter",
   "details.help":
     "Ändra titel, beskrivning och tid så länge evenemanget är ett utkast. Publiceringsbekräftelsen behöver göras om efter ändringar.",
@@ -1587,6 +1605,23 @@ const en = {
   "adminModeration.differentReviewer": "Another administrator must review the appeal.",
   "adminModeration.notFound": "Not found.",
   "adminModeration.liftFirst": "Lift the platform restriction first.",
+  "lifecycle.postpone": "Postpone the event",
+  "lifecycle.postponeHelp":
+    "For example for a storm. All seller spots are hidden at once, registration pauses and sellers confirm the new date. Set a new date within 14 days or the event is cancelled.",
+  "lifecycle.confirmPostpone": "Postpone",
+  "lifecycle.postponed": "The event is postponed.",
+  "lifecycle.reschedule": "Set a new date",
+  "lifecycle.rescheduleHelp":
+    "The new date can be at most 30 days after the original. Later dates need cancelling and copying the event.",
+  "lifecycle.confirmReschedule": "Save new date",
+  "lifecycle.rescheduled": "The new date is set. Sellers need to confirm.",
+  "lifecycle.recentAuthAny": "Sign out and in again first.",
+  "lifecycle.invalidReplacement": "Pick a future date at most 30 days after the original.",
+  "lifecycle.rescheduleClosed": "The 14 days to set a new date have passed.",
+  "seller.acceptNewDate": "I can make the new date",
+  "seller.declineNewDate": "I cannot – give up my place",
+  "seller.eventPostponed":
+    "The event is postponed. Your spot stays hidden until a new date is set and you confirm it.",
   "details.title": "Edit details",
   "details.help":
     "Change the title, description and time while the event is a draft. The publication confirmation must be given again after changes.",

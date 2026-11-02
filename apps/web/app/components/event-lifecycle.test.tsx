@@ -3,7 +3,12 @@ import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventLifecycle } from "./event-lifecycle";
 
-const mocks = vi.hoisted(() => ({ cancelEvent: vi.fn(), endEventEarly: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  cancelEvent: vi.fn(),
+  endEventEarly: vi.fn(),
+  postponeEvent: vi.fn(),
+  rescheduleEvent: vi.fn(),
+}));
 vi.mock("../lib/supabase", () => ({
   getBrowserAuthClient: () => ({
     auth: { getSession: async () => ({ data: { session: { user: { id: "owner" } } } }) },
@@ -33,7 +38,7 @@ describe("EventLifecycle", () => {
     render(<EventLifecycle event={base} locale="en" onChanged={onChanged} />);
     fireEvent.click(screen.getByText("Cancel the event", { selector: "summary" }));
     const submit = screen.getByRole("button", { name: "Cancel the event" });
-    fireEvent.change(screen.getByLabelText("Public explanation"), {
+    fireEvent.change(screen.getByLabelText("Public explanation", { selector: "#cancel-reason" }), {
       target: { value: "Storm warning" },
     });
     expect(submit).toBeDisabled();
@@ -67,7 +72,7 @@ describe("EventLifecycle", () => {
     expect(mocks.endEventEarly).toHaveBeenCalledWith("owner", eventId, 4);
   });
 
-  it("shows nothing to a co-host of a published event or for drafts", () => {
+  it("lets a co-host postpone but not cancel, and shows nothing for drafts", () => {
     const { container, rerender } = render(
       <EventLifecycle
         event={{ ...(base as object), role: "co_host" } as never}
@@ -75,7 +80,8 @@ describe("EventLifecycle", () => {
         onChanged={onChanged}
       />,
     );
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText("Cancel the event")).not.toBeInTheDocument();
+    expect(screen.getByText("Postpone the event")).toBeVisible();
     rerender(
       <EventLifecycle
         event={{ ...(base as object), state: "draft" } as never}
@@ -84,6 +90,53 @@ describe("EventLifecycle", () => {
       />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("postpones with a public reason and reschedules in event time", async () => {
+    mocks.postponeEvent.mockResolvedValue({ state: "postponed", version: 5 });
+    mocks.rescheduleEvent.mockResolvedValue({ state: "published", version: 6 });
+    const { rerender } = render(
+      <EventLifecycle
+        event={{ ...(base as object), role: "co_host", timezone: "Europe/Stockholm" } as never}
+        locale="en"
+        onChanged={onChanged}
+      />,
+    );
+    fireEvent.click(screen.getByText("Postpone the event"));
+    fireEvent.change(screen.getByLabelText("Public explanation"), { target: { value: "Storm" } });
+    fireEvent.click(screen.getByRole("button", { name: "Postpone" }));
+    await waitFor(() =>
+      expect(mocks.postponeEvent).toHaveBeenCalledWith("owner", eventId, {
+        expectedEventVersion: 4,
+        publicReason: "Storm",
+      }),
+    );
+    rerender(
+      <EventLifecycle
+        event={
+          {
+            ...(base as object),
+            role: "co_host",
+            state: "postponed",
+            timezone: "Europe/Stockholm",
+            version: 5,
+          } as never
+        }
+        locale="en"
+        onChanged={onChanged}
+      />,
+    );
+    fireEvent.click(screen.getByText("Set a new date"));
+    fireEvent.change(screen.getByLabelText("Starts"), { target: { value: "2031-09-20T10:00" } });
+    fireEvent.change(screen.getByLabelText("Ends"), { target: { value: "2031-09-20T15:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save new date" }));
+    await waitFor(() =>
+      expect(mocks.rescheduleEvent).toHaveBeenCalledWith("owner", eventId, {
+        endsAt: "2031-09-20T13:00:00.000Z",
+        expectedEventVersion: 5,
+        startsAt: "2031-09-20T08:00:00.000Z",
+      }),
+    );
   });
 
   it("has no detectable automated accessibility violations", async () => {

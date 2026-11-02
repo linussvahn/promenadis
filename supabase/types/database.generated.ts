@@ -891,6 +891,27 @@ export type Database = {
           },
         ]
       }
+      retention_heartbeats: {
+        Row: {
+          erased_count: number
+          job: string
+          last_run_at: string
+          overdue_count: number
+        }
+        Insert: {
+          erased_count: number
+          job: string
+          last_run_at: string
+          overdue_count: number
+        }
+        Update: {
+          erased_count?: number
+          job?: string
+          last_run_at?: string
+          overdue_count?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -909,6 +930,15 @@ export type Database = {
       }
       account_recovery_status: { Args: { p_account_id: string }; Returns: Json }
       advance_event_lifecycle_command: { Args: never; Returns: number }
+      apply_postponement: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_event_id: string
+          p_public_reason: string
+        }
+        Returns: Json
+      }
       apply_restriction_lift: {
         Args: { p_actor_id: string; p_restriction_id: string }
         Returns: undefined
@@ -927,7 +957,9 @@ export type Database = {
         Args: { p_account_id: string; p_code: string }
         Returns: boolean
       }
+      enforce_event_retention_command: { Args: never; Returns: number }
       erase_due_accounts_command: { Args: never; Returns: number }
+      erase_event_seller_data: { Args: { p_event_id: string }; Returns: number }
       event_boundary_summary: {
         Args: {
           p_boundary: Database["public"]["Tables"]["event_boundaries"]["Row"]
@@ -952,6 +984,10 @@ export type Database = {
       event_team_summary_with_emergency_claim: {
         Args: { p_event_id: string; p_include_invite_emails: boolean }
         Returns: Json
+      }
+      events_due_for_seller_erasure: {
+        Args: { p_now: string }
+        Returns: string[]
       }
       first_event_review_blocker: {
         Args: { p_event_id: string; p_owner_account_id: string }
@@ -1039,6 +1075,7 @@ export type Database = {
       }
       purge_expired_seller_invites_command: { Args: never; Returns: undefined }
       purge_geocode_records_command: { Args: never; Returns: undefined }
+      purge_moderation_records: { Args: { p_now: string }; Returns: number }
       purge_report_rate_buckets_command: { Args: never; Returns: undefined }
       record_moderation_action: {
         Args: {
@@ -1660,7 +1697,10 @@ export type Database = {
           description: string
           id: string
           organizer_profile_id: string
+          original_starts_at: string | null
+          postponed_at: string | null
           public_notice: string | null
+          seller_history: Json | null
           state: string
           state_changed_at: string
           team_version: number
@@ -1678,7 +1718,10 @@ export type Database = {
           description?: string
           id?: string
           organizer_profile_id: string
+          original_starts_at?: string | null
+          postponed_at?: string | null
           public_notice?: string | null
+          seller_history?: Json | null
           state?: string
           state_changed_at?: string
           team_version?: number
@@ -1696,7 +1739,10 @@ export type Database = {
           description?: string
           id?: string
           organizer_profile_id?: string
+          original_starts_at?: string | null
+          postponed_at?: string | null
           public_notice?: string | null
+          seller_history?: Json | null
           state?: string
           state_changed_at?: string
           team_version?: number
@@ -2623,6 +2669,15 @@ export type Database = {
         }
         Returns: Json
       }
+      confirm_reschedule_command: {
+        Args: {
+          p_accept: boolean
+          p_actor_id: string
+          p_correlation_id: string
+          p_participation_id: string
+        }
+        Returns: Json
+      }
       consume_local_recovery_budget_command: { Args: never; Returns: boolean }
       correct_location_pin_command: {
         Args: {
@@ -2990,6 +3045,17 @@ export type Database = {
         }
         Returns: Json
       }
+      postpone_event_command: {
+        Args: {
+          p_actor_id: string
+          p_authenticated_at: string
+          p_correlation_id: string
+          p_event_id: string
+          p_expected_event_version: number
+          p_public_reason: string
+        }
+        Returns: Json
+      }
       prepare_account_recovery_command: {
         Args: {
           p_claim_id: string
@@ -3099,6 +3165,18 @@ export type Database = {
         }
         Returns: Json
       }
+      reschedule_event_command: {
+        Args: {
+          p_actor_id: string
+          p_authenticated_at: string
+          p_correlation_id: string
+          p_ends_at: string
+          p_event_id: string
+          p_expected_event_version: number
+          p_starts_at: string
+        }
+        Returns: Json
+      }
       reserve_geocode_request_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: undefined
@@ -3117,6 +3195,7 @@ export type Database = {
         }
         Returns: Json
       }
+      retention_health_command: { Args: never; Returns: Json }
       review_event_location_command: {
         Args: {
           p_action: string

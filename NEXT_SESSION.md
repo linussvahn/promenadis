@@ -456,6 +456,41 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Milestone 2 complete locally (2026-11-03)
+
+All five planned slices are built, tested and pushed. Milestone 2 is complete
+locally except what depends on later milestones: public display of
+locations/listings and urgent snapshot/feed invalidation (Milestone 3),
+seller/owner/reporter mail for decisions, quarantine, invitations,
+postponement and appeals (Milestone 5), Turnstile and hosted Auth/geocoding
+providers (hosted alpha), and watchlist entries. Next: Milestone 3 (public
+discovery).
+
+Slice 5, `20261103000600_retention_postponement.sql`:
+
+- Retention: `enforce_event_retention_command` (hourly) erases seller data
+  for events ended/cancelled 14+ days ago or archived: participations
+  (cascading listings, tags, items, availability, live status), locations,
+  invitations. Only `events.seller_history` counts remain; an
+  `event_seller_data` erasure tombstone is written. Moderation actions and
+  closed cases are purged six months after closure unless an appeal is
+  pending or recently decided. `retention_heartbeats` +
+  `retention_health_command` (last run, overdue count, stale flag) for
+  Milestone 5 monitoring.
+- Postponement: `postpone_event_command` (owner/co-host, recent auth,
+  public reason; admins via intervention) from published or active. Approved
+  sellers move to `pending_reschedule_confirmation`, registration pauses,
+  live status clears; an active interruption closes the current interval.
+  `reschedule_event_command` within 14 days, start at most 30 days after the
+  original, registration refitted. `confirm_reschedule_command`: accept keeps
+  the place, decline withdraws and promotes. The lifecycle job withdraws
+  unconfirmed sellers when the rescheduled event starts and cancels postponed
+  events with no replacement after 14 days (then the normal 14-day erasure).
+- Web: postpone and reschedule in `EventLifecycle`, accept/decline on the
+  join page, postpone in admin intervention.
+- Verified: pgTAP 330 (26; 800 total), 107 web tests, full verify, DB
+  rebuild, 18/18 local-auth e2e, 5 smoke, integration scripts.
+
 ### Milestone 2 plan and slice 1 (2026-11-03)
 
 Planned slices, each its own commit:
@@ -469,7 +504,7 @@ Planned slices, each its own commit:
    availability and live status.
 4. (done) Reports, unauthorized-address quarantine, hide/suspend/revoke, appeals,
    invite-only seller invitations.
-5. Event-relative retention: non-public at end/cancel, 14-day erasure,
+5. (done) Event-relative retention: non-public at end/cancel, 14-day erasure,
    tombstones, heartbeats; postponement and reschedule confirmation.
 
 Slice 4b, `20261103000500_appeals_platform_invites.sql`:

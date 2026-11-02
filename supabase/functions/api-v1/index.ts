@@ -10,6 +10,9 @@ import {
   adminElevationRequestSchema,
   adminEventInterventionRequestSchema,
   applyToEventRequestSchema,
+  confirmRescheduleRequestSchema,
+  postponeEventRequestSchema,
+  rescheduleEventRequestSchema,
   adminAccountSchema,
   adminApprovalsSchema,
   adminCasesSchema,
@@ -1965,7 +1968,7 @@ Deno.serve(async (request) => {
           p_event_id: adminEventRoute[1],
           p_expected_event_version: input.data.expectedEventVersion,
           p_internal_reason: input.data.internalReason,
-          p_public_reason: input.data.action === "cancel" ? input.data.publicReason : null,
+          p_public_reason: input.data.action === "end_early" ? null : input.data.publicReason,
         });
         if (error) {
           const mapped = new Map<string, [string, string, number]>([
@@ -1981,6 +1984,10 @@ Deno.serve(async (request) => {
               ["invalid_state", "Only live events can end early.", 409],
             ],
             ["Invalid intervention", ["invalid_request", "Give the required reasons.", 400]],
+            [
+              "Only published or live events can be postponed",
+              ["invalid_state", "Only published or live events can be postponed.", 409],
+            ],
           ]).get(error.message);
           if (mapped) return denied(mapped[0], mapped[1], mapped[2]);
           throw error;
@@ -2681,6 +2688,33 @@ Deno.serve(async (request) => {
       ["Invalid invitation", ["invalid_request", "Enter a valid email address.", 400]],
       ["Invitation limit reached", ["rate_limited", "Too many invitations for this event.", 429]],
       ["Invitation not found", ["not_found", "The invitation is gone or expired.", 404]],
+      [
+        "Only the owner or a co-host can postpone",
+        ["forbidden", "Only the owner or a co-host can postpone.", 403],
+      ],
+      [
+        "Only the owner or a co-host can reschedule",
+        ["forbidden", "Only the owner or a co-host can reschedule.", 403],
+      ],
+      [
+        "Only published or live events can be postponed",
+        ["invalid_state", "Only published or live events can be postponed.", 409],
+      ],
+      ["Postponement reason required", ["invalid_request", "Give a public reason.", 400]],
+      [
+        "Only postponed events can be rescheduled",
+        ["invalid_state", "Only postponed events can be rescheduled.", 409],
+      ],
+      [
+        "Reschedule window closed",
+        ["reschedule_window_closed", "The 14 days to set a new date have passed.", 409],
+      ],
+      [
+        "Invalid replacement date",
+        ["invalid_replacement_date", "Pick a future date at most 30 days after the original.", 400],
+      ],
+      ["Nothing to confirm", ["invalid_state", "Nothing to confirm.", 409]],
+      ["Wait for the new date", ["invalid_state", "The new date is not set yet.", 409]],
     ]);
     const sellerResult = <T>(
       result: { data: unknown; error: { message: string } | null },
@@ -3028,6 +3062,70 @@ Deno.serve(async (request) => {
         }),
         sellerParticipationSchema,
         201,
+      );
+    }
+
+    const postponeRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(postpone|reschedule)$/iu,
+    );
+    if (request.method === "POST" && postponeRoute) {
+      const [, eventId, action] = postponeRoute;
+      operation = `event.${action}`;
+      const body = await requestBody(request);
+      const postpone = action === "postpone" ? postponeEventRequestSchema.safeParse(body) : null;
+      const reschedule =
+        action === "reschedule" ? rescheduleEventRequestSchema.safeParse(body) : null;
+      if (!(postpone?.success || reschedule?.success)) {
+        status = "denied";
+        return apiError(
+          "invalid_request",
+          "Check the reason or the dates.",
+          400,
+          correlationId,
+          origin,
+        );
+      }
+      return sellerResult(
+        postpone?.success
+          ? await admin.rpc("postpone_event_command", {
+              p_actor_id: actorId,
+              p_authenticated_at: actor.authenticatedAt,
+              p_correlation_id: correlationId,
+              p_event_id: eventId,
+              p_expected_event_version: postpone.data.expectedEventVersion,
+              p_public_reason: postpone.data.publicReason,
+            })
+          : await admin.rpc("reschedule_event_command", {
+              p_actor_id: actorId,
+              p_authenticated_at: actor.authenticatedAt,
+              p_correlation_id: correlationId,
+              p_ends_at: reschedule?.data?.endsAt,
+              p_event_id: eventId,
+              p_expected_event_version: reschedule?.data?.expectedEventVersion,
+              p_starts_at: reschedule?.data?.startsAt,
+            }),
+        eventLifecycleResultSchema,
+      );
+    }
+
+    const reconfirmRoute = route.match(
+      /^\/participations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/reschedule-confirmation$/iu,
+    );
+    if (request.method === "POST" && reconfirmRoute) {
+      operation = "seller.reschedule_confirm";
+      const input = confirmRescheduleRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Accept or decline.", 400, correlationId, origin);
+      }
+      return sellerResult(
+        await admin.rpc("confirm_reschedule_command", {
+          p_accept: input.data.accept,
+          p_actor_id: actorId,
+          p_correlation_id: correlationId,
+          p_participation_id: reconfirmRoute[1],
+        }),
+        sellerParticipationSchema,
       );
     }
 

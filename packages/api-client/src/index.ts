@@ -6,6 +6,8 @@ import {
   type DecideFirstEventReviewRequest,
   type CancelEventRequest,
   type ApplyToEventRequest,
+  type PostponeEventRequest,
+  type RescheduleEventRequest,
   adminAccountSchema,
   adminApprovalsSchema,
   adminCasesSchema,
@@ -535,6 +537,26 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         body: input,
         method: "POST",
       });
+    },
+    postponeEvent(accessToken: string, eventId: string, input: PostponeEventRequest) {
+      return request(`/events/${eventId}/postpone`, accessToken, eventLifecycleResultSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    rescheduleEvent(accessToken: string, eventId: string, input: RescheduleEventRequest) {
+      return request(`/events/${eventId}/reschedule`, accessToken, eventLifecycleResultSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    confirmReschedule(accessToken: string, participationId: string, accept: boolean) {
+      return request(
+        `/participations/${participationId}/reschedule-confirmation`,
+        accessToken,
+        sellerParticipationSchema,
+        { body: { accept }, method: "POST" },
+      );
     },
     listMyParticipations(accessToken: string) {
       return request("/participations", accessToken, myParticipationsSchema);

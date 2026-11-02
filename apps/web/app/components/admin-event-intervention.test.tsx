@@ -59,7 +59,6 @@ describe("AdminEventIntervention", () => {
     api.interveneInEvent.mockResolvedValue({ state: "ended", version: 6 });
     render(<AdminEventIntervention call={call} locale="en" />);
     await lookUp();
-    expect(screen.queryByLabelText("Public explanation")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Internal reason/u), {
       target: { value: "Report 43" },
     });

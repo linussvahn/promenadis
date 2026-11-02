@@ -53,7 +53,10 @@ export function AdminEventIntervention({
     formEvent.preventDefault();
     if (!event) return;
     const form = new FormData(formEvent.currentTarget);
+    const submitter = (formEvent.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const action = submitter?.value ?? "cancel";
     const internalReason = String(form.get("internalReason") ?? "");
+    const publicReason = String(form.get("publicReason") ?? "");
     const client = await call();
     if (!client) return;
     setBusy(true);
@@ -62,13 +65,13 @@ export function AdminEventIntervention({
       const result = await client.api.interveneInEvent(
         client.token,
         event.id,
-        event.state === "active"
+        action === "end_early"
           ? { action: "end_early", expectedEventVersion: event.version, internalReason }
           : {
-              action: "cancel",
+              action: action === "postpone" ? "postpone" : "cancel",
               expectedEventVersion: event.version,
               internalReason,
-              publicReason: String(form.get("publicReason") ?? ""),
+              publicReason,
             },
       );
       setEvent({ ...event, state: result.state, version: result.version });
@@ -82,6 +85,7 @@ export function AdminEventIntervention({
 
   const canCancel = event?.state === "published" || event?.state === "postponed";
   const canEnd = event?.state === "active";
+  const canPostpone = event?.state === "published" || event?.state === "active";
 
   return (
     <section aria-labelledby="admin-event-heading" className="panel">
@@ -110,9 +114,9 @@ export function AdminEventIntervention({
             {event.organizerDisplayName} · {translate(locale, `event.state.${event.state}`)}
             {event.startsAt ? ` · ${formatDateTime(locale, event.startsAt, event.timezone)}` : null}
           </p>
-          {canCancel || canEnd ? (
+          {canCancel || canEnd || canPostpone ? (
             <form className="details-form" onSubmit={intervene}>
-              {canCancel ? (
+              {canCancel || canPostpone ? (
                 <>
                   <label htmlFor="admin-public-reason">
                     {translate(locale, "lifecycle.reason")}
@@ -122,7 +126,6 @@ export function AdminEventIntervention({
                     maxLength={500}
                     minLength={3}
                     name="publicReason"
-                    required
                   />
                 </>
               ) : null}
@@ -136,9 +139,28 @@ export function AdminEventIntervention({
                 name="internalReason"
                 required
               />
-              <button className="danger-button" disabled={busy} type="submit">
-                {translate(locale, canEnd ? "lifecycle.end" : "lifecycle.cancel")}
-              </button>
+              <div className="form-actions">
+                {canEnd ? (
+                  <button className="danger-button" disabled={busy} type="submit" value="end_early">
+                    {translate(locale, "lifecycle.end")}
+                  </button>
+                ) : null}
+                {canCancel ? (
+                  <button className="danger-button" disabled={busy} type="submit" value="cancel">
+                    {translate(locale, "lifecycle.cancel")}
+                  </button>
+                ) : null}
+                {canPostpone ? (
+                  <button
+                    className="secondary-button"
+                    disabled={busy}
+                    type="submit"
+                    value="postpone"
+                  >
+                    {translate(locale, "lifecycle.postpone")}
+                  </button>
+                ) : null}
+              </div>
             </form>
           ) : (
             <p className="field-help">{translate(locale, "admin.noIntervention")}</p>

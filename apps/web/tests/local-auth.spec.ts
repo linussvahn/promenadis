@@ -1524,6 +1524,124 @@ test("invited sellers, appeals to an elevated admin and platform restrictions", 
   }
 });
 
+test("postponement asks sellers to reconfirm and seller data is erased after the grace", async ({
+  request,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const emails = ["owner", "seller"].map(
+    (role) => `postpone-${role}-${randomUUID()}@example.invalid`,
+  );
+  const password = `Local-test-${randomUUID()}`;
+  const headersFor = async (email: string) => {
+    const client = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return {
+      apikey: publicKey,
+      authorization: `Bearer ${data.session?.access_token}`,
+      origin: "http://127.0.0.1:5173",
+    };
+  };
+  for (const email of emails) {
+    const { error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
+    if (error) throw error;
+  }
+  try {
+    const [owner, seller] = await Promise.all(emails.map(headersFor));
+    const start = new Date(Date.now() + 3 * 86_400_000);
+    const created = await request.post(`${base}/events`, {
+      headers: owner,
+      data: {
+        description: "Synthetic postponement",
+        endsAt: new Date(start.getTime() + 5 * 3_600_000).toISOString(),
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic postponement owner",
+        startsAt: start.toISOString(),
+        timezone: "Europe/Stockholm",
+        title: "Synthetic postponed market",
+        visibility: "unlisted",
+      },
+    });
+    const eventId = (await created.json()).id as string;
+    const ownerId = localSql(`select id from auth.users where email='${emails[0]}';`);
+    localSql(`select public.upsert_draft_event_boundary_command('${ownerId}','${eventId}',null,'Synthetic area',
+        '{"type":"Polygon","coordinates":[[[18.06,59.33],[18.064,59.33],[18.064,59.333],[18.06,59.333],[18.06,59.33]]]}'::jsonb,
+        gen_random_uuid());
+      update public.events set admission_mode='auto_inside' where id='${eventId}';`);
+    const participation = await (
+      await request.post(`${base}/events/${eventId}/participation`, {
+        headers: seller,
+        data: {
+          addressLine: "Testgatan 14",
+          displayName: "Synthetic postponed seller",
+          latitude: 59.331,
+          locality: "",
+          longitude: 18.062,
+          placement: "manual",
+          postalCode: "",
+          rightToUseAttested: true,
+          sharesEntrance: null,
+        },
+      })
+    ).json();
+    expect(participation.state).toBe("approved");
+    localSql(`update public.events set state='published' where id='${eventId}';`);
+    const version = () =>
+      Number(localSql(`select version from public.events where id='${eventId}';`));
+
+    const postponed = await request.post(`${base}/events/${eventId}/postpone`, {
+      headers: owner,
+      data: { expectedEventVersion: version(), publicReason: "Storm warning" },
+    });
+    expect(await postponed.json()).toMatchObject({ state: "postponed" });
+    const waiting = await (
+      await request.get(`${base}/events/${eventId}/seller-view`, { headers: seller })
+    ).json();
+    expect(waiting).toMatchObject({ registrationOpen: false, state: "postponed" });
+    expect(waiting.participation.state).toBe("pending_reschedule_confirmation");
+
+    const newStart = new Date(Date.now() + 10 * 86_400_000);
+    const rescheduled = await request.post(`${base}/events/${eventId}/reschedule`, {
+      headers: owner,
+      data: {
+        endsAt: new Date(newStart.getTime() + 5 * 3_600_000).toISOString(),
+        expectedEventVersion: version(),
+        startsAt: newStart.toISOString(),
+      },
+    });
+    expect(await rescheduled.json()).toMatchObject({ state: "published" });
+    const confirmed = await request.post(
+      `${base}/participations/${participation.id}/reschedule-confirmation`,
+      {
+        headers: seller,
+        data: { accept: true },
+      },
+    );
+    expect(await confirmed.json()).toMatchObject({ state: "approved" });
+
+    // Retention: 15 days after the end, the job erases precise seller data.
+    localSql(`update public.events set state='active' where id='${eventId}';
+      update public.events set state='ended' where id='${eventId}';
+      update public.events set state_changed_at=now()-interval '15 days' where id='${eventId}';
+      select app_private.enforce_event_retention_command();`);
+    expect(
+      localSql(`select count(*) from public.event_locations where event_id='${eventId}';`),
+    ).toBe("0");
+    const gone = await (
+      await request.get(`${base}/events/${eventId}/seller-view`, { headers: seller })
+    ).json();
+    expect(gone.participation).toBeNull();
+    expect(localSql("select (public.retention_health_command()->>'stale');")).toBe("false");
+  } finally {
+    for (const email of emails) await deleteSyntheticAccount(email);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {

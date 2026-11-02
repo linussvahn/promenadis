@@ -1158,6 +1158,28 @@ export const incomingSellerInvitesSchema = z.array(
 
 export type IncomingSellerInvite = z.infer<typeof incomingSellerInvitesSchema>[number];
 
+export const postponeEventRequestSchema = z.strictObject({
+  expectedEventVersion: z.number().int().positive(),
+  publicReason: z.string().trim().min(3).max(500),
+});
+
+export type PostponeEventRequest = z.infer<typeof postponeEventRequestSchema>;
+
+export const rescheduleEventRequestSchema = z
+  .strictObject({
+    endsAt: isoInstant,
+    expectedEventVersion: z.number().int().positive(),
+    startsAt: isoInstant,
+  })
+  .refine((value) => new Date(value.endsAt) > new Date(value.startsAt), {
+    message: "Event end must be after its start",
+    path: ["endsAt"],
+  });
+
+export type RescheduleEventRequest = z.infer<typeof rescheduleEventRequestSchema>;
+
+export const confirmRescheduleRequestSchema = z.strictObject({ accept: z.boolean() });
+
 export const adminStatusSchema = z.strictObject({
   elevated: z.boolean(),
   eligible: z.boolean(),
@@ -1191,6 +1213,12 @@ export const adminEventInterventionRequestSchema = z.discriminatedUnion("action"
     action: z.literal("end_early"),
     expectedEventVersion: z.number().int().positive(),
     internalReason: z.string().trim().min(3).max(500),
+  }),
+  z.strictObject({
+    action: z.literal("postpone"),
+    expectedEventVersion: z.number().int().positive(),
+    internalReason: z.string().trim().min(3).max(500),
+    publicReason: z.string().trim().min(3).max(500),
   }),
 ]);
 
@@ -1388,6 +1416,9 @@ export const boundarySchemas = {
   EventForSeller: eventForSellerSchema,
   ApplyToEventRequest: applyToEventRequestSchema,
   SubmitReportRequest: submitReportRequestSchema,
+  PostponeEventRequest: postponeEventRequestSchema,
+  RescheduleEventRequest: rescheduleEventRequestSchema,
+  ConfirmRescheduleRequest: confirmRescheduleRequestSchema,
   SubmitAppealRequest: submitAppealRequestSchema,
   AppealQueue: appealQueueSchema,
   DecideAppealRequest: decideAppealRequestSchema,

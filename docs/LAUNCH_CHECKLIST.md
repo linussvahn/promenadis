@@ -132,7 +132,10 @@ Per-slice notes and evidence are in `NEXT_SESSION.md`.
 
 ### Milestone 2 — sellers and safety lifecycle
 
-Milestone 2 state: **in progress**. Slice 1 (seller applications, admission
+Milestone 2 state: **complete locally, 2026-11-03**, except public display and
+urgent snapshot/feed invalidation (Milestone 3), seller/owner/reporter mail
+(Milestone 5), Turnstile and hosted providers (hosted alpha) and watchlist
+entries. Slice 1 (seller applications, admission
 modes, seller places, waiting list and promotion, host decisions, withdrawal)
 is complete locally as of 2026-11-03: pgTAP 280, domain `seller-admission`
 tests, seller-join and event-sellers component tests, and the e2e "sellers
@@ -146,7 +149,11 @@ cases, location quarantine, team review and moderation) is complete locally:
 pgTAP 310 and the e2e "anonymous reports quarantine…". Slice 4b (appeals with
 reviewer separation, platform restrictions with a second-admin lift,
 reason-gated private reads, seller invitations) is complete locally: pgTAP 320
-and the e2e "invited sellers, appeals…". Event-relative retention remains.
+and the e2e "invited sellers, appeals…". Slice 5 (14-day seller-data erasure
+with tombstones and heartbeat, six-month moderation retention, postponement
+with seller reconfirmation and automatic cancellation) is complete locally:
+pgTAP 330 and the e2e "postponement asks sellers to reconfirm…". Database
+verification: 800/800 pgTAP assertions.
 
 - Seller application, entitlement/waitlist/promotion, address/geocode/manual pin,
   shared-location merge/split, and address-change reapproval.

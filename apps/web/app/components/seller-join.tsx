@@ -77,6 +77,21 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
     await load();
   };
 
+  const confirmReschedule = async (accept: boolean) => {
+    const participation = event?.participation;
+    const client = await call();
+    if (!participation || !client) return;
+    setBusy(true);
+    try {
+      await client.api.confirmReschedule(client.token, participation.id, accept);
+      await load();
+    } catch (error) {
+      setStatus(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const changeAddress = async (input: SellerAddressInput) => {
     const participation = event?.participation;
     const client = await call();
@@ -174,6 +189,25 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
                 <dd>{participation.displayName}</dd>
               </div>
             </dl>
+          ) : null}
+          {participation.state === "pending_reschedule_confirmation" &&
+          event.state === "published" ? (
+            <div className="form-actions">
+              {([true, false] as const).map((accept) => (
+                <button
+                  className={accept ? "primary-button" : "secondary-button"}
+                  disabled={busy}
+                  key={String(accept)}
+                  onClick={() => void confirmReschedule(accept)}
+                  type="button"
+                >
+                  {translate(locale, accept ? "seller.acceptNewDate" : "seller.declineNewDate")}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {event.state === "postponed" ? (
+            <p className="notice">{translate(locale, "seller.eventPostponed")}</p>
           ) : null}
           {participation.location?.quarantined ? (
             <p className="notice notice-error">{translate(locale, "seller.quarantined")}</p>

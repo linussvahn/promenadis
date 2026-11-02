@@ -462,6 +462,12 @@ Names are conceptual and can change during schema design.
   a draft upgrade is an explicit validated operation.
 - `event_suggested_tags`: at most twelve event-owned optional suggestions stored
   as authored display text plus a normalized comparison/search value.
+- Seller data retention (implemented 2026-11-03): an hourly job erases
+  participations, listings, locations and invitations 14 days after an event
+  ends or is cancelled, keeps only counts in `events.seller_history`, writes
+  an `event_seller_data` erasure tombstone and updates a privacy-free
+  `retention_heartbeats` row that monitoring reads through
+  `retention_health_command`.
 - `event_entitlements`: dormant/configurable capabilities and seller limit
   (default 30, platform-controlled); independent of a future payment provider.
   The event's admission mode (`auto_inside`, `host_approval`, `invite_only`)
