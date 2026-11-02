@@ -2206,6 +2206,50 @@ test("support requests reach the mailbox and visitors leave anonymous feedback",
   }
 });
 
+test("protected routes refuse anonymous callers and pages send security headers", async ({
+  page,
+  request,
+}) => {
+  if (!localStatus) throw new Error("Local test configuration missing");
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const id = randomUUID();
+  const protectedRoutes: Array<["GET" | "POST", string]> = [
+    ["POST", "/events"],
+    ["GET", "/notifications"],
+    ["GET", "/participations"],
+    ["GET", "/account/notification-preferences"],
+    ["GET", `/events/${id}/routing`],
+    ["GET", `/events/${id}/messages`],
+    ["POST", `/events/${id}/exports`],
+    ["GET", `/events/${id}/public-link`],
+    ["GET", "/admin/operations"],
+    ["GET", "/admin/support"],
+  ];
+  for (const [method, path] of protectedRoutes) {
+    const response = await request.fetch(`${base}${path}`, {
+      data: method === "POST" ? {} : undefined,
+      headers: { origin: "http://127.0.0.1:5173" },
+      method,
+    });
+    expect(response.status(), `${method} ${path}`).toBe(401);
+  }
+  // A forged origin is refused before any route runs.
+  const foreign = await request.get(`${base}/status`, {
+    headers: { origin: "https://evil.example" },
+  });
+  expect(foreign.status()).toBe(403);
+  // The browser gateway refuses cross-site requests without its header.
+  const gateway = await request.get("/api/notifications");
+  expect(gateway.status()).toBe(403);
+
+  const home = await page.goto("/");
+  const headers = home?.headers() ?? {};
+  expect(headers["content-security-policy"]).toContain("frame-ancestors 'none'");
+  expect(headers["x-frame-options"]).toBe("DENY");
+  expect(headers["x-content-type-options"]).toBe("nosniff");
+  expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {

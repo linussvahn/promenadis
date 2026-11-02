@@ -183,3 +183,36 @@ The operator owns this threat model. Review it:
 Every material threat-model change must update the authorization matrix, data
 classification, implementation tests, incident runbook, and launch checklist as
 applicable.
+
+## 9. Test mapping (Milestone 6, 2026-11-06)
+
+Local evidence today; "open" marks evidence that needs hosted, real-device
+or counsel work before a pilot.
+
+| Threat | Local evidence | Open |
+| --- | --- | --- |
+| Object-level authorization failure | pgTAP 420 (no browser grants, RLS on every table, no browser-executable function); per-command denial tests in pgTAP 060–410; e2e "protected routes refuse anonymous callers" | Hosted RLS/grant diff before each release |
+| Premature or overlong location publication | pgTAP 350 (early visibility, hard expiry, tombstones), 330 (14-day erasure), slice 3 edge tests | Real-clock soak during a closed alpha |
+| Stale CDN/snapshot restores removed pin | pgTAP 350/360 (feed removals across rebuilds), e2e map test (feed removes a seller without rebuild) | CDN purge verification at the edge |
+| Offline device retains old public data | `offline-store` tests (expiry, LRU), e2e walking test (offline banner, reconnect) | Real iPhone/Android offline/reconnect test |
+| Guessing or resharing unlisted URL | pgTAP 340 (128-bit keys, rotation 410), e2e landing test (no-index, no-referrer headers) | — |
+| Account takeover or magic-link abuse | pgTAP 120–200, 220–260; recovery, TOTP and session e2e tests | Turnstile, hosted Auth rate limits |
+| Stale account page after shared-session change | e2e "opaque sessions isolate accounts" | — |
+| Browser credential theft, refresh races or cookie replay | `test:local-session-security`, gateway tests, e2e session test | Hosted cookie flags over HTTPS |
+| Owner lockout or fraudulent transfer | pgTAP 060–110 | — |
+| Privilege escalation/admin misuse | pgTAP 220–250, 320, 400 (elevation required for switches, support, appeals) | Second-admin approval exercised with two real admins |
+| Malicious UGC, stored XSS, badge impersonation | Plain-text rendering only (no raw HTML anywhere; JSON-LD escapes `<`), public-pages test | Script-source CSP with nonces |
+| CSV formula injection | pgTAP 390, e2e export test (`=HYPERLINK` neutralized) | — |
+| Report/relay spam or targeted harassment | pgTAP 310, 390, 400 (network and subject buckets, honeypots), incident switches | Turnstile |
+| SSRF/provider-response poisoning | Geocoder fixture adapter with fixed hosts; routing source checksum | Hosted Geoapify response validation |
+| Webhook forgery/replay | None yet (no webhooks locally) | SES feedback webhook signatures |
+| Queue duplicate/loss or stale job | Worker node tests (lease-fenced acknowledgement), `test:local-notifications` (no replay) | Hosted queue visibility timeouts |
+| Unsafe or tampered walking graph | pgTAP 370, routing build tests, e2e walking test (preview, connectors, live block) | Hosted pinned compiler |
+| Graph/source license omission | Package and planner show ODbL attribution (routing tests, e2e) | Counsel review |
+| Secret or CI compromise | `pnpm security:scan` in `verify` | CI permissions review, rotation exercise |
+| Environment confusion | Local-only adapters fail closed outside `kong` | Separate hosted projects |
+| Backup resurrects erased data | `test:local-backup` (replay removes an erased account; tampering refused), pgTAP 410 | Quarterly real-archive restore |
+| Logging/monitoring leaks personal data | Structured operation log allowlist in the BFF; `/status` returns one field (e2e) | Log schema review on hosted logs |
+| Resource/cost exhaustion | Slice 2 load test at the event envelope | Provider quota failure tests |
+| Dependency or browser feature failure | Map/worker/storage fallbacks covered by component tests | Real-device matrix |
+| Clickjacking/CSRF/open redirect | e2e header test (`frame-ancestors 'none'`, `X-Frame-Options`), origin and gateway header checks | — |

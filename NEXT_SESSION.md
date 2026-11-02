@@ -456,6 +456,22 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Milestone 6 plan and slice 1 (2026-11-06)
+
+Plan: (1) privilege audit, anonymous denial, security headers, threat
+mapping; (2) concurrency and load at the event envelope (500 sellers, 450
+locations, 10,000 visitors, 15-second conditional safety checks), adding
+ETag/304 to manifest and feed; (3) lifecycle, expiry and DST edge cases.
+Real devices, manual WCAG, counsel and pilot scheduling are not code work.
+
+Slice 1 (no migration): `supabase/tests/database/420_privilege_audit.test.sql`
+fails on any table without RLS, any browser grant or sequence use, any
+browser-executable non-trigger function, or any function without a pinned
+(definer: empty) search path. `app/entry.server.tsx` adds CSP frame/base/
+object/form restrictions, `X-Frame-Options`, `nosniff` and a default
+referrer policy. E2E "protected routes refuse anonymous callers and pages
+send security headers". `docs/THREAT_MODEL.md` §9 maps threats to tests.
+
 ### Milestone 5 complete locally (2026-11-06)
 
 All slices are built, tested and pushed. Hosted-only parts remain: SES

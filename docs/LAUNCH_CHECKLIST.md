@@ -295,6 +295,14 @@ quarterly real-archive restore.
 
 ### Milestone 6 — pilot hardening
 
+Milestone 6 progress: slice 1 (whole-schema privilege audit in pgTAP 420,
+anonymous-denial and security-header e2e, server-rendered pages now send
+`Content-Security-Policy: frame-ancestors 'none'; object-src 'none';
+base-uri 'self'; form-action 'self'`, `X-Frame-Options`, `nosniff` and a
+default referrer policy; threat-to-test mapping in `docs/THREAT_MODEL.md`
+section 9) is complete locally as of 2026-11-06. A script-source CSP needs
+hydration nonces and stays open.
+
 - Full authorization/RLS/state/concurrency review and threat-model test mapping.
 - Load tests for the accepted event envelope and failure tests at provider quotas.
 - End/cancel/postpone/quarantine/expiry tests with CDN, offline, retry, rollback,

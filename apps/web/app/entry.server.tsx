@@ -18,6 +18,18 @@ export default function handleRequest(
 ) {
   // Location may be asked for by this origin only, never by embedded frames.
   responseHeaders.set("Permissions-Policy", "geolocation=(self), camera=(), microphone=()");
+  // No framing, plugins, foreign base URLs or cross-origin form posts. Script
+  // sources stay open for now: hydration uses inline scripts without a nonce.
+  responseHeaders.set(
+    "Content-Security-Policy",
+    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
+  );
+  responseHeaders.set("X-Frame-Options", "DENY");
+  responseHeaders.set("X-Content-Type-Options", "nosniff");
+  // Routes that need stricter referrer handling (unlisted pages) set it themselves.
+  if (!responseHeaders.has("Referrer-Policy")) {
+    responseHeaders.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  }
 
   // https://httpwg.org/specs/rfc9110.html#HEAD
   if (request.method.toUpperCase() === "HEAD") {
