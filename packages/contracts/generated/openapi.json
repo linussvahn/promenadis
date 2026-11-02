@@ -703,6 +703,9 @@
                       "corrected"
                     ]
                   },
+                  "quarantined": {
+                    "type": "boolean"
+                  },
                   "postalCode": {
                     "anyOf": [
                       {
@@ -729,6 +732,7 @@
                   "longitude",
                   "needsReview",
                   "placement",
+                  "quarantined",
                   "postalCode",
                   "sellerCount"
                 ],
@@ -861,6 +865,9 @@
                         "corrected"
                       ]
                     },
+                    "quarantined": {
+                      "type": "boolean"
+                    },
                     "postalCode": {
                       "anyOf": [
                         {
@@ -887,6 +894,7 @@
                     "longitude",
                     "needsReview",
                     "placement",
+                    "quarantined",
                     "postalCode",
                     "sellerCount"
                   ],
@@ -1121,6 +1129,9 @@
                               "corrected"
                             ]
                           },
+                          "quarantined": {
+                            "type": "boolean"
+                          },
                           "postalCode": {
                             "anyOf": [
                               {
@@ -1147,6 +1158,7 @@
                           "longitude",
                           "needsReview",
                           "placement",
+                          "quarantined",
                           "postalCode",
                           "sellerCount"
                         ],
@@ -1334,6 +1346,420 @@
           "displayName"
         ],
         "additionalProperties": false
+      },
+      "SubmitReportRequest": {
+        "type": "object",
+        "properties": {
+          "confirmsNoConsent": {
+            "type": "boolean"
+          },
+          "details": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "unauthorized_address",
+              "safety",
+              "illegal",
+              "copyright",
+              "privacy",
+              "fraud",
+              "harassment",
+              "other_terms"
+            ]
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "resident",
+                  "owner",
+                  "manager",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reporterContact": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": ""
+              },
+              {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 200
+              }
+            ]
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "subjectType": {
+            "type": "string",
+            "enum": [
+              "location",
+              "participation",
+              "item"
+            ]
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "confirmsNoConsent",
+          "details",
+          "eventId",
+          "reason",
+          "relationship",
+          "reporterContact",
+          "subjectId",
+          "subjectType"
+        ],
+        "additionalProperties": false
+      },
+      "ReportReceived": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "received"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationCases": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "addressLine": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "closedAt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "locationId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "openedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "outcome": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "restored",
+                    "upheld",
+                    "dismissed"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "participationId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "quarantined": {
+              "type": "boolean"
+            },
+            "reports": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "complete": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "details": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "unauthorized_address",
+                      "safety",
+                      "illegal",
+                      "copyright",
+                      "privacy",
+                      "fraud",
+                      "harassment",
+                      "other_terms"
+                    ]
+                  },
+                  "relationship": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "resident",
+                          "owner",
+                          "manager",
+                          "other"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "complete",
+                  "createdAt",
+                  "details",
+                  "id",
+                  "reason",
+                  "relationship"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "sellerDisplayName": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed"
+              ]
+            },
+            "subjectId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "subjectType": {
+              "type": "string",
+              "enum": [
+                "location",
+                "participation",
+                "item"
+              ]
+            }
+          },
+          "required": [
+            "addressLine",
+            "closedAt",
+            "id",
+            "locationId",
+            "openedAt",
+            "outcome",
+            "participationId",
+            "quarantined",
+            "reports",
+            "sellerDisplayName",
+            "state",
+            "subjectId",
+            "subjectType"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "ReviewCaseRequest": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "restore",
+              "uphold",
+              "dismiss"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ModerateParticipationRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "hide_listing",
+              "restore_listing",
+              "hide_item",
+              "restore_item",
+              "suspend",
+              "reinstate"
+            ]
+          },
+          "itemId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "action",
+          "itemId",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "MyModeration": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "quarantine",
+                "uphold_removal",
+                "hide_listing",
+                "hide_item",
+                "suspend",
+                "revoke"
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "eventId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "eventTitle": {
+              "type": "string",
+              "maxLength": 120
+            },
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "action",
+            "createdAt",
+            "eventId",
+            "eventTitle",
+            "id",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
       },
       "EventTaxonomy": {
         "type": "object",
@@ -1544,6 +1970,20 @@
           "earlyVisibilityOptOut": {
             "type": "boolean"
           },
+          "hidden": {
+            "type": "boolean"
+          },
+          "hiddenReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "items": {
             "maxItems": 20,
             "type": "array",
@@ -1558,6 +1998,9 @@
                 "currency": {
                   "type": "string",
                   "pattern": "^[A-Z]{3}$"
+                },
+                "hidden": {
+                  "type": "boolean"
                 },
                 "id": {
                   "type": "string",
@@ -1591,6 +2034,7 @@
               "required": [
                 "categoryId",
                 "currency",
+                "hidden",
                 "id",
                 "name",
                 "priceMinor",
@@ -1673,6 +2117,8 @@
           "categoryIds",
           "description",
           "earlyVisibilityOptOut",
+          "hidden",
+          "hiddenReason",
           "items",
           "liveStatus",
           "tags",
@@ -2275,6 +2721,9 @@
                             "corrected"
                           ]
                         },
+                        "quarantined": {
+                          "type": "boolean"
+                        },
                         "postalCode": {
                           "anyOf": [
                             {
@@ -2301,6 +2750,7 @@
                         "longitude",
                         "needsReview",
                         "placement",
+                        "quarantined",
                         "postalCode",
                         "sellerCount"
                       ],

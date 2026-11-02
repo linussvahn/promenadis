@@ -206,6 +206,11 @@ export function SellerListingEditor({
       ) : null}
       <form className="panel form-panel" key={listing.version} onSubmit={save}>
         <h2>{translate(locale, "listing.title")}</h2>
+        {listing.hidden ? (
+          <p className="notice notice-error">
+            {translate(locale, "seller.listingHidden")} {listing.hiddenReason}
+          </p>
+        ) : null}
         <p className="field-help">{translate(locale, "listing.help")}</p>
         <label htmlFor="listing-title">{translate(locale, "listing.stopTitle")}</label>
         <input defaultValue={listing.title ?? ""} id="listing-title" maxLength={80} name="title" />

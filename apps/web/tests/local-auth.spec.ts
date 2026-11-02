@@ -1231,6 +1231,140 @@ test("hosts pick categories; sellers write listings and set live status during t
   }
 });
 
+test("anonymous reports quarantine one location until the team decides", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const emails = ["owner", "seller-a", "seller-b"].map(
+    (role) => `report-${role}-${randomUUID()}@example.invalid`,
+  );
+  const password = `Local-test-${randomUUID()}`;
+  const headersFor = async (email: string) => {
+    const client = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return {
+      apikey: publicKey,
+      authorization: `Bearer ${data.session?.access_token}`,
+      origin: "http://127.0.0.1:5173",
+    };
+  };
+  for (const email of emails) {
+    const { error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
+    if (error) throw error;
+  }
+  localSql("delete from app_private.report_rate_buckets;");
+  try {
+    const [owner, sellerA, sellerB] = await Promise.all(emails.map(headersFor));
+    const created = await request.post(`${base}/events`, {
+      headers: owner,
+      data: {
+        description: "Synthetic reports",
+        endsAt: "2031-09-18T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic report owner",
+        startsAt: "2031-09-18T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic report market",
+        visibility: "unlisted",
+      },
+    });
+    const eventId = (await created.json()).id as string;
+    const ownerId = localSql(`select id from auth.users where email='${emails[0]}';`);
+    localSql(`select public.upsert_draft_event_boundary_command('${ownerId}','${eventId}',null,'Synthetic area',
+        '{"type":"Polygon","coordinates":[[[18.06,59.33],[18.064,59.33],[18.064,59.333],[18.06,59.333],[18.06,59.33]]]}'::jsonb,
+        gen_random_uuid());
+      update public.events set admission_mode='auto_inside' where id='${eventId}';`);
+    const apply = async (headers: Record<string, string>, address: string, longitude: number) =>
+      (
+        await request.post(`${base}/events/${eventId}/participation`, {
+          headers,
+          data: {
+            addressLine: address,
+            displayName: "Synthetic reported seller",
+            latitude: 59.331,
+            locality: "",
+            longitude,
+            placement: "manual",
+            postalCode: "",
+            rightToUseAttested: true,
+            sharesEntrance: null,
+          },
+        })
+      ).json();
+    const reported = await apply(sellerA, "Testgatan 7", 18.0612);
+    const other = await apply(sellerB, "Testgatan 8", 18.0613);
+
+    const anonymous = { apikey: publicKey, origin: "http://127.0.0.1:5173" };
+    const report = await request.post(`${base}/reports`, {
+      headers: anonymous,
+      data: {
+        confirmsNoConsent: true,
+        details: "I live here and never agreed to a stall at my door.",
+        eventId,
+        reason: "unauthorized_address",
+        relationship: "resident",
+        reporterContact: "neighbour@example.invalid",
+        subjectId: reported.location.id,
+        subjectType: "location",
+      },
+    });
+    expect(report.status()).toBe(202);
+    expect(await report.json()).toEqual({ received: true });
+
+    const sellerView = await (
+      await request.get(`${base}/events/${eventId}/seller-view`, { headers: sellerA })
+    ).json();
+    expect(sellerView.participation.location.quarantined).toBe(true);
+    const otherView = await (
+      await request.get(`${base}/events/${eventId}/seller-view`, { headers: sellerB })
+    ).json();
+    expect(otherView.participation.location.quarantined).toBe(false);
+
+    const casesResponse = await request.get(`${base}/events/${eventId}/cases`, { headers: owner });
+    const casesText = await casesResponse.text();
+    expect(casesText).not.toContain("neighbour@example.invalid");
+    const cases = JSON.parse(casesText);
+    expect(cases[0]).toMatchObject({ quarantined: true, state: "open" });
+    const dismissed = await request.post(`${base}/cases/${cases[0].id}/review`, {
+      headers: owner,
+      data: { decision: "dismiss", reason: "Looks fine" },
+    });
+    expect((await dismissed.json()).code).toBe("quarantine_needs_decision");
+    const upheld = await request.post(`${base}/cases/${cases[0].id}/review`, {
+      headers: owner,
+      data: { decision: "uphold", reason: "Resident confirmed" },
+    });
+    expect((await upheld.json())[0]).toMatchObject({ outcome: "upheld", state: "closed" });
+    const mine = await (await request.get(`${base}/moderation`, { headers: sellerA })).json();
+    expect(mine.map((item: { action: string }) => item.action).sort()).toEqual([
+      "quarantine",
+      "uphold_removal",
+    ]);
+
+    const suspended = await request.post(`${base}/participations/${other.id}/moderation`, {
+      headers: owner,
+      data: { action: "suspend", itemId: null, reason: "Checking a complaint" },
+    });
+    expect(await suspended.json()).toMatchObject({ state: "suspended" });
+
+    // The public form goes through the browser gateway without any session.
+    await page.goto(`/report?event=${eventId}&type=participation&subject=${other.id}`);
+    await page.getByLabel("Vad gäller det?").selectOption("harassment");
+    await page.getByLabel("Beskriv vad som är fel").fill("Threatening text on the listing.");
+    await page.getByRole("button", { name: "Skicka anmälan" }).click();
+    await expect(page.getByText(/Anmälan är mottagen/u)).toBeVisible();
+  } finally {
+    for (const email of emails) await deleteSyntheticAccount(email);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {

@@ -3,6 +3,7 @@ import type {
   DraftEventSummary,
   EventSellers as EventSellersData,
   LocationReviewRequest,
+  ModerateParticipationRequest,
   PinCorrectionRequest,
   SellerListing,
   SellerParticipation,
@@ -10,6 +11,7 @@ import type {
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { EventCases } from "./event-cases";
 import { EventTaxonomyEditor } from "./event-taxonomy-editor";
 
 const errorKeys = {
@@ -146,6 +148,14 @@ export function EventSellers({
         <p className="field-help">{translate(locale, "sellers.joinLinkHelp")}</p>
       </section>
 
+      <EventCases
+        call={call}
+        eventId={event.id}
+        locale={locale}
+        onChanged={load}
+        timezone={event.timezone}
+      />
+
       <EventTaxonomyEditor
         call={call}
         editable={canManage && event.state === "draft"}
@@ -241,6 +251,7 @@ export function EventSellers({
                 call={call}
                 eventActive={event.state === "active"}
                 locale={locale}
+                onChanged={load}
                 participation={seller}
               />
               {open || holding ? (
@@ -427,6 +438,7 @@ function SellerListingView({
   call,
   eventActive,
   locale,
+  onChanged,
   participation,
 }: {
   readonly call: () => Promise<{
@@ -435,6 +447,7 @@ function SellerListingView({
   } | null>;
   readonly eventActive: boolean;
   readonly locale: Locale;
+  readonly onChanged: () => Promise<void>;
   readonly participation: SellerParticipation;
 }) {
   const [listing, setListing] = useState<SellerListing | null>(null);
@@ -448,6 +461,39 @@ function SellerListingView({
       setListing(await client.api.getSellerListing(client.token, participation.id));
     } catch {
       setStatus(translate(locale, "listing.loadFailed"));
+    }
+  };
+
+  const moderate = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    const form = formEvent.currentTarget;
+    const submitter = (formEvent.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const [action, itemId] = (submitter?.value ?? "").split(":");
+    const reason = String(new FormData(form).get("reason") ?? "").trim();
+    const client = await call();
+    if (!client || !action) return;
+    try {
+      await client.api.moderateParticipation(client.token, participation.id, {
+        action: action as ModerateParticipationRequest["action"],
+        itemId: itemId ?? null,
+        reason,
+      });
+      setListing(await client.api.getSellerListing(client.token, participation.id));
+      await onChanged();
+      form.reset();
+      setStatus(translate(locale, "moderation.done"));
+    } catch (error) {
+      const code = error instanceof PromenadisApiError ? error.code : "";
+      setStatus(
+        translate(
+          locale,
+          code === "platform_restricted"
+            ? "cases.platformRestricted"
+            : code === "invalid_request"
+              ? "cases.reasonRequired"
+              : "listing.error",
+        ),
+      );
     }
   };
 
@@ -513,6 +559,58 @@ function SellerListingView({
               ? translate(locale, `live.${listing.liveStatus.status}`)
               : translate(locale, "live.scheduled")}
           </p>
+          {listing.hidden ? (
+            <p className="notice">{translate(locale, "moderation.listingHidden")}</p>
+          ) : null}
+          <form className="details-form" onSubmit={moderate}>
+            <label htmlFor={`moderation-reason-${participation.id}`}>
+              {translate(locale, "moderation.reason")}
+            </label>
+            <textarea
+              id={`moderation-reason-${participation.id}`}
+              maxLength={500}
+              name="reason"
+              required
+            />
+            <div className="form-actions">
+              {listing.version > 0 ? (
+                <button
+                  className="secondary-button"
+                  type="submit"
+                  value={listing.hidden ? "restore_listing" : "hide_listing"}
+                >
+                  {translate(
+                    locale,
+                    listing.hidden ? "moderation.restoreListing" : "moderation.hideListing",
+                  )}
+                </button>
+              ) : null}
+              {listing.items.map((item) => (
+                <button
+                  className="secondary-button"
+                  key={item.id}
+                  type="submit"
+                  value={`${item.hidden ? "restore_item" : "hide_item"}:${item.id}`}
+                >
+                  {translate(
+                    locale,
+                    item.hidden ? "moderation.restoreItem" : "moderation.hideItem",
+                  )}
+                  : {item.name}
+                </button>
+              ))}
+              {participation.state === "approved" ? (
+                <button className="danger-button" type="submit" value="suspend">
+                  {translate(locale, "moderation.suspend")}
+                </button>
+              ) : null}
+              {participation.state === "suspended" ? (
+                <button className="secondary-button" type="submit" value="reinstate">
+                  {translate(locale, "moderation.reinstate")}
+                </button>
+              ) : null}
+            </div>
+          </form>
           {eventActive && participation.state === "approved" ? (
             <form className="details-form" onSubmit={onBehalf}>
               <label htmlFor={`live-reason-${participation.id}`}>

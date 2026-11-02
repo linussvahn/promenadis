@@ -668,6 +668,7 @@ export const sellerLocationSchema = z.strictObject({
   longitude: z.number().min(-180).max(180),
   needsReview: z.boolean(),
   placement: z.enum(["manual", "geocoded", "corrected"]),
+  quarantined: z.boolean(),
   postalCode: z.string().max(6).nullable(),
   sellerCount: z.number().int().positive(),
 });
@@ -885,11 +886,14 @@ export const sellerListingSchema = z.strictObject({
   categoryIds: z.array(opaqueUuid).max(5),
   description: z.string().max(1000),
   earlyVisibilityOptOut: z.boolean(),
+  hidden: z.boolean(),
+  hiddenReason: z.string().max(500).nullable(),
   items: z
     .array(
       z.strictObject({
         categoryId: opaqueUuid,
         currency: z.string().regex(/^[A-Z]{3}$/u),
+        hidden: z.boolean(),
         id: opaqueUuid,
         name: z.string().max(80),
         priceMinor: z.number().int().min(0).max(10_000_000).nullable(),
@@ -941,6 +945,104 @@ export const setLiveStatusRequestSchema = z.strictObject({
 });
 
 export type SetLiveStatusRequest = z.infer<typeof setLiveStatusRequestSchema>;
+
+export const reportReasonSchema = z.enum([
+  "unauthorized_address",
+  "safety",
+  "illegal",
+  "copyright",
+  "privacy",
+  "fraud",
+  "harassment",
+  "other_terms",
+]);
+export const reportRelationshipSchema = z.enum(["resident", "owner", "manager", "other"]);
+
+export const submitReportRequestSchema = z.strictObject({
+  confirmsNoConsent: z.boolean(),
+  details: z.string().trim().min(1).max(1000),
+  eventId: opaqueUuid,
+  reason: reportReasonSchema,
+  relationship: reportRelationshipSchema.nullable(),
+  reporterContact: z.union([z.literal(""), z.string().trim().min(3).max(200)]),
+  subjectId: opaqueUuid,
+  subjectType: z.enum(["location", "participation", "item"]),
+  // Honeypot: real people leave it empty.
+  website: z.string().max(200).optional(),
+});
+
+export type SubmitReportRequest = z.infer<typeof submitReportRequestSchema>;
+
+export const reportReceivedSchema = z.strictObject({ received: z.literal(true) });
+
+export const moderationCasesSchema = z.array(
+  z.strictObject({
+    addressLine: z.string().max(200).nullable(),
+    closedAt: isoInstant.nullable(),
+    id: opaqueUuid,
+    locationId: opaqueUuid.nullable(),
+    openedAt: isoInstant,
+    outcome: z.enum(["restored", "upheld", "dismissed"]).nullable(),
+    participationId: opaqueUuid.nullable(),
+    quarantined: z.boolean(),
+    reports: z.array(
+      z.strictObject({
+        complete: z.boolean(),
+        createdAt: isoInstant,
+        details: z.string().max(1000),
+        id: opaqueUuid,
+        reason: reportReasonSchema,
+        relationship: reportRelationshipSchema.nullable(),
+      }),
+    ),
+    sellerDisplayName: z.string().max(80).nullable(),
+    state: z.enum(["open", "closed"]),
+    subjectId: opaqueUuid,
+    subjectType: z.enum(["location", "participation", "item"]),
+  }),
+);
+
+export type ModerationCase = z.infer<typeof moderationCasesSchema>[number];
+
+export const reviewCaseRequestSchema = z.strictObject({
+  decision: z.enum(["restore", "uphold", "dismiss"]),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const moderateParticipationRequestSchema = z.strictObject({
+  action: z.enum([
+    "hide_listing",
+    "restore_listing",
+    "hide_item",
+    "restore_item",
+    "suspend",
+    "reinstate",
+  ]),
+  itemId: opaqueUuid.nullable(),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export type ModerateParticipationRequest = z.infer<typeof moderateParticipationRequestSchema>;
+
+export const myModerationSchema = z.array(
+  z.strictObject({
+    action: z.enum([
+      "quarantine",
+      "uphold_removal",
+      "hide_listing",
+      "hide_item",
+      "suspend",
+      "revoke",
+    ]),
+    createdAt: isoInstant,
+    eventId: opaqueUuid,
+    eventTitle: z.string().max(120),
+    id: opaqueUuid,
+    reason: z.string().max(500).nullable(),
+  }),
+);
+
+export type MyModerationAction = z.infer<typeof myModerationSchema>[number];
 
 export const adminStatusSchema = z.strictObject({
   elevated: z.boolean(),
@@ -1171,6 +1273,12 @@ export const boundarySchemas = {
   MyParticipations: myParticipationsSchema,
   EventForSeller: eventForSellerSchema,
   ApplyToEventRequest: applyToEventRequestSchema,
+  SubmitReportRequest: submitReportRequestSchema,
+  ReportReceived: reportReceivedSchema,
+  ModerationCases: moderationCasesSchema,
+  ReviewCaseRequest: reviewCaseRequestSchema,
+  ModerateParticipationRequest: moderateParticipationRequestSchema,
+  MyModeration: myModerationSchema,
   EventTaxonomy: eventTaxonomySchema,
   SaveEventTaxonomyRequest: saveEventTaxonomyRequestSchema,
   SellerListing: sellerListingSchema,

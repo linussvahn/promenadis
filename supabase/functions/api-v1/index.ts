@@ -10,6 +10,11 @@ import {
   adminElevationRequestSchema,
   adminEventInterventionRequestSchema,
   applyToEventRequestSchema,
+  moderateParticipationRequestSchema,
+  moderationCasesSchema,
+  myModerationSchema,
+  reviewCaseRequestSchema,
+  submitReportRequestSchema,
   eventTaxonomySchema,
   saveEventTaxonomyRequestSchema,
   saveSellerListingRequestSchema,
@@ -173,6 +178,30 @@ async function authAsUser(token: string, path: string, method: string, body?: un
   });
   const data = await response.json().catch(() => null);
   return { ok: response.ok, status: response.status, data };
+}
+
+// Anonymous limits key on an HMAC of the client network prefix (IPv4 /24,
+// IPv6 /48), never the raw address.
+async function networkBucket(request: Request): Promise<string> {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
+  const prefix = forwarded.includes(":")
+    ? forwarded.split(":").slice(0, 3).join(":")
+    : forwarded.split(".").slice(0, 3).join(".");
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(`promenadis/report-network/v1/${serviceRoleKey}`),
+    { hash: "SHA-256", name: "HMAC" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(prefix || "unknown"),
+  );
+  return [...new Uint8Array(signature).slice(0, 16)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 async function authenticatedActor(request: Request): Promise<AuthenticatedActor | null> {
@@ -696,6 +725,44 @@ Deno.serve(async (request) => {
       }
       status = outcome === "dispatching" ? "degraded" : "denied";
       return outcome === "dispatching" ? finishing() : unavailable();
+    }
+
+    if (route === "/reports" && request.method === "POST") {
+      operation = "report.submit";
+      const input = submitReportRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Check the report.", 400, correlationId, origin);
+      }
+      // A filled honeypot gets the same answer and stores nothing.
+      if (input.data.website) {
+        status = "denied";
+        return json({ received: true }, 202, correlationId, origin);
+      }
+      const { data, error } = await admin.rpc("submit_report_command", {
+        p_confirms_no_consent: input.data.confirmsNoConsent,
+        p_correlation_id: correlationId,
+        p_details: input.data.details,
+        p_event_id: input.data.eventId,
+        p_network_bucket: await networkBucket(request),
+        p_reason: input.data.reason,
+        p_relationship: input.data.relationship,
+        p_reporter_contact: input.data.reporterContact || null,
+        p_subject_id: input.data.subjectId,
+        p_subject_type: input.data.subjectType,
+      });
+      if (error) {
+        const mapped = new Map<string, [string, string, number]>([
+          ["Report limit reached", ["rate_limited", "Too many reports. Try again later.", 429]],
+          ["Report subject not found", ["not_found", "That listing or location is gone.", 404]],
+          ["Invalid report", ["invalid_request", "Check the report.", 400]],
+        ]).get(error.message);
+        if (!mapped) throw error;
+        status = "denied";
+        return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+      }
+      status = "succeeded";
+      return json(data, 202, correlationId, origin);
     }
 
     const actor = await authenticatedActor(request);
@@ -2387,6 +2454,22 @@ Deno.serve(async (request) => {
       ],
       ["Invalid live status", ["invalid_request", "Check the status.", 400]],
       ["Closed for the day", ["closed_for_day", "You have closed for the day.", 409]],
+      ["Case not found", ["not_found", "Case not found.", 404]],
+      ["Case already closed", ["invalid_state", "The case is already closed.", 409]],
+      ["Invalid case decision", ["invalid_request", "Choose a decision and give a reason.", 400]],
+      [
+        "Restore or uphold a quarantined location",
+        ["quarantine_needs_decision", "Restore or uphold the quarantined location.", 409],
+      ],
+      [
+        "Platform restriction applies",
+        [
+          "platform_restricted",
+          "A platform restriction applies. Only an administrator can lift it.",
+          409,
+        ],
+      ],
+      ["Invalid moderation action", ["invalid_request", "That action is not possible.", 400]],
     ]);
     const sellerResult = <T>(
       result: { data: unknown; error: { message: string } | null },
@@ -2406,7 +2489,7 @@ Deno.serve(async (request) => {
     };
 
     const sellerEventRoute = route.match(
-      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(seller-view|participation|sellers|admission|geocode|location-review|taxonomy)$/iu,
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(seller-view|participation|sellers|admission|geocode|location-review|taxonomy|cases)$/iu,
     );
     if (sellerEventRoute) {
       const [, eventId, action] = sellerEventRoute;
@@ -2503,6 +2586,13 @@ Deno.serve(async (request) => {
         if (stored.error) throw stored.error;
         status = "succeeded";
         return json(point ? { found: true, ...point } : notFound, 200, correlationId, origin);
+      }
+      if (action === "cases" && request.method === "GET") {
+        operation = "moderation.cases_read";
+        return sellerResult(
+          await admin.rpc("list_event_cases_command", { p_actor_id: actorId, p_event_id: eventId }),
+          moderationCasesSchema,
+        );
       }
       if (action === "taxonomy" && request.method === "GET") {
         operation = "event.taxonomy_read";
@@ -2608,6 +2698,71 @@ Deno.serve(async (request) => {
       return sellerResult(
         await admin.rpc("list_my_participations_command", { p_actor_id: actorId }),
         myParticipationsSchema,
+      );
+    }
+
+    const caseRoute = route.match(
+      /^\/cases\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/review$/iu,
+    );
+    if (request.method === "POST" && caseRoute) {
+      operation = "moderation.case_review";
+      const input = reviewCaseRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError(
+          "invalid_request",
+          "Choose a decision and give a reason.",
+          400,
+          correlationId,
+          origin,
+        );
+      }
+      return sellerResult(
+        await admin.rpc("review_moderation_case_command", {
+          p_actor_id: actorId,
+          p_case_id: caseRoute[1],
+          p_correlation_id: correlationId,
+          p_decision: input.data.decision,
+          p_reason: input.data.reason,
+        }),
+        moderationCasesSchema,
+      );
+    }
+
+    if (request.method === "GET" && route === "/moderation") {
+      operation = "moderation.own_read";
+      return sellerResult(
+        await admin.rpc("list_my_moderation_command", { p_actor_id: actorId }),
+        myModerationSchema,
+      );
+    }
+
+    const moderationRoute = route.match(
+      /^\/participations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/moderation$/iu,
+    );
+    if (request.method === "POST" && moderationRoute) {
+      operation = "moderation.participation";
+      const input = moderateParticipationRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError(
+          "invalid_request",
+          "That action is not possible.",
+          400,
+          correlationId,
+          origin,
+        );
+      }
+      return sellerResult(
+        await admin.rpc("moderate_participation_command", {
+          p_action: input.data.action,
+          p_actor_id: actorId,
+          p_correlation_id: correlationId,
+          p_item_id: input.data.itemId,
+          p_participation_id: moderationRoute[1],
+          p_reason: input.data.reason,
+        }),
+        sellerParticipationSchema,
       );
     }
 

@@ -472,6 +472,40 @@ Planned slices, each its own commit:
 5. Event-relative retention: non-public at end/cancel, 14-day erasure,
    tombstones, heartbeats; postponement and reschedule confirmation.
 
+Slice 4a, `20261103000400_reports_moderation.sql`:
+
+- Anonymous `POST /reports` (handled before the auth gate; the browser
+  gateway forwards it without the session). Structured: subject
+  (location/participation/item), eight reasons, details, optional
+  relationship and contact, honeypot field. Limits: 3/hour per HMAC of the
+  network prefix (IPv4 /24, IPv6 /48; raw IP never stored) and 10/hour per
+  subject (`app_private.report_rate_buckets`, purged hourly). Clear the table
+  between repeated local e2e runs. Turnstile/CAPTCHA is a hosted-alpha gate.
+- Reports collapse into one open `moderation_cases` row per subject. The
+  first complete unauthorized-address report (relationship resident/owner/
+  manager, no-consent confirmation, 20+ character details) quarantines only
+  that physical location (`event_locations.quarantined_at`). The answer is
+  always `{received: true}`.
+- Team (owner/co-host/moderator): `list_event_cases_command` (no reporter
+  identity or contact), `review_moderation_case_command` (restore / uphold /
+  dismiss with a reason; a quarantined location must be restored or upheld;
+  uphold revokes every seller at the stop and erases the address, or hides a
+  reported item), `moderate_participation_command` (hide/restore listing text
+  or item, suspend/reinstate). `app_private.moderation_actions` records each
+  action with the affected account so it can be appealed;
+  `list_my_moderation_command` shows a seller what affected them.
+- `app_private.platform_account_restrictions` exists so local reviewers
+  cannot restore or reinstate a platform-restricted seller; admin commands
+  arrive in 4b.
+- Web: public `/report` page, `EventCases` and moderation buttons on the
+  sellers page, quarantine/hidden notices for sellers.
+- Deferred: seller/owner notification of quarantine (Milestone 5 mail),
+  urgent feed/snapshot invalidation (Milestone 3), watchlist entries,
+  report/case retention purge (slice 5).
+- Verified: pgTAP 310 (30; 744 total), 99 web tests, full verify, DB
+  rebuild, 16/16 local-auth e2e (one submits through the browser gateway),
+  5 smoke, integration scripts.
+
 Slice 3, `20261103000300_taxonomy_listings.sql`:
 
 - Taxonomy `flea-market-v1`: `taxonomy_versions`, `taxonomy_categories`

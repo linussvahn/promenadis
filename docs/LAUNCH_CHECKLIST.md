@@ -141,8 +141,10 @@ stops with host merge/split, address-change reapproval, 25 m pin corrections)
 is complete locally: pgTAP 290 and the e2e "geocoded pins, shared stops…".
 Slice 3 (flea-market-v1 taxonomy, event category subset, seller listings,
 items, accessibility facts, availability, live status) is complete locally:
-pgTAP 300 and the e2e "hosts pick categories…". Moderation and
-event-relative retention remain.
+pgTAP 300 and the e2e "hosts pick categories…". Slice 4a (anonymous reports,
+cases, location quarantine, team review and moderation) is complete locally:
+pgTAP 310 and the e2e "anonymous reports quarantine…". Appeals, platform
+suspension, seller invitations and event-relative retention remain.
 
 - Seller application, entitlement/waitlist/promotion, address/geocode/manual pin,
   shared-location merge/split, and address-change reapproval.

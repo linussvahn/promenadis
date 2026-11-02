@@ -6,6 +6,11 @@ import {
   type DecideFirstEventReviewRequest,
   type CancelEventRequest,
   type ApplyToEventRequest,
+  type ModerateParticipationRequest,
+  type SubmitReportRequest,
+  moderationCasesSchema,
+  myModerationSchema,
+  reportReceivedSchema,
   type SaveEventTaxonomyRequest,
   type SaveSellerListingRequest,
   type SetLiveStatusRequest,
@@ -410,6 +415,37 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
         sellerListingSchema,
         { body: input, method: "POST" },
       );
+    },
+    submitReport(input: SubmitReportRequest) {
+      return publicRequest("/reports", reportReceivedSchema, input);
+    },
+    listEventCases(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/cases`, accessToken, moderationCasesSchema);
+    },
+    reviewCase(
+      accessToken: string,
+      caseId: string,
+      input: { decision: "restore" | "uphold" | "dismiss"; reason: string },
+    ) {
+      return request(`/cases/${caseId}/review`, accessToken, moderationCasesSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    moderateParticipation(
+      accessToken: string,
+      participationId: string,
+      input: ModerateParticipationRequest,
+    ) {
+      return request(
+        `/participations/${participationId}/moderation`,
+        accessToken,
+        sellerParticipationSchema,
+        { body: input, method: "POST" },
+      );
+    },
+    listMyModeration(accessToken: string) {
+      return request("/moderation", accessToken, myModerationSchema);
     },
     listMyParticipations(accessToken: string) {
       return request("/participations", accessToken, myParticipationsSchema);

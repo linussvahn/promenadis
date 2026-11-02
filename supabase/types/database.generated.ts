@@ -455,6 +455,95 @@ export type Database = {
         }
         Relationships: []
       }
+      moderation_actions: {
+        Row: {
+          action: string
+          actor_account_id: string | null
+          affected_account_id: string | null
+          case_id: string | null
+          created_at: string
+          event_id: string
+          id: string
+          item_id: string | null
+          location_id: string | null
+          participation_id: string | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          actor_account_id?: string | null
+          affected_account_id?: string | null
+          case_id?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          item_id?: string | null
+          location_id?: string | null
+          participation_id?: string | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          actor_account_id?: string | null
+          affected_account_id?: string | null
+          case_id?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          item_id?: string | null
+          location_id?: string | null
+          participation_id?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_actions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      moderation_cases: {
+        Row: {
+          closed_at: string | null
+          event_id: string
+          id: string
+          location_id: string | null
+          opened_at: string
+          outcome: string | null
+          participation_id: string | null
+          state: string
+          subject_id: string
+          subject_type: string
+        }
+        Insert: {
+          closed_at?: string | null
+          event_id: string
+          id?: string
+          location_id?: string | null
+          opened_at?: string
+          outcome?: string | null
+          participation_id?: string | null
+          state?: string
+          subject_id: string
+          subject_type: string
+        }
+        Update: {
+          closed_at?: string | null
+          event_id?: string
+          id?: string
+          location_id?: string | null
+          opened_at?: string
+          outcome?: string | null
+          participation_id?: string | null
+          state?: string
+          subject_id?: string
+          subject_type?: string
+        }
+        Relationships: []
+      }
       notification_jobs: {
         Row: {
           attempt_count: number
@@ -565,6 +654,36 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_account_restrictions: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by_account_id: string | null
+          id: string
+          lifted_at: string | null
+          lifted_by_account_id: string | null
+          reason: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by_account_id?: string | null
+          id?: string
+          lifted_at?: string | null
+          lifted_by_account_id?: string | null
+          reason: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by_account_id?: string | null
+          id?: string
+          lifted_at?: string | null
+          lifted_by_account_id?: string | null
+          reason?: string
+        }
+        Relationships: []
+      }
       platform_admins: {
         Row: {
           account_id: string
@@ -629,6 +748,65 @@ export type Database = {
           window_started_at?: string
         }
         Relationships: []
+      }
+      report_rate_buckets: {
+        Row: {
+          bucket: string
+          count: number
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          count?: number
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          case_id: string
+          complete: boolean
+          created_at: string
+          details: string
+          id: string
+          reason: string
+          relationship: string | null
+          reporter_contact: string | null
+        }
+        Insert: {
+          case_id: string
+          complete: boolean
+          created_at?: string
+          details: string
+          id?: string
+          reason: string
+          relationship?: string | null
+          reporter_contact?: string | null
+        }
+        Update: {
+          case_id?: string
+          complete?: boolean
+          created_at?: string
+          details?: string
+          id?: string
+          reason?: string
+          relationship?: string | null
+          reporter_contact?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_cases"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -773,6 +951,20 @@ export type Database = {
         Returns: undefined
       }
       purge_geocode_records_command: { Args: never; Returns: undefined }
+      purge_report_rate_buckets_command: { Args: never; Returns: undefined }
+      record_moderation_action: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_case_id: string
+          p_event_id: string
+          p_item_id: string
+          p_location_id: string
+          p_participation_id: string
+          p_reason: string
+        }
+        Returns: string
+      }
       require_admin_elevation: {
         Args: { p_actor_id: string; p_auth_session_id: string }
         Returns: undefined
@@ -810,6 +1002,10 @@ export type Database = {
         Returns: boolean
       }
       tag_is_reserved: { Args: { p_normalized: string }; Returns: boolean }
+      take_report_budget: {
+        Args: { p_bucket: string; p_limit: number }
+        Returns: boolean
+      }
       totp_code: { Args: { p_key: string; p_step: number }; Returns: string }
       valid_organization_number: { Args: { p_value: string }; Returns: boolean }
     }
@@ -1093,6 +1289,8 @@ export type Database = {
           placement: string
           point: unknown
           postal_code: string | null
+          quarantine_case_id: string | null
+          quarantined_at: string | null
           updated_at: string
         }
         Insert: {
@@ -1107,6 +1305,8 @@ export type Database = {
           placement: string
           point: unknown
           postal_code?: string | null
+          quarantine_case_id?: string | null
+          quarantined_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -1121,6 +1321,8 @@ export type Database = {
           placement?: string
           point?: unknown
           postal_code?: string | null
+          quarantine_case_id?: string | null
+          quarantined_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1438,6 +1640,7 @@ export type Database = {
         Row: {
           category_id: string
           currency: string
+          hidden_at: string | null
           id: string
           name: string
           participation_id: string
@@ -1448,6 +1651,7 @@ export type Database = {
         Insert: {
           category_id: string
           currency?: string
+          hidden_at?: string | null
           id?: string
           name: string
           participation_id: string
@@ -1458,6 +1662,7 @@ export type Database = {
         Update: {
           category_id?: string
           currency?: string
+          hidden_at?: string | null
           id?: string
           name?: string
           participation_id?: string
@@ -1708,6 +1913,8 @@ export type Database = {
           early_visibility_opt_out: boolean
           has_elevator: boolean | null
           has_stairs: boolean | null
+          hidden_at: string | null
+          hidden_reason: string | null
           participation_id: string
           setting: string | null
           step_free: boolean | null
@@ -1721,6 +1928,8 @@ export type Database = {
           early_visibility_opt_out?: boolean
           has_elevator?: boolean | null
           has_stairs?: boolean | null
+          hidden_at?: string | null
+          hidden_reason?: string | null
           participation_id: string
           setting?: string | null
           step_free?: boolean | null
@@ -1734,6 +1943,8 @@ export type Database = {
           early_visibility_opt_out?: boolean
           has_elevator?: boolean | null
           has_stairs?: boolean | null
+          hidden_at?: string | null
+          hidden_reason?: string | null
           participation_id?: string
           setting?: string | null
           step_free?: boolean | null
@@ -2503,6 +2714,10 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: { p_account_id: string }; Returns: boolean }
+      list_event_cases_command: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: Json
+      }
       list_event_sellers_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
@@ -2515,6 +2730,10 @@ export type Database = {
         }
         Returns: Json
       }
+      list_my_moderation_command: {
+        Args: { p_actor_id: string }
+        Returns: Json
+      }
       list_my_participations_command: {
         Args: { p_actor_id: string }
         Returns: Json
@@ -2524,6 +2743,17 @@ export type Database = {
           p_actor_id: string
           p_auth_session_id: string
           p_correlation_id: string
+        }
+        Returns: Json
+      }
+      moderate_participation_command: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_correlation_id: string
+          p_item_id: string
+          p_participation_id: string
+          p_reason: string
         }
         Returns: Json
       }
@@ -2646,6 +2876,16 @@ export type Database = {
         }
         Returns: Json
       }
+      review_moderation_case_command: {
+        Args: {
+          p_actor_id: string
+          p_case_id: string
+          p_correlation_id: string
+          p_decision: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       save_event_taxonomy_command: {
         Args: {
           p_actor_id: string
@@ -2727,6 +2967,21 @@ export type Database = {
           p_query_hash: string
         }
         Returns: undefined
+      }
+      submit_report_command: {
+        Args: {
+          p_confirms_no_consent: boolean
+          p_correlation_id: string
+          p_details: string
+          p_event_id: string
+          p_network_bucket: string
+          p_reason: string
+          p_relationship: string
+          p_reporter_contact: string
+          p_subject_id: string
+          p_subject_type: string
+        }
+        Returns: Json
       }
       take_browser_session_command: {
         Args: { p_hash: string; p_kind: string; p_lease: string }

@@ -163,6 +163,9 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
               </div>
             </dl>
           ) : null}
+          {participation.location?.quarantined ? (
+            <p className="notice notice-error">{translate(locale, "seller.quarantined")}</p>
+          ) : null}
           {participation.geographicException && !closed ? (
             <p className="field-help">{translate(locale, "seller.outsideHelp")}</p>
           ) : null}
