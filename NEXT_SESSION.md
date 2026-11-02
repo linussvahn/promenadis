@@ -497,6 +497,42 @@ Slice 1, `20261104000100_public_pages.sql`:
 - Not yet: CDN-edge header verification and a configured canonical site origin
   (hosted alpha); rate limits on anonymous search rely on caching for now.
 
+Slice 2, `20261104000200_public_snapshots.sql`:
+
+- `app_private.public_event_publications` (one row per published event:
+  revision, safety sequence, state, active snapshot, dirty flag, last error)
+  and `app_private.public_snapshots` (exact body text, SHA-256, size, public
+  seller/stop IDs, hard expiry, `superseded_at`).
+- Row triggers on events, participations, locations, live status, listings,
+  items, tags, categories, availability, intervals, boundary and taxonomy call
+  `touch_public_state`: dirty always; safety sequence +1 for changes that can
+  remove someone (participation, location, live status, event state/key).
+  Postponed/ended/cancelled/archived writes a tombstone and deletes snapshot
+  bytes in the same transaction.
+- `refresh_public_snapshots_command` (pg_cron every 30 s) rebuilds dirty
+  events, keeps the predecessor 60 s, deletes expired ones; a failed build
+  keeps the previous safe snapshot and records `last_error`.
+- `publishable_participations` is the single rule: approved, not
+  quarantined, inside the boundary or an exception, not closed early, before
+  hard expiry (last interval end), and either active or published with
+  `events.early_location_visibility` and no seller opt-out.
+- `build_public_snapshot` allowlists fields (no address text, unit, account
+  or participation IDs); public IDs are 96-bit HMACs keyed by a per-event
+  `public_salt`; coordinates rounded to 5 decimals; cluster cells at z13/z15;
+  counts by category; taxonomy labels and synonyms for offline search.
+  `assert_public_snapshot_safe` is a key denylist backstop.
+- Live reads: `public_event_manifest_command`,
+  `public_event_safety_feed_command` (computed from authoritative state:
+  removed/away seller and stop IDs, no coordinates), `public_snapshot_command`.
+  BFF: `GET /public/{events|unlisted}/{key}/manifest|safety`,
+  `GET /public/snapshots/{id}` (stored bytes, strict Zod check, ETag/304,
+  max-age bounded by expiry, no-index). Manifest contract now uses
+  `eventKey` instead of the private event UUID.
+- `set_early_location_visibility_command` (owner/co-host, draft or published)
+  plus `PUT /events/{id}/early-location-visibility` and a toggle on the
+  sellers page; `list_event_sellers_command` returns the setting.
+- `publication_system_blockers` now returns only `routing_not_ready`.
+
 ### Milestone 2 complete locally (2026-11-03)
 
 All five planned slices are built, tested and pushed. Milestone 2 is complete

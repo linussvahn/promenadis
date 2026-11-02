@@ -172,7 +172,14 @@ robots, canonical/Open Graph/JSON-LD, `X-Robots-Tag` and `no-referrer` on
 unlisted pages, `404`/`410`, owner rotation of leaked unlisted links) is
 complete locally as of 2026-11-04: pgTAP 340, public-pages and
 event-public-link component tests, and the e2e "public and unlisted landing
-pages…". Database verification: 828/828 pgTAP assertions. Not yet verified at a CDN edge; the canonical origin comes from the
+pages…". Slice 2 (per-event manifest, content-addressed snapshot and
+coordinate-free safety feed; dirty marking and safety sequence in the
+committing transaction; 30-second rebuild worker; 60-second predecessor
+handover; tombstones at postponement, end, cancellation and archive; host
+early-visibility choice; the `public_delivery_not_ready` gate removed) is
+complete locally: pgTAP 350 and contract tests; database verification 859/859. Snapshots are stored in
+Postgres and served by the BFF; object storage and CDN purge are hosted-alpha
+work. Not yet verified at a CDN edge; the canonical origin comes from the
 request until a configured site origin exists (hosted alpha).
 
 - Sanitized public/unlisted landing behavior, discovery, organizer pages,

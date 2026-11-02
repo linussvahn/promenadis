@@ -800,6 +800,7 @@ export const participationVersionRequestSchema = z.strictObject({
 
 export const eventSellersSchema = z.strictObject({
   admissionMode: admissionModeSchema,
+  earlyLocationVisibility: z.boolean(),
   eventId: opaqueUuid,
   eventVersion: z.number().int().positive(),
   locationCount: z.number().int().nonnegative(),
@@ -1350,7 +1351,7 @@ const publicArtifactReferenceSchema = z.strictObject({
 });
 
 export const publicEventManifestSchema = z.strictObject({
-  eventId: opaqueUuid,
+  eventKey: z.string().regex(/^[0-9a-f]{32}$/u),
   expiresAt: isoInstant,
   generatedAt: isoInstant,
   publicRevision: z.number().int().nonnegative(),
@@ -1362,6 +1363,121 @@ export const publicEventManifestSchema = z.strictObject({
 });
 
 export type PublicEventManifest = z.infer<typeof publicEventManifestSchema>;
+
+const publicId = z.string().regex(/^[0-9a-f]{24}$/u);
+const localizedText = z.strictObject({ en: z.string().max(60), sv: z.string().max(60) });
+
+// The full public snapshot. Strict at every level: an unknown field fails
+// validation, so a leaked private field cannot render.
+export const publicSnapshotSchema = z.strictObject({
+  categories: z
+    .array(
+      z.strictObject({
+        id: opaqueUuid,
+        key: z.string().regex(/^[a-z0-9_]{1,40}$/u),
+        labels: localizedText,
+        synonyms: z.strictObject({
+          en: z.array(z.string().max(60)).max(30),
+          sv: z.array(z.string().max(60)).max(30),
+        }),
+      }),
+    )
+    .max(40),
+  counts: z.strictObject({
+    byCategory: z.record(opaqueUuid, z.number().int().nonnegative()),
+    open: z.number().int().nonnegative(),
+    sellers: z.number().int().nonnegative(),
+    stops: z.number().int().nonnegative(),
+  }),
+  event: z.strictObject({
+    areaLabel: z.string().max(120).nullable(),
+    boundary: z
+      .strictObject({
+        coordinates: z.array(z.array(z.tuple([z.number(), z.number()]))),
+        type: z.literal("Polygon"),
+      })
+      .nullable(),
+    intervals: z.array(z.strictObject({ endsAt: isoInstant, startsAt: isoInstant })).max(14),
+    state: z.enum(["published", "active"]),
+    timezone: z.string().min(1).max(64),
+    title: z.string().min(1).max(160),
+  }),
+  eventKey: z.string().regex(/^[0-9a-f]{32}$/u),
+  expiresAt: isoInstant,
+  generatedAt: isoInstant,
+  revision: z.number().int().positive(),
+  schemaVersion: z.literal("1.0"),
+  sellers: z
+    .array(
+      z.strictObject({
+        accessibility: z.strictObject({
+          elevator: z.boolean().nullable(),
+          setting: z.enum(["indoor", "outdoor", "both"]).nullable(),
+          stairs: z.boolean().nullable(),
+          stepFree: z.boolean().nullable(),
+          strollerFriendly: z.boolean().nullable(),
+        }),
+        availability: z.array(z.strictObject({ endsAt: isoInstant, startsAt: isoInstant })).max(10),
+        categoryIds: z.array(opaqueUuid).max(5),
+        description: z.string().max(1000),
+        displayName: z.string().min(1).max(80),
+        id: publicId,
+        items: z
+          .array(
+            z.strictObject({
+              categoryId: opaqueUuid.nullable(),
+              currency: z.string().regex(/^[A-Z]{3}$/u),
+              name: z.string().min(1).max(80),
+              priceMinor: z.number().int().nonnegative().nullable(),
+              status: z.enum(["available", "sold"]),
+            }),
+          )
+          .max(20),
+        status: z.enum(["open", "away"]),
+        stopId: publicId,
+        tags: z.array(z.string().max(60)).max(10),
+        title: z.string().max(80).nullable(),
+      }),
+    )
+    .max(500),
+  stops: z
+    .array(
+      z.strictObject({
+        cluster: z.strictObject({ z13: z.string().max(20), z15: z.string().max(20) }),
+        id: publicId,
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+        sellerIds: z.array(publicId).min(1).max(30),
+      }),
+    )
+    .max(500),
+});
+export type PublicSnapshot = z.infer<typeof publicSnapshotSchema>;
+
+// Coordinate-free, polled about every 15 seconds while an event is live.
+export const publicSafetyFeedSchema = z.strictObject({
+  awaySellerIds: z.array(publicId).max(500),
+  blockedEdgeIds: z.array(z.string().max(80)).max(500),
+  eventKey: z.string().regex(/^[0-9a-f]{32}$/u),
+  expiresAt: isoInstant,
+  generatedAt: isoInstant,
+  removedSellerIds: z.array(publicId).max(500),
+  removedStopIds: z.array(publicId).max(500),
+  requiredGraphVersion: opaqueUuid.nullable(),
+  schemaVersion: z.literal("1.0"),
+  sequence: z.number().int().positive(),
+  state: z.enum(["published", "active", "postponed", "ended", "cancelled"]),
+});
+export type PublicSafetyFeed = z.infer<typeof publicSafetyFeedSchema>;
+
+export const setEarlyLocationVisibilityRequestSchema = z.strictObject({
+  expectedEventVersion: z.number().int().positive(),
+  visible: z.boolean(),
+});
+export const earlyLocationVisibilitySchema = z.strictObject({
+  earlyLocationVisibility: z.boolean(),
+  version: z.number().int().positive(),
+});
 
 export const safeOperationalEventSchema = z.strictObject({
   correlationId: opaqueUuid,
@@ -1461,6 +1577,10 @@ export const rotateUnlistedLinkRequestSchema = z.strictObject({
 export type RotateUnlistedLinkRequest = z.infer<typeof rotateUnlistedLinkRequestSchema>;
 
 export const boundarySchemas = {
+  EarlyLocationVisibility: earlyLocationVisibilitySchema,
+  PublicSafetyFeed: publicSafetyFeedSchema,
+  PublicSnapshot: publicSnapshotSchema,
+  SetEarlyLocationVisibilityRequest: setEarlyLocationVisibilityRequestSchema,
   EventPublicLink: eventPublicLinkSchema,
   PublicEventList: publicEventListSchema,
   PublicEventSummary: publicEventSummarySchema,

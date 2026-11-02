@@ -191,8 +191,9 @@ try {
     "The current publication attestation did not clear its blocker.",
   );
   assert(
-    readinessAfterAttestation.blockers.includes("public_delivery_not_ready"),
-    "Publication readiness did not remain fail-closed for the missing public pipeline.",
+    readinessAfterAttestation.blockers.includes("routing_not_ready") &&
+      !readinessAfterAttestation.blockers.includes("public_delivery_not_ready"),
+    "Publication readiness did not remain fail-closed for the missing walking routes.",
   );
 
   const invitedTeam = await bff(`/events/${event.id}/team/invites`, accessToken, {

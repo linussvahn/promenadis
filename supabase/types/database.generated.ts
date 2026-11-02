@@ -782,6 +782,98 @@ export type Database = {
         }
         Relationships: []
       }
+      public_event_publications: {
+        Row: {
+          active_snapshot_id: string | null
+          dirty: boolean
+          dirty_since: string | null
+          event_id: string
+          expires_at: string | null
+          generated_at: string | null
+          last_error: string | null
+          public_revision: number
+          safety_sequence: number
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          active_snapshot_id?: string | null
+          dirty?: boolean
+          dirty_since?: string | null
+          event_id: string
+          expires_at?: string | null
+          generated_at?: string | null
+          last_error?: string | null
+          public_revision?: number
+          safety_sequence?: number
+          state: string
+          updated_at?: string
+        }
+        Update: {
+          active_snapshot_id?: string | null
+          dirty?: boolean
+          dirty_since?: string | null
+          event_id?: string
+          expires_at?: string | null
+          generated_at?: string | null
+          last_error?: string | null
+          public_revision?: number
+          safety_sequence?: number
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_event_publications_snapshot"
+            columns: ["active_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "public_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_snapshots: {
+        Row: {
+          body: string
+          byte_size: number
+          event_id: string
+          expires_at: string
+          generated_at: string
+          id: string
+          public_revision: number
+          seller_ids: string[]
+          sha256: string
+          stop_ids: string[]
+          superseded_at: string | null
+        }
+        Insert: {
+          body: string
+          byte_size: number
+          event_id: string
+          expires_at: string
+          generated_at?: string
+          id?: string
+          public_revision: number
+          seller_ids: string[]
+          sha256: string
+          stop_ids: string[]
+          superseded_at?: string | null
+        }
+        Update: {
+          body?: string
+          byte_size?: number
+          event_id?: string
+          expires_at?: string
+          generated_at?: string
+          id?: string
+          public_revision?: number
+          seller_ids?: string[]
+          sha256?: string
+          stop_ids?: string[]
+          superseded_at?: string | null
+        }
+        Relationships: []
+      }
       recovery_previous_email_notices: {
         Row: {
           created_at: string
@@ -943,7 +1035,12 @@ export type Database = {
         Args: { p_actor_id: string; p_restriction_id: string }
         Returns: undefined
       }
+      assert_public_snapshot_safe: { Args: { p_doc: Json }; Returns: undefined }
       base32_decode: { Args: { p_value: string }; Returns: string }
+      build_public_snapshot: {
+        Args: { p_event_id: string; p_revision: number }
+        Returns: Json
+      }
       close_participation: {
         Args: {
           p_actor_id: string
@@ -1057,13 +1154,43 @@ export type Database = {
         Args: { p_correlation_id: string; p_event_id: string }
         Returns: number
       }
+      public_event_for_route: {
+        Args: { p_key: string; p_route: string }
+        Returns: Database["public"]["Tables"]["events"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       public_event_summary: {
         Args: { p_event: Database["public"]["Tables"]["events"]["Row"] }
         Returns: Json
       }
+      public_expiry: { Args: { p_event_id: string }; Returns: string }
+      public_id: {
+        Args: {
+          p_event: Database["public"]["Tables"]["events"]["Row"]
+          p_id: string
+          p_kind: string
+        }
+        Returns: string
+      }
       publication_system_blockers: {
         Args: { p_event_id: string }
         Returns: Json
+      }
+      publish_public_snapshot: { Args: { p_event_id: string }; Returns: string }
+      publishable_participations: {
+        Args: { p_event_id: string }
+        Returns: Database["public"]["Tables"]["seller_participations"]["Row"][]
+        SetofOptions: {
+          from: "*"
+          to: "seller_participations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       purge_closed_organizer_verifications_command: {
         Args: never
@@ -1095,6 +1222,7 @@ export type Database = {
         }
         Returns: string
       }
+      refresh_public_snapshots_command: { Args: never; Returns: number }
       require_admin_elevation: {
         Args: { p_actor_id: string; p_auth_session_id: string }
         Returns: undefined
@@ -1137,6 +1265,10 @@ export type Database = {
         Returns: boolean
       }
       totp_code: { Args: { p_key: string; p_step: number }; Returns: string }
+      touch_public_state: {
+        Args: { p_event_id: string; p_urgent: boolean }
+        Returns: undefined
+      }
       valid_organization_number: { Args: { p_value: string }; Returns: boolean }
     }
     Enums: {
@@ -1700,12 +1832,14 @@ export type Database = {
           created_at: string
           created_by_account_id: string | null
           description: string
+          early_location_visibility: boolean
           id: string
           organizer_profile_id: string
           original_starts_at: string | null
           postponed_at: string | null
           public_key: string
           public_notice: string | null
+          public_salt: string
           seller_history: Json | null
           state: string
           state_changed_at: string
@@ -1722,12 +1856,14 @@ export type Database = {
           created_at?: string
           created_by_account_id?: string | null
           description?: string
+          early_location_visibility?: boolean
           id?: string
           organizer_profile_id: string
           original_starts_at?: string | null
           postponed_at?: string | null
           public_key?: string
           public_notice?: string | null
+          public_salt?: string
           seller_history?: Json | null
           state?: string
           state_changed_at?: string
@@ -1744,12 +1880,14 @@ export type Database = {
           created_at?: string
           created_by_account_id?: string | null
           description?: string
+          early_location_visibility?: boolean
           id?: string
           organizer_profile_id?: string
           original_starts_at?: string | null
           postponed_at?: string | null
           public_key?: string
           public_notice?: string | null
+          public_salt?: string
           seller_history?: Json | null
           state?: string
           state_changed_at?: string
@@ -3112,6 +3250,14 @@ export type Database = {
         Args: { p_key: string; p_route: string }
         Returns: Json
       }
+      public_event_manifest_command: {
+        Args: { p_key: string; p_route: string }
+        Returns: Json
+      }
+      public_event_safety_feed_command: {
+        Args: { p_key: string; p_route: string }
+        Returns: Json
+      }
       public_list_events_command: {
         Args: {
           p_after_id: string
@@ -3124,6 +3270,10 @@ export type Database = {
       }
       public_organizer_page_command: { Args: { p_key: string }; Returns: Json }
       public_sitemap_command: { Args: never; Returns: Json }
+      public_snapshot_command: {
+        Args: { p_snapshot_id: string }
+        Returns: Json
+      }
       publish_event_command: {
         Args: {
           p_actor_id: string
@@ -3318,6 +3468,16 @@ export type Database = {
           p_stroller_friendly: boolean
           p_tags: string[]
           p_title: string
+        }
+        Returns: Json
+      }
+      set_early_location_visibility_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_event_id: string
+          p_expected_event_version: number
+          p_visible: boolean
         }
         Returns: Json
       }

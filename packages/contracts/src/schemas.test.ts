@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   publicEventSummarySchema,
+  publicSafetyFeedSchema,
+  publicSnapshotSchema,
   attestEventPublicationRequestSchema,
   createDraftEventRequestSchema,
   deleteDraftEventRequestSchema,
@@ -53,7 +55,7 @@ describe("boundary contracts", () => {
 
   it("rejects unknown sensitive fields from public manifests", () => {
     const result = publicEventManifestSchema.safeParse({
-      eventId: id,
+      eventKey: "a".repeat(32),
       expiresAt: "2026-09-07T18:00:00+02:00",
       generatedAt,
       publicRevision: 1,
@@ -356,5 +358,76 @@ describe("boundary contracts", () => {
     expect(publicEventSummarySchema.safeParse({ ...summary, publicKey: "short" }).success).toBe(
       false,
     );
+  });
+
+  it("public snapshots and safety feeds reject unknown or sensitive fields", () => {
+    const seller = {
+      accessibility: {
+        elevator: null,
+        setting: null,
+        stairs: null,
+        stepFree: true,
+        strollerFriendly: null,
+      },
+      availability: [],
+      categoryIds: [],
+      description: "",
+      displayName: "Seller",
+      id: "a".repeat(24),
+      items: [],
+      status: "open",
+      stopId: "b".repeat(24),
+      tags: [],
+      title: null,
+    };
+    const snapshot = {
+      categories: [],
+      counts: { byCategory: {}, open: 1, sellers: 1, stops: 1 },
+      event: {
+        areaLabel: null,
+        boundary: null,
+        intervals: [],
+        state: "active",
+        timezone: "Europe/Stockholm",
+        title: "Walk",
+      },
+      eventKey: "c".repeat(32),
+      expiresAt: generatedAt,
+      generatedAt,
+      revision: 1,
+      schemaVersion: "1.0",
+      sellers: [seller],
+      stops: [
+        {
+          cluster: { z13: "1_2", z15: "3_4" },
+          id: "b".repeat(24),
+          latitude: 59.3,
+          longitude: 18.06,
+          sellerIds: ["a".repeat(24)],
+        },
+      ],
+    };
+    expect(publicSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    expect(
+      publicSnapshotSchema.safeParse({
+        ...snapshot,
+        sellers: [{ ...seller, addressLine: "Testgatan 1" }],
+      }).success,
+    ).toBe(false);
+    const feed = {
+      awaySellerIds: [],
+      blockedEdgeIds: [],
+      eventKey: "c".repeat(32),
+      expiresAt: generatedAt,
+      generatedAt,
+      removedSellerIds: ["a".repeat(24)],
+      removedStopIds: [],
+      requiredGraphVersion: null,
+      schemaVersion: "1.0",
+      sequence: 3,
+      state: "active",
+    };
+    expect(publicSafetyFeedSchema.safeParse(feed).success).toBe(true);
+    expect(publicSafetyFeedSchema.safeParse({ ...feed, latitude: 59.3 }).success).toBe(false);
   });
 });

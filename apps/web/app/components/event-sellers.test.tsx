@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   decideSeller: vi.fn(),
   reviewEventLocation: vi.fn(),
   listEventSellers: vi.fn(),
+  setEarlyLocationVisibility: vi.fn(),
   updateEventAdmission: vi.fn(),
 }));
 vi.mock("../lib/supabase", () => ({ getPromenadisApiClient: () => mocks }));
@@ -47,6 +48,7 @@ const data = {
     seller("01992026-1103-7000-8000-000000000011", "approved", "Anna"),
     seller("01992026-1103-7000-8000-000000000012", "pending", "Bo"),
   ],
+  earlyLocationVisibility: false,
   waitlistPromotionPaused: false,
 };
 const event = {
@@ -116,6 +118,14 @@ describe("EventSellers", () => {
         admissionMode: "host_approval",
         expectedVersion: 5,
         waitlistPromotionPaused: false,
+      }),
+    );
+    fireEvent.click(screen.getByLabelText(/Show approved stops to visitors/u));
+    fireEvent.click(screen.getByRole("button", { name: "Save visibility" }));
+    await waitFor(() =>
+      expect(mocks.setEarlyLocationVisibility).toHaveBeenCalledWith("owner", eventId, {
+        expectedEventVersion: 5,
+        visible: true,
       }),
     );
   });

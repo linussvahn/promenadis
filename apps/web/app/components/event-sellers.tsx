@@ -104,6 +104,18 @@ export function EventSellers({
     });
   };
 
+  const saveEarly = (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    const visible = new FormData(formEvent.currentTarget).get("earlyVisible") === "on";
+    void run(async ({ api, token }) => {
+      await api.setEarlyLocationVisibility(token, event.id, {
+        expectedEventVersion: event.version,
+        visible,
+      });
+      await onChanged();
+    });
+  };
+
   const decide = (seller: SellerParticipation, formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
     const submitter = (formEvent.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
@@ -195,6 +207,23 @@ export function EventSellers({
           </label>
           <button className="secondary-button" disabled={busy} type="submit">
             {translate(locale, "sellers.saveAdmission")}
+          </button>
+        </form>
+      ) : null}
+      {canManage && (event.state === "draft" || event.state === "published") ? (
+        <form className="panel form-panel" key={`early-${data.eventVersion}`} onSubmit={saveEarly}>
+          <h2>{translate(locale, "sellers.earlyVisibility")}</h2>
+          <label className="checkbox-field">
+            <input
+              defaultChecked={data.earlyLocationVisibility}
+              name="earlyVisible"
+              type="checkbox"
+            />
+            <span>{translate(locale, "sellers.earlyVisibilityLabel")}</span>
+          </label>
+          <p className="field-hint">{translate(locale, "sellers.earlyVisibilityHint")}</p>
+          <button className="secondary-button" disabled={busy} type="submit">
+            {translate(locale, "sellers.saveEarlyVisibility")}
           </button>
         </form>
       ) : null}

@@ -34,6 +34,10 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  earlyLocationVisibilitySchema,
+  publicEventManifestSchema,
+  publicSafetyFeedSchema,
+  publicSnapshotSchema,
   eventRegistrationSummarySchema,
   eventSellersSchema,
   eventTaxonomySchema,
@@ -449,6 +453,33 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     },
     getPublicOrganizer(key: string) {
       return publicRequest(`/public/organizers/${key}`, publicOrganizerPageSchema);
+    },
+    getPublicManifest(route: "public" | "unlisted", key: string) {
+      return publicRequest(
+        `/public/${route === "public" ? "events" : "unlisted"}/${key}/manifest`,
+        publicEventManifestSchema,
+      );
+    },
+    getPublicSafetyFeed(route: "public" | "unlisted", key: string) {
+      return publicRequest(
+        `/public/${route === "public" ? "events" : "unlisted"}/${key}/safety`,
+        publicSafetyFeedSchema,
+      );
+    },
+    getPublicSnapshot(snapshotId: string) {
+      return publicRequest(`/public/snapshots/${snapshotId}`, publicSnapshotSchema);
+    },
+    setEarlyLocationVisibility(
+      accessToken: string,
+      eventId: string,
+      input: { expectedEventVersion: number; visible: boolean },
+    ) {
+      return request(
+        `/events/${eventId}/early-location-visibility`,
+        accessToken,
+        earlyLocationVisibilitySchema,
+        { body: input, method: "PUT" },
+      );
     },
     getPublicSitemap() {
       return publicRequest("/public/sitemap", publicSitemapSchema);

@@ -249,8 +249,8 @@ select ok(
   public.get_event_publication_readiness_command(
     '01992026-0909-7000-8000-000000000101',
     (select id from public.events where title = 'Publication Readiness Fixture')
-  ) -> 'blockers' ? 'public_delivery_not_ready',
-  'readiness honestly reports the unimplemented delivery dependency'
+  ) -> 'blockers' ? 'routing_not_ready',
+  'readiness honestly reports the unimplemented routing dependency'
 );
 
 select lives_ok(

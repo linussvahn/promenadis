@@ -906,6 +906,11 @@ const sv = {
   "organizerType.company": "Företag",
   "visibility.public": "Offentlig",
   "visibility.unlisted": "Olistad via länk",
+  "sellers.earlyVisibility": "Synlighet före evenemangsdagen",
+  "sellers.earlyVisibilityLabel": "Visa godkända stopp för besökare innan evenemanget börjar",
+  "sellers.earlyVisibilityHint":
+    "Säljare som har valt bort tidig synlighet visas ändå först när evenemanget börjar.",
+  "sellers.saveEarlyVisibility": "Spara synlighet",
   "nav.discover": "Upptäck",
   "home.discover": "Upptäck evenemang",
   "public.discover.title": "Upptäck evenemang",
@@ -1853,6 +1858,11 @@ const en = {
   "organizerType.company": "Company",
   "visibility.public": "Public",
   "visibility.unlisted": "Unlisted by link",
+  "sellers.earlyVisibility": "Visibility before event day",
+  "sellers.earlyVisibilityLabel": "Show approved stops to visitors before the event starts",
+  "sellers.earlyVisibilityHint":
+    "Sellers who opted out of early visibility still appear only once the event starts.",
+  "sellers.saveEarlyVisibility": "Save visibility",
   "nav.discover": "Discover",
   "home.discover": "Discover events",
   "public.discover.title": "Discover events",

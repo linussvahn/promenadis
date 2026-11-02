@@ -40,6 +40,11 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  earlyLocationVisibilitySchema,
+  publicEventManifestSchema,
+  publicSafetyFeedSchema,
+  publicSnapshotSchema,
+  setEarlyLocationVisibilityRequestSchema,
   eventRegistrationSummarySchema,
   eventSellersSchema,
   eventTaxonomySchema,
@@ -817,6 +822,69 @@ Deno.serve(async (request) => {
         if (error) throw error;
         status = "succeeded";
         return publicJson(publicEventListSchema.parse(data), correlationId, origin);
+      }
+      const delivery = route.match(
+        /^\/public\/(events|unlisted)\/([0-9a-f]{32})\/(manifest|safety)$/u,
+      );
+      if (delivery) {
+        const manifest = delivery[3] === "manifest";
+        operation = manifest ? "public.manifest" : "public.safety_feed";
+        const { data, error } = await admin.rpc(
+          manifest ? "public_event_manifest_command" : "public_event_safety_feed_command",
+          { p_key: delivery[2], p_route: delivery[1] === "events" ? "public" : "unlisted" },
+        );
+        if (error) throw error;
+        status = "succeeded";
+        if (data?.status === "gone") return gone();
+        if (data?.status !== "ok") return notFound();
+        const body = manifest
+          ? publicEventManifestSchema.parse(data.manifest)
+          : publicSafetyFeedSchema.parse(data.feed);
+        if (!manifest && JSON.stringify(body).length > 32_768)
+          throw new Error("safety_feed_too_large");
+        const response = publicJson(body, correlationId, origin, {
+          unlisted: delivery[1] === "unlisted",
+        });
+        // Clients poll these; keep any shared cache short.
+        response.headers.set(
+          "cache-control",
+          `${delivery[1] === "unlisted" ? "private" : "public"}, max-age=${manifest ? 15 : 5}`,
+        );
+        response.headers.set("x-robots-tag", noIndex);
+        return response;
+      }
+      const snapshotRoute = route.match(
+        /^\/public\/snapshots\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/u,
+      );
+      if (snapshotRoute) {
+        operation = "public.snapshot";
+        const { data, error } = await admin.rpc("public_snapshot_command", {
+          p_snapshot_id: snapshotRoute[1],
+        });
+        if (error) throw error;
+        status = "succeeded";
+        if (!data) return notFound();
+        // Stored bytes are served as-is, after a strict allowlist check.
+        publicSnapshotSchema.parse(JSON.parse(data.body));
+        const etag = `"${data.sha256}"`;
+        const secondsLeft = Math.max(
+          0,
+          Math.floor((Date.parse(data.expiresAt) - Date.now()) / 1000),
+        );
+        const headers = new Headers({
+          ...corsHeaders(origin),
+          "cache-control": `${data.unlisted ? "private" : "public"}, max-age=${Math.min(300, secondsLeft)}`,
+          "content-type": "application/json; charset=utf-8",
+          etag,
+          "referrer-policy": "no-referrer",
+          "x-content-type-options": "nosniff",
+          "x-correlation-id": correlationId,
+          "x-robots-tag": noIndex,
+        });
+        if (request.headers.get("if-none-match") === etag) {
+          return new Response(null, { status: 304, headers });
+        }
+        return new Response(data.body, { status: 200, headers });
       }
       const organizerPage = route.match(/^\/public\/organizers\/([0-9a-f]{24})$/u);
       if (organizerPage) {
@@ -1754,6 +1822,37 @@ Deno.serve(async (request) => {
       if (!parsed.success) throw new Error("invalid_internal_response");
       status = "succeeded";
       return json(parsed.data, 200, correlationId, origin);
+    }
+
+    const earlyVisibilityRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/early-location-visibility$/iu,
+    );
+    if (request.method === "PUT" && earlyVisibilityRoute) {
+      operation = "event.early_visibility_set";
+      const input = setEarlyLocationVisibilityRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) {
+        status = "denied";
+        return apiError("invalid_request", "Check the request.", 400, correlationId, origin);
+      }
+      const { data, error } = await admin.rpc("set_early_location_visibility_command", {
+        p_actor_id: actorId,
+        p_correlation_id: correlationId,
+        p_event_id: earlyVisibilityRoute[1],
+        p_expected_event_version: input.data.expectedEventVersion,
+        p_visible: input.data.visible,
+      });
+      if (error) {
+        const mapped = new Map<string, [string, string, number]>([
+          ["Actor cannot manage admission", ["forbidden", "Only hosts can change this.", 403]],
+          ["Event version conflict", ["version_conflict", "The event changed. Reload.", 409]],
+          ["Early visibility is locked", ["invalid_state", "This can no longer change.", 409]],
+        ]).get(error.message);
+        if (!mapped) throw error;
+        status = "denied";
+        return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+      }
+      status = "succeeded";
+      return json(earlyLocationVisibilitySchema.parse(data), 200, correlationId, origin);
     }
 
     const publicLinkRoute = route.match(
