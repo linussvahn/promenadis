@@ -16,3 +16,6 @@ test-results/
 supabase/.branches/
 supabase/.temp/
 supabase/functions/.env
+
+# Local encrypted database archives (never commit)
+.local-backups/

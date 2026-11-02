@@ -13,6 +13,7 @@
       "!!apps/web/.react-router",
       "!!supabase/.temp",
       "!!supabase/functions/api-v1/fixtures",
+      "!!.local-backups",
       "!!supabase/types/database.generated.ts"
     ]
   },

@@ -1486,6 +1486,7 @@ export type Database = {
         Returns: undefined
       }
       assert_public_snapshot_safe: { Args: { p_doc: Json }; Returns: undefined }
+      backup_manifest_counts: { Args: never; Returns: Json }
       base32_decode: { Args: { p_value: string }; Returns: string }
       beat: { Args: { p_job: string }; Returns: undefined }
       build_public_snapshot: {
@@ -1711,6 +1712,7 @@ export type Database = {
         }
         Returns: Json
       }
+      replay_erasure_tombstones: { Args: never; Returns: Json }
       require_admin_elevation: {
         Args: { p_actor_id: string; p_auth_session_id: string }
         Returns: undefined

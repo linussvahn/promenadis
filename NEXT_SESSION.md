@@ -456,6 +456,22 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Milestone 5 complete locally (2026-11-06)
+
+All slices are built, tested and pushed. Hosted-only parts remain: SES
+sending/DNS/feedback/inbound relay, Turnstile on anonymous forms, Better
+Stack monitors and status page, the event-window AWS probe, quota and budget
+alerts, S3 backup storage with Object Lock and the quarterly real restore.
+Next: Milestone 6 (pilot hardening).
+
+Slice 3b, `20261106000400_backup_replay.sql`:
+
+- `app_private.replay_erasure_tombstones()` (accounts, post-event seller
+  data) and `app_private.backup_manifest_counts()`.
+- `scripts/backup/`: `keygen.mjs`, `backup-local.mjs`, `restore-drill.mjs`,
+  `test-local-backup.mjs` (erased-after-backup account removed by replay;
+  tampered archive refused). Archives go to `.local-backups/` (ignored).
+
 ### Milestone 5 plan and slice 1 (2026-11-06)
 
 Plan: (1) application notices: outbox, templates, worker, suppression,

@@ -53,3 +53,21 @@ For a confirmed user-visible incident, post affected components and impact
 on the status page within 30 minutes, update at least hourly and post the
 resolution. Notify affected event teams directly. Publish a blameless
 summary within five business days for SEV-0 or major SEV-1 incidents.
+
+## Backups and restore drills (local)
+
+- `pnpm backup:keygen` (once) writes an RSA-4096 recovery pair and an
+  Ed25519 signing pair to `~/.promenadis-recovery` (or
+  `PROMENADIS_RECOVERY_KEYS`). Keep the recovery private key offline.
+- `pnpm backup:local` exports the `public`, `app_private`, `auth` and
+  `supabase_migrations` schemas without live session data, compresses and
+  encrypts the dump (AES-256-GCM, key wrapped with RSA-OAEP) into
+  `.local-backups/`, and writes a signed manifest with checksum, counts,
+  migration and the erasure-tombstone watermark.
+- `pnpm backup:restore-drill [manifest]` verifies signature and checksum,
+  decrypts, restores into a throwaway database, compares counts, copies the
+  live tombstones in and runs `app_private.replay_erasure_tombstones()`,
+  then drops the database. Sessions are never restored, so every session is
+  invalid after a real restore.
+- Hosted: the same steps run as a scheduled container writing to a
+  versioned, Object-Locked S3 bucket in Stockholm (pilot gate).

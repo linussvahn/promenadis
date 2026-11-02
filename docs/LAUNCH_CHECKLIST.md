@@ -274,6 +274,14 @@ aggregate team summary; job heartbeats with a sanitized `/status` endpoint
 and an admin operations panel; five audited incident switches enforced in
 the database; `docs/RUNBOOK.md`) is complete locally: pgTAP 400 and the e2e
 "support requests reach the mailbox and visitors leave anonymous feedback"; database verification 962/962.
+Slice 3b (encrypted local logical backups with a signed manifest, restore
+drill into a throwaway database with count comparison and erasure-tombstone
+replay; `pnpm backup:keygen|local|restore-drill`, `pnpm test:local-backup`)
+is complete locally: pgTAP 410 and the backup drill; database verification 966/966. Milestone 5 is complete
+locally except the hosted parts: SES (sending, SPF/DKIM/DMARC, feedback,
+inbound relay), Turnstile, Better Stack monitors and the event-window AWS
+probe, quota/budget alerts, and S3 backup storage with Object Lock and a
+quarterly real-archive restore.
 
 - SES Auth/application mail, relay, notifications, queues/retries, bounce/
   complaint/suppression handling, and required-versus-optional prioritization.
