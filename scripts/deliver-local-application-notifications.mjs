@@ -30,6 +30,7 @@ function uuid(value) {
 
 export function localApplicationDependencies() {
   return {
+    origin: "http://127.0.0.1:5173",
     claim: async () =>
       JSON.parse(
         query(

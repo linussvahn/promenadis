@@ -338,6 +338,42 @@ export type Database = {
         }
         Relationships: []
       }
+      event_exports: {
+        Row: {
+          created_at: string
+          csv: string | null
+          downloaded_at: string | null
+          event_id: string
+          expires_at: string
+          id: string
+          requested_by_account_id: string | null
+          row_count: number
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          csv?: string | null
+          downloaded_at?: string | null
+          event_id: string
+          expires_at?: string
+          id?: string
+          requested_by_account_id?: string | null
+          row_count?: number
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          csv?: string | null
+          downloaded_at?: string | null
+          event_id?: string
+          expires_at?: string
+          id?: string
+          requested_by_account_id?: string | null
+          row_count?: number
+          token_hash?: string
+        }
+        Relationships: []
+      }
       event_first_reviews: {
         Row: {
           boundary_version: number
@@ -743,9 +779,11 @@ export type Database = {
           payload: Json | null
           priority: string
           recipient_account_id: string | null
+          recipient_relay_thread_id: string | null
           recipient_report_id: string | null
           recipient_seller_invite_id: string | null
           recipient_team_invite_id: string | null
+          relay_message_id: string | null
           template: string
         }
         Insert: {
@@ -765,9 +803,11 @@ export type Database = {
           payload?: Json | null
           priority: string
           recipient_account_id?: string | null
+          recipient_relay_thread_id?: string | null
           recipient_report_id?: string | null
           recipient_seller_invite_id?: string | null
           recipient_team_invite_id?: string | null
+          relay_message_id?: string | null
           template: string
         }
         Update: {
@@ -787,17 +827,33 @@ export type Database = {
           payload?: Json | null
           priority?: string
           recipient_account_id?: string | null
+          recipient_relay_thread_id?: string | null
           recipient_report_id?: string | null
           recipient_seller_invite_id?: string | null
           recipient_team_invite_id?: string | null
+          relay_message_id?: string | null
           template?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notification_outbox_recipient_relay_thread_id_fkey"
+            columns: ["recipient_relay_thread_id"]
+            isOneToOne: false
+            referencedRelation: "relay_threads"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notification_outbox_recipient_report_id_fkey"
             columns: ["recipient_report_id"]
             isOneToOne: false
             referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_outbox_relay_message_id_fkey"
+            columns: ["relay_message_id"]
+            isOneToOne: false
+            referencedRelation: "relay_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -1061,6 +1117,77 @@ export type Database = {
         }
         Relationships: []
       }
+      relay_messages: {
+        Row: {
+          author_account_id: string | null
+          body: string
+          created_at: string
+          delivered_at: string | null
+          direction: string
+          id: string
+          thread_id: string
+        }
+        Insert: {
+          author_account_id?: string | null
+          body: string
+          created_at?: string
+          delivered_at?: string | null
+          direction: string
+          id?: string
+          thread_id: string
+        }
+        Update: {
+          author_account_id?: string | null
+          body?: string
+          created_at?: string
+          delivered_at?: string | null
+          direction?: string
+          id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relay_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "relay_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      relay_threads: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          last_message_at: string
+          network_bucket: string
+          token_cipher: string
+          token_hash: string
+          visitor_email: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          last_message_at?: string
+          network_bucket: string
+          token_cipher: string
+          token_hash: string
+          visitor_email: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          last_message_at?: string
+          network_bucket?: string
+          token_cipher?: string
+          token_hash?: string
+          visitor_email?: string
+        }
+        Relationships: []
+      }
       report_rate_buckets: {
         Row: {
           bucket: string
@@ -1227,9 +1354,11 @@ export type Database = {
         Args: { p_account_id: string; p_code: string }
         Returns: boolean
       }
+      csv_cell: { Args: { p_value: string }; Returns: string }
       email_hash: { Args: { p_email: string }; Returns: string }
       enforce_event_retention_command: { Args: never; Returns: number }
       enforce_notification_retention_command: { Args: never; Returns: number }
+      enforce_relay_export_retention_command: { Args: never; Returns: number }
       enforce_routing_retention_command: { Args: never; Returns: number }
       enqueue_event_reminders_command: { Args: never; Returns: number }
       enqueue_notification: {
@@ -1399,6 +1528,14 @@ export type Database = {
       purge_geocode_records_command: { Args: never; Returns: undefined }
       purge_moderation_records: { Args: { p_now: string }; Returns: number }
       purge_report_rate_buckets_command: { Args: never; Returns: undefined }
+      queue_relay_message: {
+        Args: {
+          p_direction: string
+          p_message_id: string
+          p_thread: Database["app_private"]["Tables"]["relay_threads"]["Row"]
+        }
+        Returns: undefined
+      }
       record_moderation_action: {
         Args: {
           p_action: string
@@ -1413,6 +1550,14 @@ export type Database = {
         Returns: string
       }
       refresh_public_snapshots_command: { Args: never; Returns: number }
+      relay_key: { Args: never; Returns: string }
+      relay_thread_summary: {
+        Args: {
+          p_for_team: boolean
+          p_thread: Database["app_private"]["Tables"]["relay_threads"]["Row"]
+        }
+        Returns: Json
+      }
       require_admin_elevation: {
         Args: { p_actor_id: string; p_auth_session_id: string }
         Returns: undefined
@@ -1471,6 +1616,7 @@ export type Database = {
         Args: { p_bucket: string; p_limit: number }
         Returns: boolean
       }
+      token_hash: { Args: { p_token: string }; Returns: string }
       totp_code: { Args: { p_key: string; p_step: number }; Returns: string }
       touch_public_state: {
         Args: { p_event_id: string; p_urgent: boolean }
@@ -3419,6 +3565,10 @@ export type Database = {
         }
         Returns: string
       }
+      download_event_export_command: {
+        Args: { p_actor_id: string; p_export_id: string; p_token: string }
+        Returns: string
+      }
       duplicate_event_command: {
         Args: {
           p_actor_id: string
@@ -3671,6 +3821,10 @@ export type Database = {
         }
         Returns: Json
       }
+      list_relay_threads_command: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: Json
+      }
       list_seller_invites_command: {
         Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
@@ -3770,6 +3924,10 @@ export type Database = {
         Args: { p_query_hash: string }
         Returns: Json
       }
+      read_relay_thread_command: {
+        Args: { p_thread_id: string; p_token: string }
+        Returns: Json
+      }
       reconcile_account_recovery_dispatches_command: {
         Args: never
         Returns: number
@@ -3816,12 +3974,31 @@ export type Database = {
         }
         Returns: Json
       }
+      reply_relay_thread_command: {
+        Args: {
+          p_actor_id: string
+          p_body: string
+          p_thread_id: string
+          p_token: string
+        }
+        Returns: Json
+      }
       request_account_deletion_command: {
         Args: {
           p_actor_id: string
           p_authenticated_at: string
           p_confirmation_email: string
           p_correlation_id: string
+        }
+        Returns: Json
+      }
+      request_event_export_command: {
+        Args: {
+          p_actor_id: string
+          p_authenticated_at: string
+          p_correlation_id: string
+          p_event_id: string
+          p_token: string
         }
         Returns: Json
       }
@@ -4005,6 +4182,16 @@ export type Database = {
           p_actor_id: string
           p_auth_session_id: string
           p_correlation_id: string
+        }
+        Returns: Json
+      }
+      start_relay_thread_command: {
+        Args: {
+          p_body: string
+          p_event_key: string
+          p_network_bucket: string
+          p_token: string
+          p_visitor_email: string
         }
         Returns: Json
       }

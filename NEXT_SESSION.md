@@ -494,6 +494,29 @@ Slice 1, `20261106000100_application_notifications.sql`:
   `GET/PUT /account/notification-preferences`; dashboard "Notices" list and
   a reminders setting.
 
+Slice 2, `20261106000200_relay_export.sql`:
+
+- `app_private.relay_threads` (event, visitor address, SHA-256 of the link
+  token, the token encrypted with `instance_secrets.relay_token_key`, network
+  bucket) and `relay_messages` (direction, body 10–1000 chars, delivered
+  at). `start_relay_thread_command` (3 threads/hour/network, 50/day/event),
+  `read_relay_thread_command`, `reply_relay_thread_command` (team member as
+  owner/co-host, or visitor by token; 10 messages/hour/thread),
+  `list_relay_threads_command` (owner/co-host). Outbox templates
+  `relay_to_organizer`/`relay_to_visitor` reference the message; the worker
+  reads the body (and, for the visitor, the private link) at send time.
+- `request_event_export_command` / `download_event_export_command` in
+  `app_private.event_exports` with `csv_cell` neutralizing formula cells.
+- Retention: `enforce_relay_export_retention_command` (hourly).
+- BFF: anonymous `POST /public/{events|unlisted}/{key}/contact`,
+  `POST /contact/{id}` and `/contact/{id}/reply` (the browser gateway passes
+  them anonymously); team `GET /events/{id}/messages`,
+  `POST /events/{id}/messages/{thread}/reply`, `POST /events/{id}/exports`,
+  `POST /events/{id}/exports/{export}/download` (CSV, once).
+- Web: "Contact the organizer" on event pages, `/contact/:threadId#token`
+  (token in the fragment only; no-index, no-referrer), "Messages from
+  visitors" in the workspace, "Export sellers" on the sellers page.
+
 ### Milestone 4 complete locally (2026-11-05)
 
 All three slices are built, tested and pushed. Left for later: real iPhone

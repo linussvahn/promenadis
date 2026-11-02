@@ -37,3 +37,23 @@ test("skipped recipients are not acknowledged; failures are", async () => {
     ["b", false],
   ]);
 });
+
+test("relay mail carries the body and the visitor's private link, not addresses", () => {
+  const toVisitor = applicationNotice(
+    "relay_to_visitor",
+    { eventTitle: "Walk" },
+    "sv",
+    {
+      body: "Yes, on the side street.",
+      threadId: "t1",
+      threadToken: "secret",
+    },
+    "https://example.test",
+  );
+  assert.match(toVisitor.Text, /Yes, on the side street\./u);
+  assert.match(toVisitor.Text, /https:\/\/example\.test\/contact\/t1#secret/u);
+  const toTeam = applicationNotice("relay_to_organizer", { eventTitle: "Walk" }, "sv", {
+    body: "Parking?",
+  });
+  assert.doesNotMatch(toTeam.Text, /#|@/u);
+});

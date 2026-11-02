@@ -40,6 +40,14 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  contactOrganizerRequestSchema,
+  contactStartedSchema,
+  eventExportCreatedSchema,
+  relayTeamReplySchema,
+  relayThreadSchema,
+  relayThreadsSchema,
+  relayTokenRequestSchema,
+  relayVisitorReplySchema,
   accountNotificationsSchema,
   markNotificationsReadRequestSchema,
   notificationPreferencesSchema,
@@ -947,6 +955,81 @@ Deno.serve(async (request) => {
       }
       status = "denied";
       return notFound();
+    }
+
+    const contactStart = route.match(/^\/public\/(events|unlisted)\/([0-9a-f]{32})\/contact$/u);
+    const contactThread = route.match(
+      /^\/contact\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/reply)?$/u,
+    );
+    if (request.method === "POST" && (contactStart || contactThread)) {
+      const relayErrors = new Map<string, [string, string, number]>([
+        ["Event not found", ["not_found", "This event does not take messages.", 404]],
+        ["Thread not found", ["not_found", "This conversation is not available.", 404]],
+        ["Relay closed", ["relay_closed", "This event no longer takes messages.", 409]],
+        ["Invalid message", ["invalid_request", "Check the message.", 400]],
+        ["Message limit reached", ["rate_limited", "Too many messages. Try again later.", 429]],
+      ]);
+      const relayFailure = (error: { message: string }) => {
+        const mapped = relayErrors.get(error.message);
+        if (!mapped) throw error;
+        status = "denied";
+        return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+      };
+      if (contactStart) {
+        operation = "relay.start";
+        const input = contactOrganizerRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError("invalid_request", "Check the message.", 400, correlationId, origin);
+        }
+        const token = [...crypto.getRandomValues(new Uint8Array(32))]
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("");
+        // A filled honeypot gets a plausible answer and stores nothing.
+        if (input.data.website) {
+          status = "denied";
+          return json({ threadId: crypto.randomUUID(), token }, 201, correlationId, origin);
+        }
+        const { data, error } = await admin.rpc("start_relay_thread_command", {
+          p_body: input.data.message,
+          p_event_key: contactStart[2],
+          p_network_bucket: await networkBucket(request),
+          p_token: token,
+          p_visitor_email: input.data.visitorEmail,
+        });
+        if (error) return relayFailure(error);
+        status = "succeeded";
+        const started = contactStartedSchema.parse({ threadId: data.threadId, token });
+        const response = json(started, 201, correlationId, origin);
+        response.headers.set("referrer-policy", "no-referrer");
+        return response;
+      }
+      const threadId = (contactThread as RegExpMatchArray)[1];
+      if (!(contactThread as RegExpMatchArray)[2]) {
+        operation = "relay.read";
+        const input = relayTokenRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) return relayFailure({ message: "Thread not found" });
+        const { data, error } = await admin.rpc("read_relay_thread_command", {
+          p_thread_id: threadId,
+          p_token: input.data.token,
+        });
+        if (error) throw error;
+        if (!data) return relayFailure({ message: "Thread not found" });
+        status = "succeeded";
+        return json(relayThreadSchema.parse(data), 200, correlationId, origin);
+      }
+      operation = "relay.visitor_reply";
+      const input = relayVisitorReplySchema.safeParse(await requestBody(request));
+      if (!input.success) return relayFailure({ message: "Invalid message" });
+      const { data, error } = await admin.rpc("reply_relay_thread_command", {
+        p_actor_id: null,
+        p_body: input.data.message,
+        p_thread_id: threadId,
+        p_token: input.data.token,
+      });
+      if (error) return relayFailure(error);
+      status = "succeeded";
+      return json(relayThreadSchema.parse(data), 200, correlationId, origin);
     }
 
     if ((route === "/reports" || route === "/reports/public") && request.method === "POST") {
@@ -3566,6 +3649,120 @@ Deno.serve(async (request) => {
       if (error) throw error;
       status = "succeeded";
       return json(notificationPreferencesSchema.parse(data), 200, correlationId, origin);
+    }
+
+    const messagesRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/messages(?:\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/reply)?$/iu,
+    );
+    if (messagesRoute && (request.method === "GET" || request.method === "POST")) {
+      const [, eventId, threadId] = messagesRoute;
+      const failure = (message: string) => {
+        const mapped = new Map<string, [string, string, number]>([
+          [
+            "Actor cannot read organizer messages",
+            ["forbidden", "Only hosts read organizer messages.", 403],
+          ],
+          ["Thread not found", ["not_found", "This conversation is not available.", 404]],
+          ["Relay closed", ["relay_closed", "This event no longer takes messages.", 409]],
+          ["Invalid message", ["invalid_request", "Check the message.", 400]],
+          ["Message limit reached", ["rate_limited", "Too many messages. Try again later.", 429]],
+        ]).get(message);
+        if (!mapped) return null;
+        status = "denied";
+        return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+      };
+      if (request.method === "GET" && !threadId) {
+        operation = "relay.team_read";
+        const { data, error } = await admin.rpc("list_relay_threads_command", {
+          p_actor_id: actorId,
+          p_event_id: eventId,
+        });
+        if (error) {
+          const denied = failure(error.message);
+          if (denied) return denied;
+          throw error;
+        }
+        status = "succeeded";
+        return json(relayThreadsSchema.parse(data), 200, correlationId, origin);
+      }
+      if (request.method === "POST" && threadId) {
+        operation = "relay.team_reply";
+        const input = relayTeamReplySchema.safeParse(await requestBody(request));
+        if (!input.success) return failure("Invalid message") as Response;
+        const { data, error } = await admin.rpc("reply_relay_thread_command", {
+          p_actor_id: actorId,
+          p_body: input.data.message,
+          p_thread_id: threadId,
+          p_token: null,
+        });
+        if (error) {
+          const denied = failure(error.message);
+          if (denied) return denied;
+          throw error;
+        }
+        status = "succeeded";
+        return json(relayThreadSchema.parse(data), 200, correlationId, origin);
+      }
+    }
+
+    const exportRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/exports(?:\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/download)?$/iu,
+    );
+    if (exportRoute && request.method === "POST") {
+      const [, eventId, exportId] = exportRoute;
+      const exportErrors = new Map<string, [string, string, number]>([
+        ["Actor cannot export", ["forbidden", "Only hosts can export.", 403]],
+        ["Recent authentication required", ["recent_auth_required", "Sign in again first.", 403]],
+        [
+          "Export already active",
+          ["export_active", "An export is already waiting to be downloaded.", 409],
+        ],
+        ["Export limit reached", ["rate_limited", "Three exports a day. Try again tomorrow.", 429]],
+        ["Export unavailable", ["gone", "This export is no longer available.", 410]],
+      ]);
+      const exportFailure = (error: { message: string }) => {
+        const mapped = exportErrors.get(error.message);
+        if (!mapped) throw error;
+        status = "denied";
+        return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+      };
+      if (!exportId) {
+        operation = "event.export_create";
+        const token = [...crypto.getRandomValues(new Uint8Array(32))]
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("");
+        const { data, error } = await admin.rpc("request_event_export_command", {
+          p_actor_id: actorId,
+          p_authenticated_at: actor.authenticatedAt,
+          p_correlation_id: correlationId,
+          p_event_id: eventId,
+          p_token: token,
+        });
+        if (error) return exportFailure(error);
+        status = "succeeded";
+        return json(eventExportCreatedSchema.parse({ ...data, token }), 201, correlationId, origin);
+      }
+      operation = "event.export_download";
+      const input = relayTokenRequestSchema.safeParse(await requestBody(request));
+      if (!input.success) return exportFailure({ message: "Export unavailable" });
+      const { data, error } = await admin.rpc("download_event_export_command", {
+        p_actor_id: actorId,
+        p_export_id: exportId,
+        p_token: input.data.token,
+      });
+      if (error) return exportFailure(error);
+      status = "succeeded";
+      return new Response(data, {
+        status: 200,
+        headers: {
+          ...corsHeaders(origin),
+          "cache-control": "no-store",
+          "content-disposition": `attachment; filename="promenadis-sellers-${eventId.slice(0, 8)}.csv"`,
+          "content-type": "text/csv; charset=utf-8",
+          "x-content-type-options": "nosniff",
+          "x-correlation-id": correlationId,
+        },
+      });
     }
 
     const appealRoute = route.match(

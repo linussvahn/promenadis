@@ -258,7 +258,16 @@ complaints, 30-day in-app copies and preferences; local Mailpit worker
 `pnpm notifications:app`) is complete locally as of 2026-11-06: pgTAP 380,
 worker node tests, notification component tests and
 `pnpm test:local-notifications`; database verification 924/924. SES sending, SPF/DKIM/DMARC, SES feedback
-ingestion and inbound relay are hosted-alpha work.
+ingestion and inbound relay are hosted-alpha work. Slice 2 (organizer
+contact relay: anonymous form on the event page with honeypot and network/
+event rate limits, owners and co-hosts answer in the app, the visitor follows
+a private thread link carried by reply mail, neither address shown, bodies
+30 days after delivery, threads 14 days after the end; limited CSV export:
+recent sign-in, one active per event, three per day, entitlement cap,
+formula cells neutralized, single download, deleted within 24 hours) is
+complete locally: pgTAP 390, worker relay test and the e2e "visitors
+contact organizers through the relay and hosts export sellers"; database verification 945/945. Turnstile on
+the relay form is a hosted-alpha gate.
 
 - SES Auth/application mail, relay, notifications, queues/retries, bounce/
   complaint/suppression handling, and required-versus-optional prioritization.

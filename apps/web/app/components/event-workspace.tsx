@@ -7,7 +7,9 @@ import { CreationProgress } from "./creation-progress";
 import { EventControls } from "./event-controls";
 import { EventDetailsEditor } from "./event-details-editor";
 import { EventDuplicate } from "./event-duplicate";
+import { EventExport } from "./event-export";
 import { EventLifecycle } from "./event-lifecycle";
+import { EventMessages } from "./event-messages";
 import { EventPublicLink } from "./event-public-link";
 import { EventSellers } from "./event-sellers";
 import { EventTeam } from "./event-team";
@@ -180,6 +182,7 @@ function EventWorkspaceContent({
           locale={locale}
           onChanged={loadDashboard}
         />
+        <EventExport accessToken={accessToken} event={event} locale={locale} />
       </main>
     );
   }
@@ -276,6 +279,7 @@ function EventWorkspaceContent({
           />
           <EventLifecycle event={event} locale={locale} onChanged={loadDashboard} />
           <EventPublicLink event={event} locale={locale} onChanged={loadDashboard} />
+          <EventMessages accessToken={accessToken} event={event} locale={locale} />
           {event.state === "draft" ? (
             <PublicationReadiness event={event} locale={locale} onPublished={loadDashboard} />
           ) : null}

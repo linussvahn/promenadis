@@ -71,7 +71,39 @@ const footer = [
   "Öppna Promenadis direkt för mer information. Svara inte på det här meddelandet.",
 ];
 
-export function applicationNotice(template, payload, locale) {
+// Relay mail is the one exception to fixed text: it carries the plain-text
+// message body, but never either side's address.
+function relayNotice(template, title, recipient, origin) {
+  // Drop control characters except newlines and tabs.
+  const body = [...String(recipient.body ?? "")]
+    .filter((character) => character >= " " || character === "\n" || character === "\t")
+    .join("");
+  if (template === "relay_to_organizer") {
+    return {
+      Subject: `Promenadis: ${title}`,
+      Text: `Nytt meddelande om ${title} via Promenadis:\n\n${body}\n\nSvara i Promenadis: öppna evenemanget och välj Meddelanden. Besökarens e-postadress visas inte.\n\n—\n\nA new message about ${title} through Promenadis (shown above). Reply in Promenadis under the event's Messages. The visitor's address is not shown.`,
+    };
+  }
+  const link = `${origin}/contact/${recipient.threadId}#${recipient.threadToken}`;
+  return {
+    Subject: `Promenadis: ${title}`,
+    Text: `Svar från arrangören av ${title}:\n\n${body}\n\nLäs tråden och svara: ${link}\nArrangörens e-postadress visas inte.\n\n—\n\nA reply from the organizer of ${title} (shown above). Read the thread and reply: ${link}`,
+  };
+}
+
+export function applicationNotice(
+  template,
+  payload,
+  locale,
+  recipient = {},
+  origin = "http://127.0.0.1:5173",
+) {
+  if (template === "relay_to_organizer" || template === "relay_to_visitor") {
+    const title = String(payload?.eventTitle ?? "Promenadis")
+      .replace(/[\r\n]+/gu, " ")
+      .slice(0, 160);
+    return relayNotice(template, title, recipient, origin);
+  }
   const text = texts[template];
   if (!text) throw new Error("Unsupported notice");
   const title = String(payload?.eventTitle ?? "Promenadis")
@@ -85,7 +117,7 @@ export function applicationNotice(template, payload, locale) {
 
 // Same contract as security delivery: at least once, acknowledged under the
 // database lease, never exactly once.
-export async function deliverApplicationBatch({ claim, resolveRecipient, send, finish }) {
+export async function deliverApplicationBatch({ claim, resolveRecipient, send, finish, origin }) {
   const result = { accepted: 0, failed: 0, skipped: 0, unacknowledged: 0 };
   for (const job of await claim()) {
     let delivered = false;
@@ -98,7 +130,7 @@ export async function deliverApplicationBatch({ claim, resolveRecipient, send, f
       } else {
         delivered = await send(
           recipient.email,
-          applicationNotice(job.template, job.payload, recipient.locale),
+          applicationNotice(job.template, job.payload, recipient.locale, recipient, origin),
           job.job_id,
         );
         if (!delivered) result.failed++;

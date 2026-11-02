@@ -2049,6 +2049,107 @@ test("hosts build, inspect, correct and approve the walking network", async ({
   }
 });
 
+test("visitors contact organizers through the relay and hosts export sellers", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const marker = randomUUID().slice(0, 8);
+  const email = `relay-owner-${marker}@example.invalid`;
+  const visitor = `relay-visitor-${marker}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const { data: created, error } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password,
+  });
+  if (error || !created.user) throw error ?? new Error("User missing");
+  const { data: seller } = await admin.auth.admin.createUser({
+    email: `relay-seller-${marker}@example.invalid`,
+    email_confirm: true,
+  });
+  const client = createClient(localStatus.API_URL, publicKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data } = await client.auth.signInWithPassword({ email, password });
+  const headers = {
+    apikey: publicKey,
+    authorization: `Bearer ${data.session?.access_token}`,
+    origin: "http://127.0.0.1:5173",
+  };
+  try {
+    const eventId = localSql(`
+      select public.create_scheduled_draft_event_command('${created.user.id}',null,'Relay owner','Relay walk ${marker}','',
+        'Europe/Stockholm','public', now()+interval '3 days', now()+interval '3 days 4 hours', gen_random_uuid());
+      select public.upsert_draft_event_boundary_command('${created.user.id}',(select id from public.events where title='Relay walk ${marker}'),null,'Area',
+        '{"type":"Polygon","coordinates":[[[18.0600,59.3100],[18.0720,59.3100],[18.0720,59.3160],[18.0600,59.3160],[18.0600,59.3100]]]}'::jsonb,
+        gen_random_uuid());
+      update public.events set admission_mode='auto_inside' where title='Relay walk ${marker}';
+      select public.apply_to_event_command('${seller?.user?.id}',(select id from public.events where title='Relay walk ${marker}'),
+        '=HYPERLINK("x")','Testgatan 9','11122','Stockholm',18.0632,59.3121,'manual',null,true,gen_random_uuid());
+      update public.events set state='published' where title='Relay walk ${marker}';
+      select id from public.events where title='Relay walk ${marker}';`)
+      .split("\n")
+      .at(-1) as string;
+    const eventKey = localSql(`select public_key from public.events where id='${eventId}';`);
+
+    await page.goto(`/e/${eventKey}`);
+    await page.getByText("Kontakta arrangören").click();
+    await page.getByLabel("Din e-postadress (för svar)").fill(visitor);
+    await page.getByLabel("Meddelande").fill("Finns det parkering nära loppisen?");
+    await page.getByRole("button", { name: "Skicka" }).click();
+    await expect(page).toHaveURL(/\/contact\/[0-9a-f-]{36}#[0-9a-f]{64}$/u);
+    await expect(page.getByText("Finns det parkering nära loppisen?")).toBeVisible();
+    const threadUrl = page.url();
+
+    const threads = await (
+      await request.get(`${base}/events/${eventId}/messages`, { headers })
+    ).json();
+    expect(JSON.stringify(threads)).not.toContain(visitor);
+    const replied = await request.post(
+      `${base}/events/${eventId}/messages/${threads[0].id}/reply`,
+      {
+        headers,
+        data: { message: "Ja, på sidogatan bakom torget." },
+      },
+    );
+    expect(replied.status()).toBe(200);
+    execFileSync("node", ["scripts/deliver-local-application-notifications.mjs"], {
+      cwd: repositoryRoot,
+    });
+    const mail = await latestMessage(request, visitor);
+    expect(mail.Text).toContain("Ja, på sidogatan bakom torget.");
+    expect(mail.Text).toContain(threadUrl.slice(threadUrl.indexOf("/contact/")));
+    expect(mail.Text).not.toContain(email);
+    await page.reload();
+    await expect(page.getByText("Ja, på sidogatan bakom torget.")).toBeVisible();
+
+    // Export: approved sellers' public operational fields, once, neutralized.
+    const exported = await request.post(`${base}/events/${eventId}/exports`, { headers });
+    expect(exported.status()).toBe(201);
+    const { exportId, token } = await exported.json();
+    const download = await request.post(`${base}/events/${eventId}/exports/${exportId}/download`, {
+      headers,
+      data: { token },
+    });
+    expect(download.headers()["content-type"]).toContain("text/csv");
+    const csv = await download.text();
+    expect(csv).toContain('"Testgatan 9","11122","Stockholm","\'=HYPERLINK(""x"")"');
+    expect(csv).not.toContain("@example.invalid");
+    const again = await request.post(`${base}/events/${eventId}/exports/${exportId}/download`, {
+      headers,
+      data: { token },
+    });
+    expect(again.status()).toBe(410);
+  } finally {
+    await deleteSyntheticAccount(email);
+    await deleteSyntheticAccount(`relay-seller-${marker}@example.invalid`);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {

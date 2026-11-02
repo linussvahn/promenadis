@@ -1719,6 +1719,8 @@ export const notificationTemplateSchema = z.enum([
   "unlisted_link_rotated",
   "report_reviewed",
   "event_reminder",
+  "relay_to_organizer",
+  "relay_to_visitor",
 ]);
 export type NotificationTemplate = z.infer<typeof notificationTemplateSchema>;
 
@@ -1740,7 +1742,50 @@ export const markNotificationsReadRequestSchema = z.strictObject({
 export const notificationPreferencesSchema = z.strictObject({ eventReminders: z.boolean() });
 export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
 
+export const relayThreadSchema = z.strictObject({
+  createdAt: isoInstant,
+  eventTitle: z.string().max(160),
+  id: opaqueUuid,
+  lastMessageAt: isoInstant,
+  messages: z.array(
+    z.strictObject({
+      body: z.string().max(1000),
+      createdAt: isoInstant,
+      direction: z.enum(["visitor", "organizer"]),
+      id: opaqueUuid,
+    }),
+  ),
+});
+export type RelayThread = z.infer<typeof relayThreadSchema>;
+export const relayThreadsSchema = z.array(relayThreadSchema);
+
+const relayBody = z.string().trim().min(10).max(1000);
+export const contactOrganizerRequestSchema = z.strictObject({
+  message: relayBody,
+  visitorEmail: z.email().max(320),
+  // Honeypot: real people leave it empty.
+  website: z.string().max(200).optional(),
+});
+export type ContactOrganizerRequest = z.infer<typeof contactOrganizerRequestSchema>;
+const relayToken = z.string().regex(/^[0-9a-f]{64}$/u);
+export const contactStartedSchema = z.strictObject({ threadId: opaqueUuid, token: relayToken });
+export const relayTokenRequestSchema = z.strictObject({ token: relayToken });
+export const relayVisitorReplySchema = z.strictObject({ message: relayBody, token: relayToken });
+export const relayTeamReplySchema = z.strictObject({ message: relayBody });
+
+export const eventExportCreatedSchema = z.strictObject({
+  exportId: opaqueUuid,
+  expiresAt: isoInstant,
+  rows: z.number().int().nonnegative(),
+  token: relayToken,
+});
+export type EventExportCreated = z.infer<typeof eventExportCreatedSchema>;
+
 export const boundarySchemas = {
+  ContactOrganizerRequest: contactOrganizerRequestSchema,
+  ContactStarted: contactStartedSchema,
+  EventExportCreated: eventExportCreatedSchema,
+  RelayThread: relayThreadSchema,
   AccountNotifications: accountNotificationsSchema,
   MarkNotificationsReadRequest: markNotificationsReadRequestSchema,
   NotificationPreferences: notificationPreferencesSchema,

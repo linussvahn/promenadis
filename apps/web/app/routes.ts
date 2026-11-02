@@ -20,6 +20,7 @@ export default [
   route("u/:key", "routes/unlisted-event.tsx"),
   route(":route/:key/map", "routes/public-event-map.tsx"),
   route("o/:key", "routes/organizer.tsx"),
+  route("contact/:threadId", "routes/contact-thread.tsx"),
   route("sitemap.xml", "routes/sitemap.tsx"),
   route("robots.txt", "routes/robots.tsx"),
   route("settings", "routes/settings.tsx"),

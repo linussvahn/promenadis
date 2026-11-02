@@ -7,6 +7,7 @@ import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import type { ReactNode } from "react";
 import { Form, Link } from "react-router";
 import { useStoredLocale } from "../lib/locale";
+import { ContactOrganizer } from "./organizer-contact";
 import { PageHeader } from "./page-header";
 
 export function PublicShell({ children }: { readonly children: (locale: Locale) => ReactNode }) {
@@ -219,6 +220,9 @@ export function EventLanding({
       ) : null}
       {event.visibility === "unlisted" ? (
         <p className="field-hint">{translate(locale, "public.unlistedNotice")}</p>
+      ) : null}
+      {["published", "active", "postponed"].includes(event.state) ? (
+        <ContactOrganizer eventKey={event.publicKey} locale={locale} route={event.visibility} />
       ) : null}
     </article>
   );

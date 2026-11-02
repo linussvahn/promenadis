@@ -34,6 +34,11 @@ import {
   eventLifecycleResultSchema,
   eventPublicationReadinessSchema,
   eventPublicLinkSchema,
+  type ContactOrganizerRequest,
+  contactStartedSchema,
+  eventExportCreatedSchema,
+  relayThreadSchema,
+  relayThreadsSchema,
   accountNotificationsSchema,
   notificationPreferencesSchema,
   type AddRoutingOverrideRequest,
@@ -553,6 +558,76 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
           method: "PUT",
         },
       );
+    },
+    contactOrganizer(route: "public" | "unlisted", key: string, input: ContactOrganizerRequest) {
+      return publicRequest(
+        `/public/${route === "public" ? "events" : "unlisted"}/${key}/contact`,
+        contactStartedSchema,
+        input,
+      );
+    },
+    readContactThread(threadId: string, token: string) {
+      return publicRequest(`/contact/${threadId}`, relayThreadSchema, { token });
+    },
+    replyContactThread(threadId: string, token: string, message: string) {
+      return publicRequest(`/contact/${threadId}/reply`, relayThreadSchema, { message, token });
+    },
+    listEventMessages(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/messages`, accessToken, relayThreadsSchema);
+    },
+    replyEventMessage(accessToken: string, eventId: string, threadId: string, message: string) {
+      return request(
+        `/events/${eventId}/messages/${threadId}/reply`,
+        accessToken,
+        relayThreadSchema,
+        {
+          body: { message },
+          method: "POST",
+        },
+      );
+    },
+    createEventExport(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/exports`, accessToken, eventExportCreatedSchema, {
+        method: "POST",
+      });
+    },
+    /** Returns the CSV text; the export can be downloaded once. */
+    async downloadEventExport(
+      accessToken: string,
+      eventId: string,
+      exportId: string,
+      token: string,
+    ) {
+      const response = await fetch(
+        `${config.baseUrl}${config.browserSession ? "" : "/functions/v1/api-v1"}/events/${eventId}/exports/${exportId}/download`,
+        {
+          body: JSON.stringify({ token }),
+          cache: "no-store",
+          credentials: config.browserSession ? "same-origin" : "omit",
+          headers: config.browserSession
+            ? {
+                "content-type": "application/json",
+                "x-account-id": accessToken,
+                "x-promenadis-browser": "1",
+              }
+            : {
+                apikey: config.publishableKey ?? "",
+                authorization: `Bearer ${accessToken}`,
+                "content-type": "application/json",
+              },
+          method: "POST",
+        },
+      );
+      if (!response.ok) {
+        const parsed = apiErrorSchema.safeParse(await response.json().catch(() => null));
+        throw new PromenadisApiError(
+          parsed.success ? parsed.data.message : "The request failed.",
+          response.status,
+          parsed.success ? parsed.data.code : "request_failed",
+          parsed.success ? parsed.data.correlationId : response.headers.get("x-correlation-id"),
+        );
+      }
+      return response.text();
     },
     getPublicSitemap() {
       return publicRequest("/public/sitemap", publicSitemapSchema);
