@@ -568,6 +568,15 @@ export type Database = {
       account_recovery_status: { Args: { p_account_id: string }; Returns: Json }
       advance_event_lifecycle_command: { Args: never; Returns: number }
       base32_decode: { Args: { p_value: string }; Returns: string }
+      close_participation: {
+        Args: {
+          p_actor_id: string
+          p_participation_id: string
+          p_reason: string
+          p_state: string
+        }
+        Returns: undefined
+      }
       consume_recovery_totp: {
         Args: { p_account_id: string; p_code: string }
         Returns: boolean
@@ -626,6 +635,10 @@ export type Database = {
         }
       }
       mask_email: { Args: { p_email: string }; Returns: string }
+      normalize_address: {
+        Args: { p_address_line: string; p_postal_code: string }
+        Returns: string
+      }
       organizer_team_summary: {
         Args: {
           p_include_invite_emails: boolean
@@ -636,6 +649,10 @@ export type Database = {
       organizer_verification_status: {
         Args: { p_organizer_profile_id: string }
         Returns: Json
+      }
+      promote_waitlisted_sellers: {
+        Args: { p_correlation_id: string; p_event_id: string }
+        Returns: number
       }
       publication_system_blockers: {
         Args: { p_event_id: string }
@@ -665,6 +682,26 @@ export type Database = {
       resolve_recovery_dispatch: {
         Args: { p_correlation_id: string; p_dispatch_id: string }
         Returns: string
+      }
+      seller_participation_summary: {
+        Args: {
+          p_include_address: boolean
+          p_participation: Database["public"]["Tables"]["seller_participations"]["Row"]
+        }
+        Returns: Json
+      }
+      seller_places_available: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
+      seller_places_used: { Args: { p_event_id: string }; Returns: number }
+      seller_registration_open: {
+        Args: {
+          p_event: Database["public"]["Tables"]["events"]["Row"]
+          p_now: string
+          p_registration: Database["public"]["Tables"]["event_registration_settings"]["Row"]
+        }
+        Returns: boolean
       }
       totp_code: { Args: { p_key: string; p_step: number }; Returns: string }
       valid_organization_number: { Args: { p_value: string }; Returns: boolean }
@@ -827,6 +864,32 @@ export type Database = {
           },
         ]
       }
+      event_entitlements: {
+        Row: {
+          event_id: string
+          seller_limit: number
+          updated_at: string
+        }
+        Insert: {
+          event_id: string
+          seller_limit?: number
+          updated_at?: string
+        }
+        Update: {
+          event_id?: string
+          seller_limit?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_entitlements_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_intervals: {
         Row: {
           created_at: string
@@ -903,6 +966,56 @@ export type Database = {
           },
           {
             foreignKeyName: "event_invites_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_locations: {
+        Row: {
+          address_line: string
+          created_at: string
+          event_id: string
+          id: string
+          inside_boundary: boolean
+          locality: string | null
+          normalized_address: string
+          placement: string
+          point: unknown
+          postal_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_line: string
+          created_at?: string
+          event_id: string
+          id?: string
+          inside_boundary: boolean
+          locality?: string | null
+          normalized_address: string
+          placement: string
+          point: unknown
+          postal_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_line?: string
+          created_at?: string
+          event_id?: string
+          id?: string
+          inside_boundary?: boolean
+          locality?: string | null
+          normalized_address?: string
+          placement?: string
+          point?: unknown
+          postal_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_locations_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
@@ -1102,6 +1215,7 @@ export type Database = {
       }
       events: {
         Row: {
+          admission_mode: string
           created_at: string
           created_by_account_id: string | null
           description: string
@@ -1116,8 +1230,10 @@ export type Database = {
           updated_at: string
           version: number
           visibility: string
+          waitlist_promotion_paused: boolean
         }
         Insert: {
+          admission_mode?: string
           created_at?: string
           created_by_account_id?: string | null
           description?: string
@@ -1132,8 +1248,10 @@ export type Database = {
           updated_at?: string
           version?: number
           visibility?: string
+          waitlist_promotion_paused?: boolean
         }
         Update: {
+          admission_mode?: string
           created_at?: string
           created_by_account_id?: string | null
           description?: string
@@ -1148,6 +1266,7 @@ export type Database = {
           updated_at?: string
           version?: number
           visibility?: string
+          waitlist_promotion_paused?: boolean
         }
         Relationships: [
           {
@@ -1324,6 +1443,83 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_participations: {
+        Row: {
+          account_id: string
+          address_attested_at: string
+          applied_at: string
+          decided_by_account_id: string | null
+          decision_reason: string | null
+          display_name: string
+          event_id: string
+          geographic_exception: boolean
+          id: string
+          location_id: string | null
+          state: string
+          state_changed_at: string
+          version: number
+        }
+        Insert: {
+          account_id: string
+          address_attested_at: string
+          applied_at?: string
+          decided_by_account_id?: string | null
+          decision_reason?: string | null
+          display_name: string
+          event_id: string
+          geographic_exception: boolean
+          id?: string
+          location_id?: string | null
+          state: string
+          state_changed_at?: string
+          version?: number
+        }
+        Update: {
+          account_id?: string
+          address_attested_at?: string
+          applied_at?: string
+          decided_by_account_id?: string | null
+          decision_reason?: string | null
+          display_name?: string
+          event_id?: string
+          geographic_exception?: boolean
+          id?: string
+          location_id?: string | null
+          state?: string
+          state_changed_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_participations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "seller_participations_decided_by_account_id_fkey"
+            columns: ["decided_by_account_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "seller_participations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_participations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "event_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1384,6 +1580,21 @@ export type Database = {
           p_expected_event_version: number
           p_internal_reason: string
           p_public_reason: string
+        }
+        Returns: Json
+      }
+      apply_to_event_command: {
+        Args: {
+          p_actor_id: string
+          p_address_line: string
+          p_correlation_id: string
+          p_display_name: string
+          p_event_id: string
+          p_latitude: number
+          p_locality: string
+          p_longitude: number
+          p_postal_code: string
+          p_right_to_use_attested: boolean
         }
         Returns: Json
       }
@@ -1589,6 +1800,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      decide_seller_participation_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_decision: string
+          p_expected_version: number
+          p_participation_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       delete_browser_session_command: {
         Args: { p_hash: string }
         Returns: undefined
@@ -1657,6 +1879,10 @@ export type Database = {
       }
       get_admin_status_command: {
         Args: { p_actor_id: string; p_auth_session_id: string }
+        Returns: Json
+      }
+      get_event_for_seller_command: {
+        Args: { p_actor_id: string; p_event_id: string }
         Returns: Json
       }
       get_event_publication_readiness_command: {
@@ -1763,12 +1989,20 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: { p_account_id: string }; Returns: boolean }
+      list_event_sellers_command: {
+        Args: { p_actor_id: string; p_event_id: string }
+        Returns: Json
+      }
       list_first_event_reviews_command: {
         Args: {
           p_actor_id: string
           p_auth_session_id: string
           p_correlation_id: string
         }
+        Returns: Json
+      }
+      list_my_participations_command: {
+        Args: { p_actor_id: string }
         Returns: Json
       }
       list_organizer_verifications_command: {
@@ -1936,6 +2170,17 @@ export type Database = {
         }
         Returns: Json
       }
+      update_event_admission_command: {
+        Args: {
+          p_actor_id: string
+          p_admission_mode: string
+          p_correlation_id: string
+          p_event_id: string
+          p_expected_version: number
+          p_waitlist_promotion_paused: boolean
+        }
+        Returns: Json
+      }
       update_event_team_member_role_command: {
         Args: {
           p_actor_id: string
@@ -1989,6 +2234,15 @@ export type Database = {
           p_event_id: string
           p_expected_version: number
           p_opens_at: string
+        }
+        Returns: Json
+      }
+      withdraw_participation_command: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id: string
+          p_expected_version: number
+          p_participation_id: string
         }
         Returns: Json
       }

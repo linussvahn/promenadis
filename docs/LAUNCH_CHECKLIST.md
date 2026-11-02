@@ -132,6 +132,13 @@ Per-slice notes and evidence are in `NEXT_SESSION.md`.
 
 ### Milestone 2 — sellers and safety lifecycle
 
+Milestone 2 state: **in progress**. Slice 1 (seller applications, admission
+modes, seller places, waiting list and promotion, host decisions, withdrawal)
+is complete locally as of 2026-11-03: pgTAP 280, domain `seller-admission`
+tests, seller-join and event-sellers component tests, and the e2e "sellers
+apply through the join page…". Geocoding, shared locations, address changes,
+listing content, moderation and event-relative retention remain.
+
 - Seller application, entitlement/waitlist/promotion, address/geocode/manual pin,
   shared-location merge/split, and address-change reapproval.
 - Versioned bilingual taxonomy, seller listings/items/tags, accessibility facts,

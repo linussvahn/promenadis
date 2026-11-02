@@ -462,8 +462,10 @@ Names are conceptual and can change during schema design.
   a draft upgrade is an explicit validated operation.
 - `event_suggested_tags`: at most twelve event-owned optional suggestions stored
   as authored display text plus a normalized comparison/search value.
-- `event_entitlements`: dormant/configurable capabilities and seller limit;
-  independent of a future payment provider.
+- `event_entitlements`: dormant/configurable capabilities and seller limit
+  (default 30, platform-controlled); independent of a future payment provider.
+  The event's admission mode (`auto_inside`, `host_approval`, `invite_only`)
+  and waitlist-promotion pause live on `events`.
 
 The implemented event-team command boundary uses a separate optimistic
 `team_version`. Browser roles cannot read memberships or invitation emails
@@ -509,7 +511,11 @@ keep public URLs and event-history shells intact when profile ownership changes.
 - `seller_participations`: account-event relationship and admission state.
 - `event_locations`: physical route stop, precise geometry, publication state,
   geocode/manual placement provenance.
-- `location_sellers`: attach one or more participations to one physical stop.
+- `seller_participations.location_id` attaches one or more participations to one
+  physical stop (implemented as a column rather than a separate
+  `location_sellers` table). Closed participations (withdrawn, rejected,
+  revoked) hold no location, and a location with no participations is deleted
+  at once, so a closed application keeps no address.
 - `seller_availability`: intervals bounded by the event schedule.
 - `seller_live_status`: optional confirmed-open/temporarily-away/closed-early
   override with actor, timestamp, expiry, and audit linkage; scheduled status is

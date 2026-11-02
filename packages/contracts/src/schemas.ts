@@ -646,6 +646,124 @@ export const requestFirstEventReviewSchema = z.strictObject({
   expectedEventVersion: z.number().int().positive(),
 });
 
+export const admissionModeSchema = z.enum(["auto_inside", "host_approval", "invite_only"]);
+export const participationStateSchema = z.enum([
+  "pending",
+  "waitlisted",
+  "approved",
+  "withdrawn",
+  "rejected",
+  "suspended",
+  "revoked",
+  "pending_address_change",
+  "pending_reschedule_confirmation",
+]);
+
+export const sellerLocationSchema = z.strictObject({
+  addressLine: z.string().min(3).max(200),
+  insideBoundary: z.boolean(),
+  latitude: z.number().min(-90).max(90),
+  locality: z.string().max(100).nullable(),
+  longitude: z.number().min(-180).max(180),
+  placement: z.enum(["manual", "geocoded"]),
+  postalCode: z.string().max(6).nullable(),
+});
+
+export const sellerParticipationSchema = z.strictObject({
+  appliedAt: isoInstant,
+  decisionReason: z.string().max(500).nullable(),
+  displayName: z.string().min(1).max(80),
+  eventId: opaqueUuid,
+  geographicException: z.boolean(),
+  id: opaqueUuid,
+  location: sellerLocationSchema.nullable(),
+  state: participationStateSchema,
+  version: z.number().int().positive(),
+});
+
+export type SellerParticipation = z.infer<typeof sellerParticipationSchema>;
+
+export const myParticipationsSchema = z.array(
+  sellerParticipationSchema.extend({
+    eventState: eventStateSchema,
+    eventTitle: z.string().max(120),
+    startsAt: isoInstant.nullable(),
+    timezone: z.string().min(1).max(100),
+  }),
+);
+
+export type MyParticipation = z.infer<typeof myParticipationsSchema>[number];
+
+export const eventForSellerSchema = z.strictObject({
+  admissionMode: admissionModeSchema,
+  boundary: z.array(boundaryPointSchema).nullable(),
+  description: z.string().max(2000),
+  endsAt: isoInstant.nullable(),
+  id: opaqueUuid,
+  organizerDisplayName: z.string().max(100),
+  participation: sellerParticipationSchema.nullable(),
+  placesFull: z.boolean(),
+  registrationClosesAt: isoInstant.nullable(),
+  registrationOpen: z.boolean(),
+  startsAt: isoInstant.nullable(),
+  state: eventStateSchema,
+  timezone: z.string().min(1).max(100),
+  title: z.string().max(120),
+});
+
+export type EventForSeller = z.infer<typeof eventForSellerSchema>;
+
+export const applyToEventRequestSchema = z.strictObject({
+  addressLine: z.string().trim().min(3).max(200),
+  displayName: z.string().trim().min(1).max(80),
+  latitude: z.number().min(-90).max(90),
+  locality: z.string().trim().max(100),
+  longitude: z.number().min(-180).max(180),
+  postalCode: z.union([
+    z.literal(""),
+    z
+      .string()
+      .trim()
+      .regex(/^[0-9]{3} ?[0-9]{2}$/u),
+  ]),
+  rightToUseAttested: z.literal(true),
+});
+
+export type ApplyToEventRequest = z.infer<typeof applyToEventRequestSchema>;
+
+export const participationVersionRequestSchema = z.strictObject({
+  expectedVersion: z.number().int().positive(),
+});
+
+export const eventSellersSchema = z.strictObject({
+  admissionMode: admissionModeSchema,
+  eventId: opaqueUuid,
+  eventVersion: z.number().int().positive(),
+  locationCount: z.number().int().nonnegative(),
+  placesUsed: z.number().int().nonnegative(),
+  sellerLimit: z.number().int().nonnegative(),
+  sellers: z.array(sellerParticipationSchema),
+  waitlistPromotionPaused: z.boolean(),
+});
+
+export type EventSellers = z.infer<typeof eventSellersSchema>;
+
+export const decideSellerRequestSchema = z.strictObject({
+  decision: z.enum(["approve", "waitlist", "reject", "revoke"]),
+  expectedVersion: z.number().int().positive(),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export type DecideSellerRequest = z.infer<typeof decideSellerRequestSchema>;
+
+export const updateEventAdmissionRequestSchema = z.strictObject({
+  admissionMode: admissionModeSchema,
+  expectedVersion: z.number().int().positive(),
+  waitlistPromotionPaused: z.boolean(),
+});
+
+export type UpdateEventAdmissionRequest = z.infer<typeof updateEventAdmissionRequestSchema>;
+
 export const adminStatusSchema = z.strictObject({
   elevated: z.boolean(),
   eligible: z.boolean(),
@@ -871,6 +989,14 @@ export const boundarySchemas = {
   DecideOrganizerVerification: decideOrganizerVerificationSchema,
   PublishEventRequest: publishEventRequestSchema,
   CancelEventRequest: cancelEventRequestSchema,
+  SellerParticipation: sellerParticipationSchema,
+  MyParticipations: myParticipationsSchema,
+  EventForSeller: eventForSellerSchema,
+  ApplyToEventRequest: applyToEventRequestSchema,
+  ParticipationVersionRequest: participationVersionRequestSchema,
+  EventSellers: eventSellersSchema,
+  DecideSellerRequest: decideSellerRequestSchema,
+  UpdateEventAdmissionRequest: updateEventAdmissionRequestSchema,
   UpdateDraftEventDetailsRequest: updateDraftEventDetailsRequestSchema,
   EventDetailsResult: eventDetailsResultSchema,
   DuplicateEventRequest: duplicateEventRequestSchema,

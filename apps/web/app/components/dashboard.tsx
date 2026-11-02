@@ -4,13 +4,14 @@ import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
 import { IncomingOrganizerInvites } from "./incoming-organizer-invites";
 import { IncomingTeamInvites } from "./incoming-team-invites";
+import { MyParticipations } from "./my-participations";
 
 export function Dashboard() {
   return <AccountShell>{({ locale }) => <DashboardContent locale={locale} />}</AccountShell>;
 }
 
 function DashboardContent({ locale }: { readonly locale: "sv" | "en" }) {
-  const { dashboard, loadDashboard, loadFailed } = useAccountData();
+  const { accessToken, dashboard, loadDashboard, loadFailed } = useAccountData();
 
   return (
     <main className="account-page app-page" id="main" tabIndex={-1}>
@@ -37,6 +38,7 @@ function DashboardContent({ locale }: { readonly locale: "sv" | "en" }) {
             locale={locale}
             onAccepted={loadDashboard}
           />
+          <MyParticipations accessToken={accessToken} locale={locale} />
         </>
       ) : null}
 

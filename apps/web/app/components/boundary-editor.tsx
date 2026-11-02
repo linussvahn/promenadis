@@ -7,10 +7,10 @@ import MapView, { Layer, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getPromenadisApiClient, getBrowserAuthClient } from "../lib/supabase";
 
-const DEFAULT_CENTER: BoundaryPoint = [18.0686, 59.3293];
-const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+export const DEFAULT_CENTER: BoundaryPoint = [18.0686, 59.3293];
+export const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
-class MapErrorBoundary extends Component<
+export class MapErrorBoundary extends Component<
   { readonly children: ReactNode; readonly fallback: ReactNode },
   { readonly failed: boolean }
 > {

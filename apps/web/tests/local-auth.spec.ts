@@ -848,6 +848,121 @@ test("owners edit drafts and organizers, copy events, and elevated admins can ca
   }
 });
 
+test("sellers apply through the join page, fill seller places and move up from the waiting list", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(120_000);
+  if (!admin || !localStatus) throw new Error("Local test configuration missing");
+  const publicKey = localStatus.PUBLISHABLE_KEY ?? localStatus.ANON_KEY;
+  const base = `${localStatus.API_URL}/functions/v1/api-v1`;
+  const ownerEmail = `market-owner-${randomUUID()}@example.invalid`;
+  const firstEmail = `market-seller-a-${randomUUID()}@example.invalid`;
+  const secondEmail = `market-seller-b-${randomUUID()}@example.invalid`;
+  const password = `Local-test-${randomUUID()}`;
+  const headersFor = async (email: string) => {
+    const client = createClient(localStatus.API_URL, publicKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return {
+      apikey: publicKey,
+      authorization: `Bearer ${data.session?.access_token}`,
+      origin: "http://127.0.0.1:5173",
+    };
+  };
+  for (const email of [ownerEmail, secondEmail]) {
+    const { error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
+    if (error) throw error;
+  }
+  try {
+    const owner = await headersFor(ownerEmail);
+    const created = await request.post(`${base}/events`, {
+      headers: owner,
+      data: {
+        description: "Synthetic market",
+        endsAt: "2031-09-15T15:00:00+02:00",
+        organizerProfileId: null,
+        publicOrganizerName: "Synthetic market owner",
+        startsAt: "2031-09-15T10:00:00+02:00",
+        timezone: "Europe/Stockholm",
+        title: "Synthetic seller market",
+        visibility: "unlisted",
+      },
+    });
+    const eventId = (await created.json()).id as string;
+    const ownerId = localSql(`select id from auth.users where email='${ownerEmail}';`);
+    localSql(`select public.upsert_draft_event_boundary_command('${ownerId}','${eventId}',null,'Synthetic area',
+        '{"type":"Polygon","coordinates":[[[18.06,59.33],[18.064,59.33],[18.064,59.333],[18.06,59.333],[18.06,59.33]]]}'::jsonb,
+        gen_random_uuid());
+      update public.event_entitlements set seller_limit=1 where event_id='${eventId}';`);
+    const eventVersion = Number(
+      localSql(`select version from public.events where id='${eventId}';`),
+    );
+    const admission = await request.put(`${base}/events/${eventId}/admission`, {
+      headers: owner,
+      data: {
+        admissionMode: "auto_inside",
+        expectedVersion: eventVersion,
+        waitlistPromotionPaused: false,
+      },
+    });
+    expect(await admission.json()).toMatchObject({ admissionMode: "auto_inside", sellerLimit: 1 });
+
+    // First seller: the browser join page with typed coordinates.
+    await signIn(page, firstEmail);
+    await page.goto(`/events/${eventId}/join`);
+    await page.getByLabel("Namn som visas för besökare").fill("Syntetisk säljare");
+    await page.getByLabel("Adress", { exact: true }).fill("Testgatan 1");
+    await page.getByLabel("Postnummer (valfritt)").fill("113 45");
+    await page.getByLabel("Latitud").fill("59.331");
+    await page.getByLabel("Longitud").fill("18.062");
+    await page.getByLabel(/Jag har rätt att använda/u).check();
+    await page.getByRole("button", { name: "Skicka ansökan" }).click();
+    await expect(page.getByText("Du har en säljplats på evenemanget.")).toBeVisible();
+
+    // Second seller is waitlisted, then promoted when the first withdraws.
+    const second = await headersFor(secondEmail);
+    const applied = await request.post(`${base}/events/${eventId}/participation`, {
+      headers: second,
+      data: {
+        addressLine: "Testgatan 2",
+        displayName: "Second seller",
+        latitude: 59.3315,
+        locality: "",
+        longitude: 18.0625,
+        postalCode: "",
+        rightToUseAttested: true,
+      },
+    });
+    expect(await applied.json()).toMatchObject({ state: "waitlisted" });
+    expect(
+      (await request.get(`${base}/events/${eventId}/sellers`, { headers: second })).status(),
+    ).toBe(403);
+    const team = await (
+      await request.get(`${base}/events/${eventId}/sellers`, { headers: owner })
+    ).json();
+    expect(team).toMatchObject({ locationCount: 1, placesUsed: 1, sellerLimit: 1 });
+
+    await page.getByRole("button", { name: "Dra tillbaka ansökan" }).click();
+    await expect(page.getByText(/Ansökan är tillbakadragen/u)).toBeVisible();
+    const mine = await (await request.get(`${base}/participations`, { headers: second })).json();
+    expect(mine[0]).toMatchObject({
+      eventTitle: "Synthetic seller market",
+      location: null,
+      state: "approved",
+    });
+    expect(
+      localSql(`select count(*) from public.event_locations where event_id='${eventId}';`),
+    ).toBe("1");
+  } finally {
+    await deleteSyntheticAccount(firstEmail);
+    await deleteSyntheticAccount(secondEmail);
+    await deleteSyntheticAccount(ownerEmail);
+  }
+});
+
 test("organization verification needs a valid number and an elevated reviewer", async ({
   request,
 }) => {

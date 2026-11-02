@@ -8,6 +8,14 @@ import {
   accountDeletionStatusSchema,
   adminElevationRequestSchema,
   adminEventInterventionRequestSchema,
+  applyToEventRequestSchema,
+  decideSellerRequestSchema,
+  eventForSellerSchema,
+  eventSellersSchema,
+  myParticipationsSchema,
+  participationVersionRequestSchema,
+  sellerParticipationSchema,
+  updateEventAdmissionRequestSchema,
   adminEventSummarySchema,
   duplicateEventRequestSchema,
   eventDetailsResultSchema,
@@ -2283,6 +2291,201 @@ Deno.serve(async (request) => {
       if (!parsed.success) throw new Error("invalid_internal_response");
       status = "succeeded";
       return json(parsed.data, 200, correlationId, origin);
+    }
+
+    const sellerErrors = new Map<string, [string, string, number]>([
+      ["Event not found", ["not_found", "Event not found.", 404]],
+      ["Participation not found", ["not_found", "Application not found.", 404]],
+      [
+        "Actor is not an event team member",
+        ["forbidden", "Only the event team can see sellers.", 403],
+      ],
+      [
+        "Actor cannot manage admission",
+        ["forbidden", "Only the owner or a co-host can change this.", 403],
+      ],
+      ["Event is invite-only", ["invite_only", "This event only takes invited sellers.", 409]],
+      ["Registration is closed", ["registration_closed", "Registration is closed.", 409]],
+      ["Already applied", ["already_applied", "You have already applied.", 409]],
+      ["Application limit reached", ["rate_limited", "Too many applications today.", 429]],
+      ["Event area not ready", ["area_not_ready", "The event area is not ready yet.", 409]],
+      ["Invalid application", ["invalid_request", "Check the application fields.", 400]],
+      [
+        "Right to use the location must be confirmed",
+        ["invalid_request", "Confirm that you may use the location.", 400],
+      ],
+      [
+        "Participation version conflict",
+        ["version_conflict", "The application changed. Reload.", 409],
+      ],
+      [
+        "Participation already closed",
+        ["invalid_state", "The application is already closed.", 409],
+      ],
+      ["Event is closed", ["invalid_state", "The event is closed.", 409]],
+      [
+        "Cannot decide own participation",
+        ["conflict_of_interest", "You cannot decide your own application.", 403],
+      ],
+      ["Seller places are full", ["places_full", "All seller places are taken.", 409]],
+      ["Invalid seller decision", ["invalid_request", "That decision is not possible.", 400]],
+      ["Admission can no longer change", ["invalid_state", "Admission can no longer change.", 409]],
+      ["Event version conflict", ["version_conflict", "The event changed. Reload.", 409]],
+      ["Invalid admission settings", ["invalid_request", "Check the admission settings.", 400]],
+    ]);
+    const sellerResult = <T>(
+      result: { data: unknown; error: { message: string } | null },
+      schema: { safeParse: (value: unknown) => { success: boolean; data?: T } },
+      httpStatus = 200,
+    ) => {
+      if (result.error) {
+        const mapped = sellerErrors.get(result.error.message);
+        if (!mapped) throw result.error;
+        status = "denied";
+        return apiError(mapped[0], mapped[1], mapped[2], correlationId, origin);
+      }
+      const parsed = schema.safeParse(result.data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, httpStatus, correlationId, origin);
+    };
+
+    const sellerEventRoute = route.match(
+      /^\/events\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(seller-view|participation|sellers|admission)$/iu,
+    );
+    if (sellerEventRoute) {
+      const [, eventId, action] = sellerEventRoute;
+      if (request.method === "GET" && action === "seller-view") {
+        operation = "seller.event_read";
+        return sellerResult(
+          await admin.rpc("get_event_for_seller_command", {
+            p_actor_id: actorId,
+            p_event_id: eventId,
+          }),
+          eventForSellerSchema,
+        );
+      }
+      if (request.method === "POST" && action === "participation") {
+        operation = "seller.apply";
+        const input = applyToEventRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError(
+            "invalid_request",
+            "Check the application fields.",
+            400,
+            correlationId,
+            origin,
+          );
+        }
+        return sellerResult(
+          await admin.rpc("apply_to_event_command", {
+            p_actor_id: actorId,
+            p_address_line: input.data.addressLine,
+            p_correlation_id: correlationId,
+            p_display_name: input.data.displayName,
+            p_event_id: eventId,
+            p_latitude: input.data.latitude,
+            p_locality: input.data.locality,
+            p_longitude: input.data.longitude,
+            p_postal_code: input.data.postalCode,
+            p_right_to_use_attested: input.data.rightToUseAttested,
+          }),
+          sellerParticipationSchema,
+          201,
+        );
+      }
+      if (request.method === "GET" && action === "sellers") {
+        operation = "seller.team_list";
+        return sellerResult(
+          await admin.rpc("list_event_sellers_command", {
+            p_actor_id: actorId,
+            p_event_id: eventId,
+          }),
+          eventSellersSchema,
+        );
+      }
+      if (request.method === "PUT" && action === "admission") {
+        operation = "event.admission_update";
+        const input = updateEventAdmissionRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError(
+            "invalid_request",
+            "Check the admission settings.",
+            400,
+            correlationId,
+            origin,
+          );
+        }
+        return sellerResult(
+          await admin.rpc("update_event_admission_command", {
+            p_actor_id: actorId,
+            p_admission_mode: input.data.admissionMode,
+            p_correlation_id: correlationId,
+            p_event_id: eventId,
+            p_expected_version: input.data.expectedVersion,
+            p_waitlist_promotion_paused: input.data.waitlistPromotionPaused,
+          }),
+          eventSellersSchema,
+        );
+      }
+    }
+
+    if (request.method === "GET" && route === "/participations") {
+      operation = "seller.own_list";
+      return sellerResult(
+        await admin.rpc("list_my_participations_command", { p_actor_id: actorId }),
+        myParticipationsSchema,
+      );
+    }
+
+    const participationRoute = route.match(
+      /^\/participations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(withdraw|decision)$/iu,
+    );
+    if (request.method === "POST" && participationRoute) {
+      const [, participationId, action] = participationRoute;
+      const body = await requestBody(request);
+      if (action === "withdraw") {
+        operation = "seller.withdraw";
+        const input = participationVersionRequestSchema.safeParse(body);
+        if (!input.success) {
+          status = "denied";
+          return apiError("invalid_request", "Reload and try again.", 400, correlationId, origin);
+        }
+        return sellerResult(
+          await admin.rpc("withdraw_participation_command", {
+            p_actor_id: actorId,
+            p_correlation_id: correlationId,
+            p_expected_version: input.data.expectedVersion,
+            p_participation_id: participationId,
+          }),
+          sellerParticipationSchema,
+        );
+      }
+      operation = "seller.decide";
+      const input = decideSellerRequestSchema.safeParse(body);
+      if (!input.success) {
+        status = "denied";
+        return apiError(
+          "invalid_request",
+          "That decision is not possible.",
+          400,
+          correlationId,
+          origin,
+        );
+      }
+      return sellerResult(
+        await admin.rpc("decide_seller_participation_command", {
+          p_actor_id: actorId,
+          p_correlation_id: correlationId,
+          p_decision: input.data.decision,
+          p_expected_version: input.data.expectedVersion,
+          p_participation_id: participationId,
+          p_reason: input.data.reason ?? null,
+        }),
+        sellerParticipationSchema,
+      );
     }
 
     const detailsRoute = route.match(

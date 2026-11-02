@@ -8,11 +8,12 @@ import { EventControls } from "./event-controls";
 import { EventDetailsEditor } from "./event-details-editor";
 import { EventDuplicate } from "./event-duplicate";
 import { EventLifecycle } from "./event-lifecycle";
+import { EventSellers } from "./event-sellers";
 import { EventTeam } from "./event-team";
 import { PublicationReadiness } from "./publication-readiness";
 import { RegistrationEditor } from "./registration-editor";
 
-type WorkspaceView = "overview" | "area" | "registration" | "review";
+type WorkspaceView = "overview" | "area" | "registration" | "review" | "sellers";
 
 export function EventWorkspace({ view }: { readonly view: WorkspaceView }) {
   return (
@@ -156,6 +157,27 @@ function EventWorkspaceContent({
             </Link>
           </div>
         </section>
+      </main>
+    );
+  }
+
+  if (view === "sellers") {
+    return (
+      <main className="account-page flow-page" id="main" tabIndex={-1}>
+        <Link className="back-link" to={`/events/${event.id}`}>
+          ← {translate(locale, "event.backToOverview")}
+        </Link>
+        <header className="app-heading flow-heading">
+          <p className="eyebrow">{event.title}</p>
+          <h1>{translate(locale, "sellers.title")}</h1>
+          <p className="lede">{translate(locale, "sellers.intro")}</p>
+        </header>
+        <EventSellers
+          accessToken={accessToken}
+          event={event}
+          locale={locale}
+          onChanged={loadDashboard}
+        />
       </main>
     );
   }
@@ -313,6 +335,9 @@ function EventWorkspaceContent({
               ) : null}
             </li>
           </ol>
+          <Link className="secondary-button button-link" to={`/events/${event.id}/sellers`}>
+            {translate(locale, "sellers.open")}
+          </Link>
           <div className="upcoming-note">
             <strong>{translate(locale, "event.nextFeatures")}</strong>
             <span>{translate(locale, "event.nextFeaturesHelp")}</span>

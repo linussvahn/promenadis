@@ -5,6 +5,13 @@ import {
   type RequestAccountDeletionRequest,
   type DecideFirstEventReviewRequest,
   type CancelEventRequest,
+  type ApplyToEventRequest,
+  type DecideSellerRequest,
+  type UpdateEventAdmissionRequest,
+  eventForSellerSchema,
+  eventSellersSchema,
+  myParticipationsSchema,
+  sellerParticipationSchema,
   type AdminEventInterventionRequest,
   type DuplicateEventRequest,
   type UpdateDraftEventDetailsRequest,
@@ -314,6 +321,43 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
       return request(`/events/${eventId}/duplicate`, accessToken, commandResourceResponseSchema, {
         body: input,
         method: "POST",
+      });
+    },
+    getEventForSeller(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/seller-view`, accessToken, eventForSellerSchema);
+    },
+    applyToEvent(accessToken: string, eventId: string, input: ApplyToEventRequest) {
+      return request(`/events/${eventId}/participation`, accessToken, sellerParticipationSchema, {
+        body: input,
+        method: "POST",
+      });
+    },
+    listMyParticipations(accessToken: string) {
+      return request("/participations", accessToken, myParticipationsSchema);
+    },
+    withdrawParticipation(accessToken: string, participationId: string, expectedVersion: number) {
+      return request(
+        `/participations/${participationId}/withdraw`,
+        accessToken,
+        sellerParticipationSchema,
+        { body: { expectedVersion }, method: "POST" },
+      );
+    },
+    listEventSellers(accessToken: string, eventId: string) {
+      return request(`/events/${eventId}/sellers`, accessToken, eventSellersSchema);
+    },
+    decideSeller(accessToken: string, participationId: string, input: DecideSellerRequest) {
+      return request(
+        `/participations/${participationId}/decision`,
+        accessToken,
+        sellerParticipationSchema,
+        { body: input, method: "POST" },
+      );
+    },
+    updateEventAdmission(accessToken: string, eventId: string, input: UpdateEventAdmissionRequest) {
+      return request(`/events/${eventId}/admission`, accessToken, eventSellersSchema, {
+        body: input,
+        method: "PUT",
       });
     },
     publishEvent(accessToken: string, eventId: string, expectedEventVersion: number) {

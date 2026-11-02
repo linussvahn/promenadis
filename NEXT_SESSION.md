@@ -1,6 +1,6 @@
 # Promenadis implementation handoff
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 ## How to resume
 
@@ -455,6 +455,59 @@ Treat those documents as canonical rather than relying on chat memory.
   and contract artifacts are current.
 
 ## Recommended next work
+
+### Milestone 2 plan and slice 1 (2026-11-03)
+
+Planned slices, each its own commit:
+
+1. Seller applications and admission (done, below).
+2. Geocoding adapter (local fixture, Geoapify later), shared locations
+   (exact-address prompt, host merge/split), address-change reapproval, pin
+   correction up to 25 m.
+3. Taxonomy `flea-market-v1`, event taxonomy subset, seller listing content
+   (title, description, categories, tags, items, accessibility facts),
+   availability and live status.
+4. Reports, unauthorized-address quarantine, hide/suspend/revoke, appeals,
+   invite-only seller invitations.
+5. Event-relative retention: non-public at end/cancel, 14-day erasure,
+   tombstones, heartbeats; postponement and reschedule confirmation.
+
+Slice 1, `20261103000100_seller_admission.sql`:
+
+- `events.admission_mode` (`auto_inside` | `host_approval` | `invite_only`,
+  default `host_approval`) and `waitlist_promotion_paused`;
+  `event_entitlements` (seller limit 30, platform-controlled, created by
+  trigger).
+- `event_locations` (private address, manual pin, `inside_boundary`,
+  normalized address for later shared-location matching) and
+  `seller_participations` (one per account/event, nine states, transition
+  trigger mirroring `packages/domain/src/seller-admission.ts`). Closing a
+  participation clears its location and the location row is deleted, so
+  closed applications keep no address.
+- Commands: `get_event_for_seller_command`, `apply_to_event_command`
+  (registration window, not invite-only, attestation, boundary required,
+  10 applications/account/day, inside+auto = approved or waitlisted, else
+  pending; outside = geographic exception), `list_my_participations_command`,
+  `withdraw_participation_command`, `list_event_sellers_command` (team;
+  places used vs map locations), `decide_seller_participation_command`
+  (owner/co-host/moderator; approve/waitlist/reject/revoke; capacity checked
+  under the event lock; reasons for reject/revoke; no self-decision),
+  `update_event_admission_command` (owner/co-host, draft/published).
+  `promote_waitlisted_sellers` runs after withdraw/revoke/admission change:
+  automatic mode only, not paused, before the start, inside-boundary only.
+- BFF: `GET /events/{id}/seller-view`, `POST /events/{id}/participation`,
+  `GET /events/{id}/sellers`, `PUT /events/{id}/admission`,
+  `GET /participations`, `POST /participations/{id}/withdraw|decision`.
+- Web: `/events/:id/join` (application with map pin plus typed-coordinate
+  fallback, status, withdraw), `/events/:id/sellers` (places, join link,
+  admission settings, decisions), "Your seller applications" on the dashboard.
+- Not yet: geocoding (pins are manual), shared stops, address change,
+  suspension/reinstatement (moderation slice), invitations for invite-only
+  events, notifications to sellers, account-deletion blockers for sellers.
+- Verified: pgTAP 280 (34; 655 total), domain/component tests (164 total),
+  full verify, DB rebuild, 13/13 local-auth e2e, 5 smoke, all integration
+  scripts.
+
 
 ### Milestone 1 completion gaps (2026-11-02)
 
