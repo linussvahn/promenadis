@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { OrganizerTeam } from "./organizer-team";
 
 const organizerProfileId = "01991dd3-a7c7-7ea2-aee5-43ec2cb5f611";
@@ -54,7 +55,9 @@ describe("OrganizerTeam", () => {
       teamVersion: 2,
     });
 
-    render(<OrganizerTeam locale="en" organizerProfileId={organizerProfileId} owner />);
+    await renderWithRouter(
+      <OrganizerTeam locale="en" organizerProfileId={organizerProfileId} owner />,
+    );
     await screen.findByText("Organizer Owner");
     fireEvent.change(screen.getByLabelText("Invite a manager by email"), {
       target: { value: "manager@example.invalid" },
@@ -83,7 +86,9 @@ describe("OrganizerTeam", () => {
     mocks.getOrganizerTeam.mockResolvedValue(teamWithManager);
     mocks.removeOrganizerManager.mockResolvedValue(initialTeam);
 
-    render(<OrganizerTeam locale="en" organizerProfileId={organizerProfileId} owner />);
+    await renderWithRouter(
+      <OrganizerTeam locale="en" organizerProfileId={organizerProfileId} owner />,
+    );
     await screen.findByText("Organizer Manager");
     fireEvent.click(screen.getByRole("button", { name: "Remove manager" }));
     expect(mocks.removeOrganizerManager).not.toHaveBeenCalled();
@@ -101,7 +106,7 @@ describe("OrganizerTeam", () => {
 
   it("has no detectable automated accessibility violations", async () => {
     mocks.getOrganizerTeam.mockResolvedValue(initialTeam);
-    const { container } = render(
+    const { container } = await renderWithRouter(
       <OrganizerTeam locale="en" organizerProfileId={organizerProfileId} owner />,
     );
     await screen.findByText("Organizer Owner");

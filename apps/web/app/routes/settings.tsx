@@ -1,11 +1,9 @@
-import type { MetaFunction } from "react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Settings } from "../components/settings";
 
-export const meta: MetaFunction = () => [
-  { title: "Settings · Promenadis" },
-  { name: "robots", content: "noindex, nofollow" },
-];
-
-export default function SettingsRoute() {
-  return <Settings />;
-}
+export const Route = createFileRoute("/settings")({
+  component: () => <Settings />,
+  head: () => ({
+    meta: [{ title: "Settings · Promenadis" }, { name: "robots", content: "noindex, nofollow" }],
+  }),
+});

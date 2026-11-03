@@ -1,5 +1,5 @@
 import { formatDateTime, translate } from "@promenadis/i18n";
-import { Link } from "react-router";
+import { Link } from "@tanstack/react-router";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
 import { IncomingOrganizerInvites } from "./incoming-organizer-invites";
@@ -114,7 +114,7 @@ function DashboardContent({ locale }: { readonly locale: "sv" | "en" }) {
                         : translate(locale, "event.areaMissing")}
                     </span>
                     <Button asChild size="sm" variant="outline">
-                      <Link to={`/events/${draft.id}`}>
+                      <Link params={{ eventId: draft.id }} to="/events/$eventId">
                         {translate(
                           locale,
                           draft.state === "draft" ? "event.continue" : "event.open",

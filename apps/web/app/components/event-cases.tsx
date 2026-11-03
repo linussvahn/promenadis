@@ -1,7 +1,10 @@
 import { type createPromenadisApiClient, PromenadisApiError } from "@promenadis/api-client";
 import type { ModerationCase } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
+import { accountKey } from "../lib/use-account-data";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -10,6 +13,8 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
+type Client = { readonly api: ApiClient; readonly token: string };
+type Decision = "restore" | "uphold" | "dismiss";
 
 // Event-scoped report cases. Reporter identity and contact are never shown;
 // a quarantined location needs an explicit restore or uphold.
@@ -26,38 +31,34 @@ export function EventCases({
   readonly onChanged: () => Promise<void>;
   readonly timezone: string;
 }) {
-  const [cases, setCases] = useState<ModerationCase[] | null>(null);
-  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
+  const casesKey = accountKey(useExpectedAccountId(), "events", eventId, "cases");
   const [status, setStatus] = useState("");
 
-  const load = useCallback(async () => {
-    const client = await call();
-    if (!client) return;
-    try {
-      setCases(await client.api.listEventCases(client.token, eventId));
-    } catch {
-      setStatus(translate(locale, "cases.error"));
-    }
-  }, [call, eventId, locale]);
+  const casesQuery = useQuery({
+    queryKey: casesKey,
+    queryFn: async (): Promise<ModerationCase[] | null> => {
+      const client = await call();
+      return client ? client.api.listEventCases(client.token, eventId) : null;
+    },
+  });
+  const cases = casesQuery.data ?? null;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const review = async (item: ModerationCase, formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const submitter = (formEvent.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-    const decision = (submitter?.value ?? "dismiss") as "restore" | "uphold" | "dismiss";
-    const reason = String(new FormData(formEvent.currentTarget).get("reason") ?? "").trim();
-    const client = await call();
-    if (!client) return;
-    setBusy(true);
-    setStatus("");
-    try {
-      setCases(await client.api.reviewCase(client.token, item.id, { decision, reason }));
+  const reviewMutation = useMutation({
+    mutationFn: ({
+      api,
+      token,
+      item,
+      decision,
+      reason,
+    }: Client & { item: ModerationCase; decision: Decision; reason: string }) =>
+      api.reviewCase(token, item.id, { decision, reason }),
+    onSuccess: async (next) => {
+      queryClient.setQueryData(casesKey, next);
       await onChanged();
       setStatus(translate(locale, "cases.reviewed"));
-    } catch (error) {
+    },
+    onError: (error) => {
       const code = error instanceof PromenadisApiError ? error.code : "";
       setStatus(
         translate(
@@ -69,9 +70,19 @@ export function EventCases({
               : "cases.error",
         ),
       );
-    } finally {
-      setBusy(false);
-    }
+    },
+  });
+  const busy = reviewMutation.isPending;
+
+  const review = async (item: ModerationCase, formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    const submitter = (formEvent.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const decision = (submitter?.value ?? "dismiss") as Decision;
+    const reason = String(new FormData(formEvent.currentTarget).get("reason") ?? "").trim();
+    const client = await call();
+    if (!client) return;
+    setStatus("");
+    reviewMutation.mutate({ ...client, decision, item, reason });
   };
 
   if (!cases) return null;

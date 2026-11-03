@@ -1,8 +1,9 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { SupportRequest } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation } from "@tanstack/react-query";
+import { useSearch } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { useSearchParams } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { PageHeading } from "./page";
 import { Alert } from "./ui/alert";
@@ -19,24 +20,24 @@ const topics = ["support", "accessibility", "privacy", "safety", "legal"] as con
 
 // One first-party form for the five routes into the support mailbox.
 export function SupportForm({ locale }: { readonly locale: Locale }) {
-  const [params] = useSearchParams();
-  const initial = topics.find((topic) => topic === params.get("topic")) ?? "support";
+  // The route declares no search schema, so compare the raw value.
+  const search = useSearch({ strict: false }) as Readonly<Record<string, unknown>>;
+  const initial = topics.find((topic) => topic === search.topic) ?? "support";
   const [sent, setSent] = useState(false);
   const [status, setStatus] = useState("");
-  const submit = async (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const form = new FormData(formEvent.currentTarget);
-    const api = getPromenadisApiClient();
-    if (!api) return;
-    try {
+  const send = useMutation({
+    mutationFn: async (form: FormData) => {
+      const api = getPromenadisApiClient();
+      if (!api) return false;
       await api.submitSupportRequest({
         contact: String(form.get("contact") ?? "").trim(),
         message: String(form.get("message") ?? ""),
         topic: String(form.get("topic")) as SupportRequest["topic"],
         website: String(form.get("website") ?? ""),
       });
-      setSent(true);
-    } catch (error) {
+      return true;
+    },
+    onError: (error) => {
       const code = error instanceof PromenadisApiError ? error.code : "";
       setStatus(
         translate(
@@ -44,7 +45,14 @@ export function SupportForm({ locale }: { readonly locale: Locale }) {
           code === "rate_limited" || code === "paused" ? "support.busy" : "support.error",
         ),
       );
-    }
+    },
+    onSuccess: (submitted) => {
+      if (submitted) setSent(true);
+    },
+  });
+  const submit = (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    send.mutate(new FormData(formEvent.currentTarget));
   };
   return (
     <section aria-labelledby="support-title" className="grid max-w-3xl gap-6">
@@ -59,7 +67,7 @@ export function SupportForm({ locale }: { readonly locale: Locale }) {
         </Alert>
       ) : (
         <Card asChild className="max-w-2xl">
-          <form onSubmit={(formEvent) => void submit(formEvent)}>
+          <form onSubmit={submit}>
             <CardContent>
               <FieldGroup>
                 <Field>
@@ -123,22 +131,28 @@ export function EventFeedback({
 }) {
   const [sent, setSent] = useState(false);
   const [status, setStatus] = useState("");
-  const submit = async (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const form = new FormData(formEvent.currentTarget);
-    const api = getPromenadisApiClient();
-    if (!api) return;
-    try {
+  const send = useMutation({
+    mutationFn: async (form: FormData) => {
+      const api = getPromenadisApiClient();
+      if (!api) return false;
       await api.submitEventFeedback(route, eventKey, {
         comment: String(form.get("comment") ?? ""),
         followupContact: String(form.get("followup") ?? "").trim(),
         rating: Number(form.get("rating")),
       });
-      setSent(true);
-    } catch (error) {
+      return true;
+    },
+    onError: (error) => {
       const code = error instanceof PromenadisApiError ? error.code : "";
       setStatus(translate(locale, code === "already_sent" ? "feedback.already" : "support.error"));
-    }
+    },
+    onSuccess: (submitted) => {
+      if (submitted) setSent(true);
+    },
+  });
+  const submit = (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    send.mutate(new FormData(formEvent.currentTarget));
   };
   if (sent) {
     return (
@@ -149,7 +163,7 @@ export function EventFeedback({
   }
   return (
     <Card asChild className="max-w-2xl">
-      <form onSubmit={(formEvent) => void submit(formEvent)}>
+      <form onSubmit={submit}>
         <CardHeader>
           <CardTitle>{translate(locale, "feedback.title")}</CardTitle>
           <CardDescription>{translate(locale, "feedback.intro")}</CardDescription>

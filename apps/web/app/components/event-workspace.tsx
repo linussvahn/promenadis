@@ -1,7 +1,10 @@
+import type { IdentityDashboard } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { lazy, type ReactNode, Suspense } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { useAccountData } from "../lib/use-account-data";
+import { useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { lazy, type ReactNode, Suspense, useCallback } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
+import { accountKey, useAccountData } from "../lib/use-account-data";
 import { cn } from "../lib/utils";
 import { AccountShell } from "./account-shell";
 import { CreationProgress } from "./creation-progress";
@@ -48,11 +51,24 @@ function EventWorkspaceContent({
   readonly view: WorkspaceView;
 }) {
   const navigate = useNavigate();
-  const { eventId = "" } = useParams();
-  const [searchParams] = useSearchParams();
-  const { accessToken, dashboard, loadDashboard, loadFailed } = useAccountData();
+  const eventId = useParams({ strict: false }).eventId ?? "";
+  // Routes without validateSearch parse "?new=1" as the number 1.
+  const search = useSearch({ strict: false }) as { readonly new?: unknown };
+  const isCreationFlow = String(search.new) === "1";
+  const accountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
+  // The event lives in the dashboard query; child components invalidate that
+  // key (and the per-event keys below it) after their own writes.
+  const { accessToken, dashboard, loadFailed } = useAccountData();
   const event = dashboard?.events.find((candidate) => candidate.id === eventId);
-  const isCreationFlow = searchParams.get("new") === "1";
+
+  // For children that still report changes through a callback.
+  const refreshEvent = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: accountKey(accountId, "dashboard") }),
+      queryClient.invalidateQueries({ queryKey: accountKey(accountId, "event", eventId) }),
+    ]);
+  }, [accountId, eventId, queryClient]);
 
   if (loadFailed) {
     return (
@@ -96,7 +112,7 @@ function EventWorkspaceContent({
   if (view === "area") {
     return (
       <PageMain width="wide">
-        <Link className={backLink} to={`/events/${event.id}`}>
+        <Link className={backLink} params={{ eventId: event.id }} to="/events/$eventId">
           ← {translate(locale, "event.backToOverview")}
         </Link>
         {isCreationFlow ? <CreationProgress currentStep={2} locale={locale} /> : null}
@@ -112,8 +128,13 @@ function EventWorkspaceContent({
                 events={[event]}
                 locale={locale}
                 onSaved={async () => {
-                  await loadDashboard();
-                  if (isCreationFlow) await navigate(`/events/${event.id}/review`);
+                  await refreshEvent();
+                  if (isCreationFlow) {
+                    await navigate({
+                      params: { eventId: event.id },
+                      to: "/events/$eventId/review",
+                    });
+                  }
                 }}
               />
             </Suspense>
@@ -126,7 +147,12 @@ function EventWorkspaceContent({
   if (view === "review") {
     return (
       <PageMain width="flow">
-        <Link className={backLink} to={`/events/${event.id}/area?new=1`}>
+        <Link
+          className={backLink}
+          params={{ eventId: event.id }}
+          search={{ new: "1" }}
+          to="/events/$eventId/area"
+        >
           ← {translate(locale, "creation.backToArea")}
         </Link>
         <CreationProgress currentStep={3} locale={locale} />
@@ -168,12 +194,18 @@ function EventWorkspaceContent({
             </CardContent>
             <CardFooter className="border-t">
               <Button asChild variant="outline">
-                <Link to={`/events/${event.id}/area?new=1`}>
+                <Link
+                  params={{ eventId: event.id }}
+                  search={{ new: "1" }}
+                  to="/events/$eventId/area"
+                >
                   {translate(locale, "creation.editArea")}
                 </Link>
               </Button>
               <Button asChild>
-                <Link to={`/events/${event.id}`}>{translate(locale, "creation.finish")}</Link>
+                <Link params={{ eventId: event.id }} to="/events/$eventId">
+                  {translate(locale, "creation.finish")}
+                </Link>
               </Button>
             </CardFooter>
           </section>
@@ -185,7 +217,7 @@ function EventWorkspaceContent({
   if (view === "sellers") {
     return (
       <PageMain width="flow">
-        <Link className={backLink} to={`/events/${event.id}`}>
+        <Link className={backLink} params={{ eventId: event.id }} to="/events/$eventId">
           ← {translate(locale, "event.backToOverview")}
         </Link>
         <PageHeading
@@ -197,7 +229,7 @@ function EventWorkspaceContent({
           accessToken={accessToken}
           event={event}
           locale={locale}
-          onChanged={loadDashboard}
+          onChanged={refreshEvent}
         />
         <EventExport accessToken={accessToken} event={event} locale={locale} />
       </PageMain>
@@ -207,7 +239,7 @@ function EventWorkspaceContent({
   if (view === "walking") {
     return (
       <PageMain width="wide">
-        <Link className={backLink} to={`/events/${event.id}`}>
+        <Link className={backLink} params={{ eventId: event.id }} to="/events/$eventId">
           ← {translate(locale, "event.backToOverview")}
         </Link>
         <PageHeading
@@ -225,7 +257,7 @@ function EventWorkspaceContent({
   if (view === "registration") {
     return (
       <PageMain width="flow">
-        <Link className={backLink} to={`/events/${event.id}`}>
+        <Link className={backLink} params={{ eventId: event.id }} to="/events/$eventId">
           ← {translate(locale, "event.backToOverview")}
         </Link>
         <PageHeading
@@ -233,7 +265,7 @@ function EventWorkspaceContent({
           eyebrow={event.title}
           title={translate(locale, "registration.title")}
         />
-        <RegistrationEditor event={event} locale={locale} onSaved={loadDashboard} />
+        <RegistrationEditor event={event} locale={locale} />
       </PageMain>
     );
   }
@@ -275,36 +307,45 @@ function EventWorkspaceContent({
               <dd>{registrationWindow}</dd>
             </div>
           </SummaryList>
-          <EventDetailsEditor
-            accessToken={accessToken}
-            event={event}
-            locale={locale}
-            onSaved={loadDashboard}
-          />
+          <EventDetailsEditor accessToken={accessToken} event={event} locale={locale} />
           <EventControls
             event={event}
             locale={locale}
             onDeleted={async () => {
-              await loadDashboard();
-              await navigate("/dashboard", { replace: true });
+              await navigate({ replace: true, to: "/dashboard" });
+              // Drop the deleted draft at once, then confirm with the server.
+              queryClient.setQueryData<{ dashboard: IdentityDashboard | null }>(
+                accountKey(accountId, "dashboard"),
+                (current) =>
+                  current?.dashboard
+                    ? {
+                        ...current,
+                        dashboard: {
+                          ...current.dashboard,
+                          events: current.dashboard.events.filter(
+                            (candidate) => candidate.id !== event.id,
+                          ),
+                        },
+                      }
+                    : current,
+              );
+              await queryClient.invalidateQueries({ queryKey: accountKey(accountId, "dashboard") });
             }}
-            onSaved={loadDashboard}
           />
-          <EventLifecycle event={event} locale={locale} onChanged={loadDashboard} />
-          <EventPublicLink event={event} locale={locale} onChanged={loadDashboard} />
+          <EventLifecycle event={event} locale={locale} />
+          <EventPublicLink event={event} locale={locale} />
           <EventMessages accessToken={accessToken} event={event} locale={locale} />
           <EventFeedbackSummary accessToken={accessToken} event={event} locale={locale} />
-          {event.state === "draft" ? (
-            <PublicationReadiness event={event} locale={locale} onPublished={loadDashboard} />
-          ) : null}
+          {event.state === "draft" ? <PublicationReadiness event={event} locale={locale} /> : null}
           <EventTeam actorRole={event.role} eventId={event.id} locale={locale} />
           <EventDuplicate
             accessToken={accessToken}
             event={event}
             locale={locale}
             onCreated={async (createdId) => {
-              await loadDashboard();
-              await navigate(`/events/${createdId}`);
+              // The copy must be in the dashboard before its workspace opens.
+              await queryClient.invalidateQueries({ queryKey: accountKey(accountId, "dashboard") });
+              await navigate({ params: { eventId: createdId }, to: "/events/$eventId" });
             }}
             organizers={dashboard.organizers}
           />
@@ -327,7 +368,11 @@ function EventWorkspaceContent({
                 <SetupStep
                   action={
                     event.state === "draft" ? (
-                      <Link className="font-semibold" to={`/events/${event.id}/area`}>
+                      <Link
+                        className="font-semibold"
+                        params={{ eventId: event.id }}
+                        to="/events/$eventId/area"
+                      >
                         {event.boundary
                           ? translate(locale, "event.editArea")
                           : translate(locale, "event.addArea")}
@@ -351,7 +396,11 @@ function EventWorkspaceContent({
                 <SetupStep
                   action={
                     event.state === "draft" ? (
-                      <Link className="font-semibold" to={`/events/${event.id}/registration`}>
+                      <Link
+                        className="font-semibold"
+                        params={{ eventId: event.id }}
+                        to="/events/$eventId/registration"
+                      >
                         {event.registration
                           ? translate(locale, "registration.edit")
                           : translate(locale, "registration.add")}
@@ -375,12 +424,12 @@ function EventWorkspaceContent({
               </ol>
               <div className="grid gap-3">
                 <Button asChild variant="outline">
-                  <Link to={`/events/${event.id}/sellers`}>
+                  <Link params={{ eventId: event.id }} to="/events/$eventId/sellers">
                     {translate(locale, "sellers.open")}
                   </Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link to={`/events/${event.id}/walking`}>
+                  <Link params={{ eventId: event.id }} to="/events/$eventId/walking">
                     {translate(locale, "walking.open")}
                   </Link>
                 </Button>

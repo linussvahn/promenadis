@@ -6,7 +6,10 @@ import type {
   AppealQueueItem,
 } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
+import { accountKey } from "../lib/use-account-data";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -21,6 +24,12 @@ const rowForm = "grid max-w-xl gap-4";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
 type Call = () => Promise<{ api: ApiClient; token: string } | null>;
+type Client = NonNullable<Awaited<ReturnType<Call>>>;
+interface ModerationLists {
+  readonly appeals: readonly AppealQueueItem[];
+  readonly approvals: readonly AdminApproval[];
+  readonly cases: readonly AdminCase[];
+}
 
 const errorKeys = {
   different_approver_required: "adminModeration.differentApprover",
@@ -40,46 +49,63 @@ export function AdminModeration({
   readonly call: Call;
   readonly locale: Locale;
 }) {
-  const [appeals, setAppeals] = useState<AppealQueueItem[]>([]);
-  const [cases, setCases] = useState<AdminCase[]>([]);
-  const [approvals, setApprovals] = useState<AdminApproval[]>([]);
+  const queryClient = useQueryClient();
+  const listsKey = accountKey(useExpectedAccountId(), "admin", "moderation");
   const [account, setAccount] = useState<AdminAccount | null>(null);
   const [contacts, setContacts] = useState<Record<string, string>>({});
   const [status, setStatus] = useState("");
 
-  const load = useCallback(async () => {
-    const client = await call();
-    if (!client) return;
-    try {
-      const [nextAppeals, nextCases, nextApprovals] = await Promise.all([
+  const listsQuery = useQuery({
+    queryKey: listsKey,
+    queryFn: async (): Promise<ModerationLists | null> => {
+      const client = await call();
+      if (!client) return null;
+      const [appeals, cases, approvals] = await Promise.all([
         client.api.listAppeals(client.token),
         client.api.listAdminCases(client.token),
         client.api.listAdminApprovals(client.token),
       ]);
-      setAppeals(nextAppeals);
-      setCases(nextCases);
-      setApprovals(nextApprovals);
-    } catch {
-      setStatus(translate(locale, "admin.error"));
-    }
-  }, [call, locale]);
+      return { appeals, approvals, cases };
+    },
+  });
+  const appeals = listsQuery.data?.appeals ?? [];
+  const cases = listsQuery.data?.cases ?? [];
+  const approvals = listsQuery.data?.approvals ?? [];
+  const setLists = (patch: Partial<ModerationLists>) =>
+    queryClient.setQueryData<ModerationLists | null>(listsKey, (current) => ({
+      appeals: [],
+      approvals: [],
+      cases: [],
+      ...current,
+      ...patch,
+    }));
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Each action reads or writes through the elevated session and updates
+  // the cached lists itself; reporter contact and account lookups stay
+  // component state so they are never cached.
+  const actionMutation = useMutation({
+    mutationFn: ({
+      action,
+      client,
+    }: {
+      action: (client: Client) => Promise<void>;
+      client: Client;
+    }) => action(client),
+    onSuccess: () => setStatus(translate(locale, "adminModeration.saved")),
+    onError: (error) => {
+      const code = error instanceof PromenadisApiError ? error.code : "";
+      setStatus(translate(locale, errorKeys[code as keyof typeof errorKeys] ?? "admin.error"));
+    },
+    retry: false,
+  });
 
-  const run = async (action: (client: NonNullable<Awaited<ReturnType<Call>>>) => Promise<void>) => {
+  const run = async (action: (client: Client) => Promise<void>) => {
     const client = await call();
     if (!client) return;
     setStatus("");
-    try {
-      await action(client);
-      setStatus(translate(locale, "adminModeration.saved"));
-    } catch (error) {
-      const code = error instanceof PromenadisApiError ? error.code : "";
-      setStatus(translate(locale, errorKeys[code as keyof typeof errorKeys] ?? "admin.error"));
-    }
+    actionMutation.mutate({ action, client });
   };
+  const shownStatus = status || (listsQuery.isError ? translate(locale, "admin.error") : "");
 
   const reasonFrom = (formEvent: FormEvent<HTMLFormElement>) =>
     String(new FormData(formEvent.currentTarget).get("reason") ?? "").trim();
@@ -119,12 +145,12 @@ export function AdminModeration({
                       .submitter as HTMLButtonElement | null;
                     const reason = reasonFrom(formEvent);
                     void run(async ({ api, token }) => {
-                      setAppeals(
-                        await api.decideAppeal(token, item.id, {
+                      setLists({
+                        appeals: await api.decideAppeal(token, item.id, {
                           decision: submitter?.value === "reverse" ? "reverse" : "uphold",
                           reason,
                         }),
-                      );
+                      });
                     });
                   }}
                 >
@@ -295,7 +321,7 @@ export function AdminModeration({
                             ? { ...restriction, pendingLift: true }
                             : null,
                         });
-                        setApprovals(await api.listAdminApprovals(token));
+                        setLists({ approvals: await api.listAdminApprovals(token) });
                       } else {
                         setAccount(await api.restrictAccount(token, account.accountId, reason));
                       }
@@ -350,7 +376,9 @@ export function AdminModeration({
                         key={String(approve)}
                         onClick={() =>
                           void run(async ({ api, token }) => {
-                            setApprovals(await api.decideAdminApproval(token, item.id, approve));
+                            setLists({
+                              approvals: await api.decideAdminApproval(token, item.id, approve),
+                            });
                           })
                         }
                         type="button"
@@ -370,7 +398,7 @@ export function AdminModeration({
         </section>
       </Card>
       <p aria-live="polite" className="min-h-6 text-sm font-semibold">
-        {status}
+        {shownStatus}
       </p>
     </>
   );

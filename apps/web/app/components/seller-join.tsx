@@ -1,10 +1,12 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { EventForSeller } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { useCallback, useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useParams, useSearch } from "@tanstack/react-router";
+import { useCallback, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
-import { useAccountData } from "../lib/use-account-data";
+import { accountKey, useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
 import { backLink, PageHeading, PageMain, SummaryList } from "./page";
 import { SellerAddressForm, type SellerAddressInput } from "./seller-address-form";
@@ -31,13 +33,13 @@ const errorKeys = {
 } as const;
 
 export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
-  const { eventId = "" } = useParams();
-  const [searchParams] = useSearchParams();
-  const inviteId = searchParams.get("invite");
+  const eventId = useParams({ strict: false }).eventId ?? "";
+  // The join route does not declare its search params yet; read `invite` loosely.
+  const search = useSearch({ strict: false }) as { readonly invite?: unknown };
+  const inviteId = typeof search.invite === "string" && search.invite ? search.invite : null;
   const { accessToken, dashboard } = useAccountData();
-  const [event, setEvent] = useState<EventForSeller | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const accountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
 
   const call = useCallback(async () => {
@@ -46,19 +48,35 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
     return api && token ? { api, token } : null;
   }, [accessToken]);
 
-  const load = useCallback(async () => {
-    const client = await call();
-    if (!client) return;
-    try {
-      setEvent(await client.api.getEventForSeller(client.token, eventId));
-    } catch {
-      setFailed(true);
-    }
-  }, [call, eventId]);
+  const eventQuery = useQuery({
+    queryKey: accountKey(accountId, "event", eventId, "seller"),
+    queryFn: async () => {
+      const client = await call();
+      return client ? client.api.getEventForSeller(client.token, eventId) : null;
+    },
+  });
+  const event: EventForSeller | null = eventQuery.data ?? null;
+  const failed = eventQuery.isError && !event;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Every write re-reads the seller's view of the event; errors reach the caller.
+  const write = useMutation({
+    mutationFn: async (
+      action: (client: NonNullable<Awaited<ReturnType<typeof call>>>) => Promise<unknown>,
+    ) => {
+      const client = await call();
+      if (!client) return false;
+      await action(client);
+      return true;
+    },
+    onSuccess: async (done) => {
+      if (done) {
+        await queryClient.invalidateQueries({
+          queryKey: accountKey(accountId, "event", eventId, "seller"),
+        });
+      }
+    },
+  });
+  const busy = write.isPending;
 
   const errorText = (error: unknown) => {
     const code = error instanceof PromenadisApiError ? error.code : "";
@@ -66,66 +84,59 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
   };
 
   const apply = async (input: SellerAddressInput, form: FormData) => {
-    const client = await call();
-    if (!client) return;
-    await client.api.applyToEvent(client.token, eventId, {
-      ...input,
-      displayName: String(form.get("displayName") ?? ""),
-    });
-    await load();
+    await write.mutateAsync(({ api, token }) =>
+      api.applyToEvent(token, eventId, {
+        ...input,
+        displayName: String(form.get("displayName") ?? ""),
+      }),
+    );
   };
 
   const acceptInvite = async (input: SellerAddressInput, form: FormData) => {
-    const client = await call();
-    if (!client || !inviteId) return;
-    await client.api.acceptSellerInvite(client.token, inviteId, {
-      ...input,
-      displayName: String(form.get("displayName") ?? ""),
-    });
-    await load();
+    if (!inviteId) return;
+    await write.mutateAsync(({ api, token }) =>
+      api.acceptSellerInvite(token, inviteId, {
+        ...input,
+        displayName: String(form.get("displayName") ?? ""),
+      }),
+    );
   };
 
   const confirmReschedule = async (accept: boolean) => {
     const participation = event?.participation;
-    const client = await call();
-    if (!participation || !client) return;
-    setBusy(true);
+    if (!participation) return;
     try {
-      await client.api.confirmReschedule(client.token, participation.id, accept);
-      await load();
+      await write.mutateAsync(({ api, token }) =>
+        api.confirmReschedule(token, participation.id, accept),
+      );
     } catch (error) {
       setStatus(errorText(error));
-    } finally {
-      setBusy(false);
     }
   };
 
   const changeAddress = async (input: SellerAddressInput) => {
     const participation = event?.participation;
-    const client = await call();
-    if (!participation || !client) return;
-    await client.api.changeParticipationAddress(client.token, participation.id, {
-      ...input,
-      expectedVersion: participation.version,
-    });
-    await load();
-    setStatus(translate(locale, "seller.addressChanged"));
+    if (!participation) return;
+    const done = await write.mutateAsync(({ api, token }) =>
+      api.changeParticipationAddress(token, participation.id, {
+        ...input,
+        expectedVersion: participation.version,
+      }),
+    );
+    if (done) setStatus(translate(locale, "seller.addressChanged"));
   };
 
   const withdraw = async () => {
     const participation = event?.participation;
-    const client = await call();
-    if (!participation || !client) return;
-    setBusy(true);
+    if (!participation) return;
     setStatus("");
     try {
-      await client.api.withdrawParticipation(client.token, participation.id, participation.version);
-      await load();
-      setStatus(translate(locale, "seller.withdrawn"));
+      const done = await write.mutateAsync(({ api, token }) =>
+        api.withdrawParticipation(token, participation.id, participation.version),
+      );
+      if (done) setStatus(translate(locale, "seller.withdrawn"));
     } catch (error) {
       setStatus(errorText(error));
-    } finally {
-      setBusy(false);
     }
   };
 

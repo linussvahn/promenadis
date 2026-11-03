@@ -1,8 +1,11 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { MyModerationAction } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Field } from "./ui/field";
@@ -17,37 +20,30 @@ export function MyModeration({
   readonly accessToken: () => Promise<string | null>;
   readonly locale: Locale;
 }) {
-  const [items, setItems] = useState<MyModerationAction[]>([]);
+  const queryClient = useQueryClient();
+  const moderationKey = accountKey(useExpectedAccountId(), "moderation");
   const [status, setStatus] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
+  const { data: items = [] } = useQuery({
+    queryKey: moderationKey,
+    queryFn: async (): Promise<MyModerationAction[]> => {
       const api = getPromenadisApiClient();
       const token = await accessToken();
-      if (!api || !token) return;
-      try {
-        const next = await api.listMyModeration(token);
-        if (!cancelled) setItems(next);
-      } catch {
-        // The events list above already reports session problems.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken]);
+      if (!api || !token) return [];
+      return api.listMyModeration(token);
+    },
+    // The events list above already reports session problems.
+    throwOnError: false,
+  });
 
-  const appeal = async (item: MyModerationAction, formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const statement = String(new FormData(formEvent.currentTarget).get("statement") ?? "").trim();
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    try {
-      setItems(await api.submitAppeal(token, item.id, statement));
-      setStatus(translate(locale, "appeal.sent"));
-    } catch (error) {
+  const submitAppeal = useMutation({
+    mutationFn: async ({ item, statement }: { item: MyModerationAction; statement: string }) => {
+      const api = getPromenadisApiClient();
+      const token = await accessToken();
+      if (!api || !token) return null;
+      return api.submitAppeal(token, item.id, statement);
+    },
+    onError: (error) => {
       const code = error instanceof PromenadisApiError ? error.code : "";
       setStatus(
         translate(
@@ -59,7 +55,18 @@ export function MyModeration({
               : "appeal.error",
         ),
       );
-    }
+    },
+    onSuccess: (next) => {
+      if (!next) return;
+      queryClient.setQueryData(moderationKey, next);
+      setStatus(translate(locale, "appeal.sent"));
+    },
+  });
+
+  const appeal = (item: MyModerationAction, formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    const statement = String(new FormData(formEvent.currentTarget).get("statement") ?? "").trim();
+    submitAppeal.mutate({ item, statement });
   };
 
   if (items.length === 0) return null;
@@ -92,7 +99,7 @@ export function MyModeration({
               ) : (
                 <form
                   className="grid max-w-xl gap-4"
-                  onSubmit={(formEvent) => void appeal(item, formEvent)}
+                  onSubmit={(formEvent) => appeal(item, formEvent)}
                 >
                   <Field>
                     <Label htmlFor={`appeal-${item.id}`}>

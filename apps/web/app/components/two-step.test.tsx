@@ -1,7 +1,8 @@
 import { PromenadisApiError } from "@promenadis/api-client";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { TwoStep } from "./two-step";
 
 const mocks = vi.hoisted(() => ({
@@ -17,7 +18,8 @@ vi.mock("../lib/supabase", () => ({
 
 const factorId = "01992026-1101-7400-8000-000000000001";
 const off = { assuranceLevel: "aal1", totpEnabled: false };
-const renderTwoStep = () => render(<TwoStep accessToken={async () => "account"} locale="en" />);
+const renderTwoStep = () =>
+  renderWithRouter(<TwoStep accessToken={async () => "account"} locale="en" />);
 
 afterEach(() => {
   cleanup();
@@ -38,7 +40,7 @@ describe("TwoStep", () => {
     mocks.verifyTotp
       .mockResolvedValueOnce({ error: { status: 400 } })
       .mockResolvedValueOnce({ error: null });
-    renderTwoStep();
+    await renderTwoStep();
     fireEvent.click(await screen.findByRole("button", { name: "Turn on two-step verification" }));
     expect(
       await screen.findByRole("img", { name: "QR code for the authenticator app" }),
@@ -59,14 +61,14 @@ describe("TwoStep", () => {
     mocks.removeTotp.mockRejectedValue(
       new PromenadisApiError("stale", 403, "recent_auth_required", null),
     );
-    renderTwoStep();
+    await renderTwoStep();
     fireEvent.click(await screen.findByRole("button", { name: "Turn off two-step verification" }));
     await screen.findByText("Sign out and in again before changing two-step verification.");
   });
 
   it("has no detectable automated accessibility violations", async () => {
     mocks.getMfaStatus.mockResolvedValue(off);
-    const { container } = renderTwoStep();
+    const { container } = await renderTwoStep();
     await screen.findByRole("button", { name: "Turn on two-step verification" });
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);

@@ -6,7 +6,10 @@ import type {
   SellerParticipation,
 } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
+import { accountKey } from "../lib/use-account-data";
 import { toDateTimeLocal, wallTimeToIso } from "../lib/wall-time";
 import { Alert } from "./ui/alert";
 import { Badge } from "./ui/badge";
@@ -60,54 +63,68 @@ export function SellerListingEditor({
   readonly participation: SellerParticipation;
   readonly timezone: string;
 }) {
-  const [taxonomy, setTaxonomy] = useState<EventTaxonomy | null>(null);
-  const [listing, setListing] = useState<SellerListing | null>(null);
+  const accountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
+  const [synced, setSynced] = useState<SellerListing | null>(null);
   const [items, setItems] = useState<ItemDraft[]>([]);
   const [slots, setSlots] = useState<SlotDraft[]>([]);
   const [tags, setTags] = useState("");
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const listingKey = accountKey(accountId, "participation", participation.id, "listing");
 
-  const applyListing = useCallback(
-    (next: SellerListing) => {
-      setListing(next);
-      setItems(
-        next.items.map(({ categoryId, id, name, priceMinor, status: itemStatus }) => ({
-          categoryId,
-          key: id,
-          name,
-          priceMinor,
-          status: itemStatus,
-        })),
-      );
-      setSlots(
-        next.availability.map((slot) => ({
-          endsAt: toDateTimeLocal(slot.endsAt, timezone),
-          key: crypto.randomUUID(),
-          startsAt: toDateTimeLocal(slot.startsAt, timezone),
-        })),
-      );
-      setTags(next.tags.join(", "));
-    },
-    [timezone],
-  );
-
-  useEffect(() => {
-    void (async () => {
+  const taxonomyQuery = useQuery({
+    queryKey: accountKey(accountId, "event", eventId, "taxonomy"),
+    queryFn: async () => {
       const client = await call();
-      if (!client) return;
-      try {
-        const [nextTaxonomy, nextListing] = await Promise.all([
-          client.api.getEventTaxonomy(client.token, eventId),
-          client.api.getSellerListing(client.token, participation.id),
-        ]);
-        setTaxonomy(nextTaxonomy);
-        applyListing(nextListing);
-      } catch {
-        setStatus(translate(locale, "listing.loadFailed"));
-      }
-    })();
-  }, [applyListing, call, eventId, locale, participation.id]);
+      return client ? client.api.getEventTaxonomy(client.token, eventId) : null;
+    },
+  });
+  const listingQuery = useQuery({
+    queryKey: listingKey,
+    queryFn: async () => {
+      const client = await call();
+      return client ? client.api.getSellerListing(client.token, participation.id) : null;
+    },
+  });
+  const taxonomy: EventTaxonomy | null = taxonomyQuery.data ?? null;
+  const listing: SellerListing | null = listingQuery.data ?? null;
+  const loadFailed = (taxonomyQuery.isError && !taxonomy) || (listingQuery.isError && !listing);
+
+  // Reset the drafts whenever the server copy of the listing changes.
+  if (listing && listing !== synced) {
+    setSynced(listing);
+    setItems(
+      listing.items.map(({ categoryId, id, name, priceMinor, status: itemStatus }) => ({
+        categoryId,
+        key: id,
+        name,
+        priceMinor,
+        status: itemStatus,
+      })),
+    );
+    setSlots(
+      listing.availability.map((slot) => ({
+        endsAt: toDateTimeLocal(slot.endsAt, timezone),
+        key: crypto.randomUUID(),
+        startsAt: toDateTimeLocal(slot.startsAt, timezone),
+      })),
+    );
+    setTags(listing.tags.join(", "));
+  }
+
+  // Both writes answer with the saved listing.
+  const write = useMutation({
+    mutationFn: async (
+      action: (client: { api: ApiClient; token: string }) => Promise<SellerListing>,
+    ) => {
+      const client = await call();
+      return client ? action(client) : null;
+    },
+    onSuccess: (next) => {
+      if (next) queryClient.setQueryData(listingKey, next);
+    },
+  });
+  const busy = write.isPending;
 
   const errorText = (error: unknown) => {
     const code = error instanceof PromenadisApiError ? error.code : "";
@@ -118,71 +135,63 @@ export function SellerListingEditor({
     formEvent.preventDefault();
     if (!listing) return;
     const form = new FormData(formEvent.currentTarget);
-    const client = await call();
-    if (!client) return;
-    setBusy(true);
     setStatus("");
     try {
-      const saved = await client.api.saveSellerListing(client.token, participation.id, {
-        accessibility: {
-          elevator: triStateFrom(form.get("elevator")),
-          setting: (String(form.get("setting") ?? "") ||
-            null) as SellerListing["accessibility"]["setting"],
-          stairs: triStateFrom(form.get("stairs")),
-          stepFree: triStateFrom(form.get("stepFree")),
-          strollerFriendly: triStateFrom(form.get("strollerFriendly")),
-        },
-        availability: slots.map((slot) => ({
-          endsAt: wallTimeToIso(slot.endsAt, timezone),
-          startsAt: wallTimeToIso(slot.startsAt, timezone),
-        })),
-        categoryIds: form.getAll("categoryIds").map(String),
-        description: String(form.get("description") ?? ""),
-        earlyVisibilityOptOut: form.get("earlyOptOut") === "on",
-        expectedVersion: listing.version,
-        items: items.map(({ categoryId, name, priceMinor, status: itemStatus }) => ({
-          categoryId,
-          name,
-          priceMinor,
-          status: itemStatus,
-        })),
-        tags: tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-        title: String(form.get("title") ?? "").trim(),
-      });
-      applyListing(saved);
-      setStatus(translate(locale, "listing.saved"));
+      const saved = await write.mutateAsync(({ api, token }) =>
+        api.saveSellerListing(token, participation.id, {
+          accessibility: {
+            elevator: triStateFrom(form.get("elevator")),
+            setting: (String(form.get("setting") ?? "") ||
+              null) as SellerListing["accessibility"]["setting"],
+            stairs: triStateFrom(form.get("stairs")),
+            stepFree: triStateFrom(form.get("stepFree")),
+            strollerFriendly: triStateFrom(form.get("strollerFriendly")),
+          },
+          availability: slots.map((slot) => ({
+            endsAt: wallTimeToIso(slot.endsAt, timezone),
+            startsAt: wallTimeToIso(slot.startsAt, timezone),
+          })),
+          categoryIds: form.getAll("categoryIds").map(String),
+          description: String(form.get("description") ?? ""),
+          earlyVisibilityOptOut: form.get("earlyOptOut") === "on",
+          expectedVersion: listing.version,
+          items: items.map(({ categoryId, name, priceMinor, status: itemStatus }) => ({
+            categoryId,
+            name,
+            priceMinor,
+            status: itemStatus,
+          })),
+          tags: tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+          title: String(form.get("title") ?? "").trim(),
+        }),
+      );
+      if (saved) setStatus(translate(locale, "listing.saved"));
     } catch (error) {
       setStatus(errorText(error));
-    } finally {
-      setBusy(false);
     }
   };
 
   const setLive = async (next: "open" | "away" | "closed_early") => {
-    const client = await call();
-    if (!client) return;
-    setBusy(true);
     setStatus("");
     try {
-      applyListing(
-        await client.api.setSellerLiveStatus(client.token, participation.id, {
-          status: next,
-          until: null,
-        }),
+      const saved = await write.mutateAsync(({ api, token }) =>
+        api.setSellerLiveStatus(token, participation.id, { status: next, until: null }),
       );
-      setStatus(translate(locale, `live.${next}`));
+      if (saved) setStatus(translate(locale, `live.${next}`));
     } catch (error) {
       setStatus(errorText(error));
-    } finally {
-      setBusy(false);
     }
   };
 
   if (!taxonomy || !listing) {
-    return <p aria-live="polite">{status || translate(locale, "common.loading")}</p>;
+    return (
+      <p aria-live="polite">
+        {status || translate(locale, loadFailed ? "listing.loadFailed" : "common.loading")}
+      </p>
+    );
   }
 
   const enabled = taxonomy.categories.filter((category) => category.enabled);

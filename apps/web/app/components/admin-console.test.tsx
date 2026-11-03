@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { AdminContent } from "./admin-console";
 
 const mocks = vi.hoisted(() => ({
@@ -14,7 +15,10 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("../lib/supabase", () => ({ getPromenadisApiClient: () => mocks }));
 const accountData = vi.hoisted(() => ({ accessToken: async () => "admin" }));
-vi.mock("../lib/use-account-data", () => ({ useAccountData: () => accountData }));
+vi.mock("../lib/use-account-data", async (original) => ({
+  ...(await original<typeof import("../lib/use-account-data")>()),
+  useAccountData: () => accountData,
+}));
 
 const eventId = "01992026-1101-7600-8000-000000000001";
 const item = {
@@ -46,7 +50,7 @@ describe("AdminContent", () => {
       .mockResolvedValueOnce(elevated);
     mocks.listFirstEventReviews.mockResolvedValue([item]);
     mocks.startAdminElevation.mockResolvedValue(elevated);
-    render(<AdminContent locale="en" />);
+    await renderWithRouter(<AdminContent locale="en" />, { path: "/admin" });
     expect(screen.queryByText("Spring walk")).not.toBeInTheDocument();
     fireEvent.change(await screen.findByLabelText("Six-digit code from the app"), {
       target: { value: "123456" },
@@ -62,7 +66,7 @@ describe("AdminContent", () => {
     mocks.getAdminStatus.mockResolvedValue(elevated);
     mocks.listFirstEventReviews.mockResolvedValueOnce([item]).mockResolvedValueOnce([]);
     mocks.decideFirstEventReview.mockResolvedValue(elevated);
-    render(<AdminContent locale="en" />);
+    await renderWithRouter(<AdminContent locale="en" />, { path: "/admin" });
     fireEvent.change(await screen.findByLabelText("Reason (shown to the owner if rejected)"), {
       target: { value: "Boundary covers a closed park" },
     });
@@ -80,7 +84,7 @@ describe("AdminContent", () => {
   it("never offers a decision on the admin's own event", async () => {
     mocks.getAdminStatus.mockResolvedValue(elevated);
     mocks.listFirstEventReviews.mockResolvedValue([{ ...item, ownEvent: true }]);
-    render(<AdminContent locale="en" />);
+    await renderWithRouter(<AdminContent locale="en" />, { path: "/admin" });
     await screen.findByText("You cannot review an event whose team you belong to.");
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
@@ -103,7 +107,7 @@ describe("AdminContent", () => {
       },
     ]);
     mocks.decideOrganizerVerification.mockResolvedValue(elevated);
-    render(<AdminContent locale="en" />);
+    await renderWithRouter(<AdminContent locale="en" />, { path: "/admin" });
     fireEvent.change(await screen.findByLabelText("Registered name at Bolagsverket"), {
       target: { value: "Example Förening" },
     });
@@ -125,7 +129,9 @@ describe("AdminContent", () => {
   it("has no detectable automated accessibility violations", async () => {
     mocks.getAdminStatus.mockResolvedValue(elevated);
     mocks.listFirstEventReviews.mockResolvedValue([item]);
-    const { container } = render(<AdminContent locale="en" />);
+    const { container } = await renderWithRouter(<AdminContent locale="en" />, {
+      path: "/admin",
+    });
     await screen.findByText("Spring walk");
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);

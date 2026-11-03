@@ -1,6 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { accountKey } from "../lib/use-account-data";
+import { renderWithRouter } from "../test/render";
 import { EventLifecycle } from "./event-lifecycle";
 
 const mocks = vi.hoisted(() => ({
@@ -25,7 +28,8 @@ const base = {
   title: "Spring walk",
   version: 4,
 } as never;
-const onChanged = vi.fn(async () => {});
+const render = (ui: ReactNode) =>
+  renderWithRouter(ui, { path: "/events/$eventId", url: `/events/${eventId}` });
 
 afterEach(() => {
   cleanup();
@@ -35,7 +39,8 @@ afterEach(() => {
 describe("EventLifecycle", () => {
   it("cancels a published event only with the exact title and a public reason", async () => {
     mocks.cancelEvent.mockResolvedValue({ state: "cancelled", version: 5 });
-    render(<EventLifecycle event={base} locale="en" onChanged={onChanged} />);
+    const { queryClient } = await render(<EventLifecycle event={base} locale="en" />);
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     fireEvent.click(screen.getByText("Cancel the event", { selector: "summary" }));
     const submit = screen.getByRole("button", { name: "Cancel the event" });
     fireEvent.change(screen.getByLabelText("Public explanation", { selector: "#cancel-reason" }), {
@@ -54,16 +59,17 @@ describe("EventLifecycle", () => {
       }),
     );
     expect(await screen.findByText("The event is cancelled.")).toBeVisible();
-    expect(onChanged).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: accountKey("owner", "dashboard") }),
+    );
   });
 
   it("lets a co-host end a live event but never cancel it", async () => {
     mocks.endEventEarly.mockResolvedValue({ state: "ended", version: 5 });
-    render(
+    await render(
       <EventLifecycle
         event={{ ...(base as object), role: "co_host", state: "active" } as never}
         locale="en"
-        onChanged={onChanged}
       />,
     );
     expect(screen.queryByText("Cancel the event")).not.toBeInTheDocument();
@@ -72,22 +78,15 @@ describe("EventLifecycle", () => {
     expect(mocks.endEventEarly).toHaveBeenCalledWith("owner", eventId, 4);
   });
 
-  it("lets a co-host postpone but not cancel, and shows nothing for drafts", () => {
-    const { container, rerender } = render(
-      <EventLifecycle
-        event={{ ...(base as object), role: "co_host" } as never}
-        locale="en"
-        onChanged={onChanged}
-      />,
+  it("lets a co-host postpone but not cancel, and shows nothing for drafts", async () => {
+    await render(
+      <EventLifecycle event={{ ...(base as object), role: "co_host" } as never} locale="en" />,
     );
     expect(screen.queryByText("Cancel the event")).not.toBeInTheDocument();
     expect(screen.getByText("Postpone the event")).toBeVisible();
-    rerender(
-      <EventLifecycle
-        event={{ ...(base as object), state: "draft" } as never}
-        locale="en"
-        onChanged={onChanged}
-      />,
+    cleanup();
+    const { container } = await render(
+      <EventLifecycle event={{ ...(base as object), state: "draft" } as never} locale="en" />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -95,11 +94,10 @@ describe("EventLifecycle", () => {
   it("postpones with a public reason and reschedules in event time", async () => {
     mocks.postponeEvent.mockResolvedValue({ state: "postponed", version: 5 });
     mocks.rescheduleEvent.mockResolvedValue({ state: "published", version: 6 });
-    const { rerender } = render(
+    await render(
       <EventLifecycle
         event={{ ...(base as object), role: "co_host", timezone: "Europe/Stockholm" } as never}
         locale="en"
-        onChanged={onChanged}
       />,
     );
     fireEvent.click(screen.getByText("Postpone the event"));
@@ -111,7 +109,8 @@ describe("EventLifecycle", () => {
         publicReason: "Storm",
       }),
     );
-    rerender(
+    cleanup();
+    await render(
       <EventLifecycle
         event={
           {
@@ -123,7 +122,6 @@ describe("EventLifecycle", () => {
           } as never
         }
         locale="en"
-        onChanged={onChanged}
       />,
     );
     fireEvent.click(screen.getByText("Set a new date"));
@@ -140,7 +138,7 @@ describe("EventLifecycle", () => {
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(<EventLifecycle event={base} locale="en" onChanged={onChanged} />);
+    const { container } = await render(<EventLifecycle event={base} locale="en" />);
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);
   });

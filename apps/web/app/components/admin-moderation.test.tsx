@@ -1,7 +1,8 @@
 import { PromenadisApiError } from "@promenadis/api-client";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { AdminModeration } from "./admin-moderation";
 
 const api = {
@@ -60,7 +61,7 @@ afterEach(() => {
 describe("AdminModeration", () => {
   it("reverses an appeal with a reason", async () => {
     api.decideAppeal.mockResolvedValue([]);
-    render(<AdminModeration call={call} locale="en" />);
+    await renderWithRouter(<AdminModeration call={call} locale="en" />);
     const reasons = await screen.findAllByLabelText("Reason (required)");
     fireEvent.change(reasons[0] as HTMLElement, { target: { value: "Book title" } });
     fireEvent.click(screen.getByRole("button", { name: "Change the decision" }));
@@ -74,7 +75,7 @@ describe("AdminModeration", () => {
 
   it("shows reporter contact only after a reason", async () => {
     api.readReportContact.mockResolvedValue({ contact: "witness@example.invalid" });
-    render(<AdminModeration call={call} locale="en" />);
+    await renderWithRouter(<AdminModeration call={call} locale="en" />);
     fireEvent.change(await screen.findByLabelText(/reporter's contact/u), {
       target: { value: "Need to verify" },
     });
@@ -87,7 +88,7 @@ describe("AdminModeration", () => {
     api.decideAppeal.mockRejectedValue(
       new PromenadisApiError("x", 409, "different_reviewer_required", null),
     );
-    render(<AdminModeration call={call} locale="en" />);
+    await renderWithRouter(<AdminModeration call={call} locale="en" />);
     const reasons = await screen.findAllByLabelText("Reason (required)");
     fireEvent.change(reasons[0] as HTMLElement, { target: { value: "Mine" } });
     fireEvent.click(screen.getByRole("button", { name: "Keep the decision" }));
@@ -95,7 +96,7 @@ describe("AdminModeration", () => {
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(<AdminModeration call={call} locale="en" />);
+    const { container } = await renderWithRouter(<AdminModeration call={call} locale="en" />);
     await screen.findByText("It was a book title.");
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);

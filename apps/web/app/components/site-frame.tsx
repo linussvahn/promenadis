@@ -10,7 +10,8 @@ import {
   X,
 } from "lucide-react";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { subscribeSessionChanges } from "../lib/account-session";
 import { getBrowserAuthClient } from "../lib/supabase";
 import { cn } from "../lib/utils";
@@ -66,7 +67,7 @@ function NavItem({
   icon: Icon,
   children,
 }: {
-  readonly to: string;
+  readonly to: "/discover" | "/dashboard" | "/settings" | "/sign-in";
   readonly icon: LucideIcon;
   readonly children: ReactNode;
 }) {
@@ -99,6 +100,7 @@ export function SiteFrame({
 }) {
   const session = useSessionAccount();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -122,7 +124,10 @@ export function SiteFrame({
     setSigningOut(true);
     const { error } = await supabase.auth.signOut();
     setSigningOut(false);
-    if (!error) await navigate("/sign-in", { replace: true });
+    if (error) return;
+    // Nothing cached for this account may outlive its session.
+    queryClient.clear();
+    await navigate({ replace: true, to: "/sign-in" });
   };
 
   const signedIn = typeof session.accountId === "string";

@@ -1,7 +1,9 @@
 import type { AccountNotifications } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -14,35 +16,32 @@ export function MyNotifications({
   readonly accessToken: () => Promise<string | null>;
   readonly locale: Locale;
 }) {
-  const [items, setItems] = useState<AccountNotifications>([]);
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
+  const queryClient = useQueryClient();
+  const notificationsKey = accountKey(useExpectedAccountId(), "notifications");
+  const { data: items = [] } = useQuery({
+    queryKey: notificationsKey,
+    queryFn: async (): Promise<AccountNotifications> => {
       const api = getPromenadisApiClient();
       const token = await accessToken();
-      if (!api || !token) return;
-      try {
-        const next = await api.listNotifications(token);
-        if (!cancelled) setItems(next);
-      } catch {
-        // The events list above already reports session problems.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken]);
+      if (!api || !token) return [];
+      return api.listNotifications(token);
+    },
+    // The events list above already reports session problems.
+    throwOnError: false,
+  });
 
-  const markAll = async () => {
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    try {
-      setItems(await api.markNotificationsRead(token));
-    } catch {
-      // Unread state is cosmetic; keep the list as it is.
-    }
-  };
+  const markAll = useMutation({
+    mutationFn: async () => {
+      const api = getPromenadisApiClient();
+      const token = await accessToken();
+      if (!api || !token) return null;
+      return api.markNotificationsRead(token);
+    },
+    // Unread state is cosmetic; on failure keep the list as it is.
+    onSuccess: (next) => {
+      if (next) queryClient.setQueryData(notificationsKey, next);
+    },
+  });
 
   if (items.length === 0) return null;
   const unread = items.filter((item) => !item.read).length;
@@ -56,7 +55,7 @@ export function MyNotifications({
           </CardTitle>
           {unread > 0 ? (
             <CardAction>
-              <Button onClick={() => void markAll()} size="sm" type="button" variant="ghost">
+              <Button onClick={() => markAll.mutate()} size="sm" type="button" variant="ghost">
                 {translate(locale, "notifications.markRead")}
               </Button>
             </CardAction>

@@ -5,7 +5,9 @@ const root = resolve(".");
 const ignoredDirectories = new Set([
   ".git",
   ".netlify",
-  ".react-router",
+  ".tanstack",
+  ".output",
+  "dist",
   "build",
   "coverage",
   "node_modules",

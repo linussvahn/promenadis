@@ -10,11 +10,14 @@
       "!!**/node_modules",
       "!!**/playwright-report",
       "!!**/test-results",
-      "!!apps/web/.react-router",
       "!!supabase/.temp",
       "!!supabase/functions/api-v1/fixtures",
       "!!.local-backups",
-      "!!supabase/types/database.generated.ts"
+      "!!supabase/types/database.generated.ts",
+      "!!apps/web/app/routeTree.gen.ts",
+      "!!apps/web/.tanstack",
+      "!!apps/web/dist",
+      "!!apps/web/.output"
     ]
   },
   "formatter": {

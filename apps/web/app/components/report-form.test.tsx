@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
-import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { ReportForm } from "./report-form";
 
 const mocks = vi.hoisted(() => ({ submitPublicReport: vi.fn(), submitReport: vi.fn() }));
@@ -10,11 +10,7 @@ vi.mock("../lib/supabase", () => ({ getPromenadisApiClient: () => mocks }));
 const eventId = "01992026-1103-7300-8000-000000000001";
 const subjectId = "01992026-1103-7300-8000-000000000002";
 const renderForm = (query = `?event=${eventId}&type=location&subject=${subjectId}`) =>
-  render(
-    <MemoryRouter initialEntries={[`/report${query}`]}>
-      <ReportForm locale="en" />
-    </MemoryRouter>,
-  );
+  renderWithRouter(<ReportForm locale="en" />, { path: "/report", url: `/report${query}` });
 
 afterEach(() => {
   cleanup();
@@ -24,7 +20,7 @@ afterEach(() => {
 describe("ReportForm", () => {
   it("sends an unauthorized-address report with relationship and confirmation", async () => {
     mocks.submitReport.mockResolvedValue({ received: true });
-    renderForm();
+    await renderForm();
     fireEvent.change(screen.getByLabelText("Your connection to the address"), {
       target: { value: "owner" },
     });
@@ -49,8 +45,8 @@ describe("ReportForm", () => {
     expect(await screen.findByText(/reviewed by a person/u)).toBeVisible();
   });
 
-  it("asks no address questions for other reasons", () => {
-    renderForm();
+  it("asks no address questions for other reasons", async () => {
+    await renderForm();
     fireEvent.change(screen.getByLabelText("What is it about?"), {
       target: { value: "harassment" },
     });
@@ -59,7 +55,7 @@ describe("ReportForm", () => {
 
   it("sends public-map reports with the event key and opaque public IDs", async () => {
     mocks.submitPublicReport.mockResolvedValue({ received: true });
-    renderForm(`?key=${"a".repeat(32)}&type=participation&subject=${"b".repeat(24)}`);
+    await renderForm(`?key=${"a".repeat(32)}&type=participation&subject=${"b".repeat(24)}`);
     fireEvent.change(screen.getByLabelText("What is it about?"), { target: { value: "fraud" } });
     fireEvent.change(screen.getByLabelText("Describe what is wrong"), {
       target: { value: "Sells fake goods." },
@@ -78,13 +74,13 @@ describe("ReportForm", () => {
     expect(mocks.submitReport).not.toHaveBeenCalled();
   });
 
-  it("rejects an incomplete link", () => {
-    renderForm("?event=x");
+  it("rejects an incomplete link", async () => {
+    await renderForm("?event=x");
     expect(screen.getByText("The report link is incomplete.")).toBeVisible();
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = renderForm();
+    const { container } = await renderForm();
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);
   });

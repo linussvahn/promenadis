@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { accountKey } from "../lib/use-account-data";
+import { renderWithRouter } from "../test/render";
 import { EventControls } from "./event-controls";
 
 const mocks = vi.hoisted(() => ({
@@ -12,7 +14,6 @@ const mocks = vi.hoisted(() => ({
     data: { session: { user: { id: "synthetic-session", email: "fixture@example.invalid" } } },
   }),
   onDeleted: vi.fn().mockResolvedValue(undefined),
-  onSaved: vi.fn().mockResolvedValue(undefined),
   updateDraftEventVisibility: vi.fn().mockResolvedValue({
     id: "01991dd3-a7c7-7ea2-aee5-43ec2cb5f606",
     state: "draft",
@@ -28,6 +29,8 @@ vi.mock("../lib/supabase", () => ({
   }),
   getBrowserAuthClient: () => ({ auth: { getSession: mocks.getSession } }),
 }));
+
+const route = { path: "/events/$eventId", url: "/events/01991dd3-a7c7-7ea2-aee5-43ec2cb5f606" };
 
 const event = {
   boundary: null,
@@ -52,14 +55,11 @@ afterEach(() => {
 
 describe("EventControls", () => {
   it("updates draft visibility with optimistic concurrency", async () => {
-    render(
-      <EventControls
-        event={event}
-        locale="sv"
-        onDeleted={mocks.onDeleted}
-        onSaved={mocks.onSaved}
-      />,
+    const { queryClient } = await renderWithRouter(
+      <EventControls event={event} locale="sv" onDeleted={mocks.onDeleted} />,
+      route,
     );
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
 
     fireEvent.change(screen.getByLabelText("Synlighet"), { target: { value: "unlisted" } });
     fireEvent.click(screen.getByRole("button", { name: "Spara synlighet" }));
@@ -70,17 +70,17 @@ describe("EventControls", () => {
         visibility: "unlisted",
       }),
     );
-    expect(mocks.onSaved).toHaveBeenCalledOnce();
+    // The workspace reads the event from the dashboard query, so the save refreshes it.
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: accountKey(null, "dashboard") }),
+    );
+    expect(await screen.findByText("Synligheten har sparats.")).toBeInTheDocument();
   });
 
   it("requires the exact title before owner deletion", async () => {
-    render(
-      <EventControls
-        event={event}
-        locale="sv"
-        onDeleted={mocks.onDeleted}
-        onSaved={mocks.onSaved}
-      />,
+    await renderWithRouter(
+      <EventControls event={event} locale="sv" onDeleted={mocks.onDeleted} />,
+      route,
     );
 
     fireEvent.click(screen.getByText("Radera utkast"));
@@ -101,13 +101,9 @@ describe("EventControls", () => {
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(
-      <EventControls
-        event={event}
-        locale="sv"
-        onDeleted={mocks.onDeleted}
-        onSaved={mocks.onSaved}
-      />,
+    const { container } = await renderWithRouter(
+      <EventControls event={event} locale="sv" onDeleted={mocks.onDeleted} />,
+      route,
     );
     const result = await axe.run(container, {
       rules: { "color-contrast": { enabled: false } },

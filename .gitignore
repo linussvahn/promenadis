@@ -4,7 +4,8 @@
 !.env.example
 .netlify/
 .pnpm-store/
-.react-router/
+.tanstack/
+.output/
 apps/*/build/
 packages/*/dist/
 coverage/
@@ -19,3 +20,4 @@ supabase/functions/.env
 
 # Local encrypted database archives (never commit)
 .local-backups/
+apps/*/dist/

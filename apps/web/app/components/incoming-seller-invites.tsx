@@ -1,8 +1,10 @@
 import type { IncomingSellerInvite } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
-import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 export function IncomingSellerInvites({
@@ -12,25 +14,17 @@ export function IncomingSellerInvites({
   readonly accessToken: () => Promise<string | null>;
   readonly locale: Locale;
 }) {
-  const [invites, setInvites] = useState<IncomingSellerInvite[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
+  const { data: invites = [] } = useQuery({
+    queryKey: accountKey(useExpectedAccountId(), "seller-invites"),
+    queryFn: async (): Promise<IncomingSellerInvite[]> => {
       const api = getPromenadisApiClient();
       const token = await accessToken();
-      if (!api || !token) return;
-      try {
-        const next = await api.listIncomingSellerInvites(token);
-        if (!cancelled) setInvites(next);
-      } catch {
-        // Session problems are reported by the dashboard.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken]);
+      if (!api || !token) return [];
+      return api.listIncomingSellerInvites(token);
+    },
+    // Session problems are reported by the dashboard.
+    throwOnError: false,
+  });
 
   if (invites.length === 0) return null;
   return (
@@ -52,7 +46,9 @@ export function IncomingSellerInvites({
                 <span className="text-sm text-muted-foreground">{invite.organizerDisplayName}</span>
                 <Link
                   className="font-semibold sm:ml-auto"
-                  to={`/events/${invite.eventId}/join?invite=${invite.id}`}
+                  params={{ eventId: invite.eventId }}
+                  search={{ invite: invite.id }}
+                  to="/events/$eventId/join"
                 >
                   {translate(locale, "sellerInvite.respond")}
                 </Link>

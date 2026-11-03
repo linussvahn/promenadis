@@ -1,42 +1,46 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { DiscoveryPage, PublicShell } from "../components/public-pages";
-import { loadPublic } from "../lib/public-api.server";
-import type { Route } from "./+types/discover";
+import { listPublicEvents } from "../lib/public-api";
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const params = new URL(request.url).searchParams;
-  const query = (params.get("q") ?? "").slice(0, 100);
-  const liveOnly = params.get("live") === "1";
-  const list = await loadPublic((api) =>
-    api.listPublicEvents({ after: params.get("after"), liveOnly, query }),
-  );
-  return { list, liveOnly, origin: new URL(request.url).origin, query };
-}
-
-export const meta: Route.MetaFunction = ({ loaderData: data }) => [
-  { title: "Upptäck evenemang · Promenadis" },
-  {
-    name: "description",
-    content: "Loppisar och kvarterspromenader som är öppna för alla.",
+export const Route = createFileRoute("/discover")({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { after?: string; live?: "1"; q?: string } => ({
+    ...(typeof search.after === "string" ? { after: search.after } : {}),
+    ...(search.live === "1" || search.live === 1 ? { live: "1" as const } : {}),
+    ...(typeof search.q === "string" ? { q: search.q.slice(0, 100) } : {}),
+  }),
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps }) => {
+    const query = deps.q ?? "";
+    const liveOnly = deps.live === "1";
+    const { list, origin } = await listPublicEvents({
+      data: { after: deps.after ?? null, liveOnly, query },
+    });
+    return { list, liveOnly, origin, query };
   },
-  // Search result pages are not indexed; the plain listing is.
-  ...(data && (data.query || data.liveOnly)
-    ? [{ name: "robots", content: "noindex, follow" }]
-    : data
-      ? [{ tagName: "link", rel: "canonical", href: `${data.origin}/discover` }]
-      : []),
-];
+  head: ({ loaderData }) => ({
+    meta: [
+      { title: "Upptäck evenemang · Promenadis" },
+      { name: "description", content: "Loppisar och kvarterspromenader som är öppna för alla." },
+      // Search result pages are not indexed; the plain listing is.
+      ...(loaderData && (loaderData.query || loaderData.liveOnly)
+        ? [{ name: "robots", content: "noindex, follow" }]
+        : []),
+    ],
+    links:
+      loaderData && !loaderData.query && !loaderData.liveOnly
+        ? [{ rel: "canonical", href: `${loaderData.origin}/discover` }]
+        : [],
+  }),
+  component: DiscoverRoute,
+});
 
-export default function DiscoverRoute({ loaderData }: Route.ComponentProps) {
+function DiscoverRoute() {
+  const { list, liveOnly, query } = Route.useLoaderData();
   return (
     <PublicShell>
-      {(locale) => (
-        <DiscoveryPage
-          list={loaderData.list}
-          liveOnly={loaderData.liveOnly}
-          locale={locale}
-          query={loaderData.query}
-        />
-      )}
+      {(locale) => <DiscoveryPage list={list} liveOnly={liveOnly} locale={locale} query={query} />}
     </PublicShell>
   );
 }

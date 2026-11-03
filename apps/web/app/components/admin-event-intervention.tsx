@@ -1,7 +1,10 @@
 import { type createPromenadisApiClient, PromenadisApiError } from "@promenadis/api-client";
 import type { AdminEventSummary } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
+import { accountKey } from "../lib/use-account-data";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Field } from "./ui/field";
@@ -10,6 +13,8 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
+type Client = { readonly api: ApiClient; readonly token: string };
+type InterventionInput = Parameters<ApiClient["interveneInEvent"]>[2];
 
 // Protective admin path: look up one event by id, then cancel it while
 // published or end it while live. Both need an internal reason for the audit.
@@ -20,9 +25,11 @@ export function AdminEventIntervention({
   readonly call: () => Promise<{ api: ApiClient; token: string } | null>;
   readonly locale: Locale;
 }) {
-  const [event, setEvent] = useState<AdminEventSummary | null>(null);
-  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
+  const accountId = useExpectedAccountId();
+  const [lookupId, setLookupId] = useState<string | null>(null);
   const [status, setStatus] = useState("");
+  const eventKey = accountKey(accountId, "admin", "event", lookupId);
 
   const errorText = (error: unknown) => {
     const code = error instanceof PromenadisApiError ? error.code : null;
@@ -38,21 +45,50 @@ export function AdminEventIntervention({
     );
   };
 
+  // Looking up is a read of one event; a not-found id is not retried.
+  const eventQuery = useQuery({
+    enabled: lookupId !== null,
+    queryKey: eventKey,
+    queryFn: async (): Promise<AdminEventSummary | null> => {
+      const client = await call();
+      return client && lookupId ? client.api.getAdminEvent(client.token, lookupId) : null;
+    },
+    retry: false,
+  });
+  const event = eventQuery.data ?? null;
+
+  const interveneMutation = useMutation({
+    mutationFn: ({
+      api,
+      token,
+      target,
+      input,
+    }: Client & { target: AdminEventSummary; input: InterventionInput }) =>
+      api.interveneInEvent(token, target.id, input),
+    onSuccess: (result, { target }) => {
+      const changed: AdminEventSummary = {
+        ...target,
+        state: result.state,
+        version: result.version,
+      };
+      queryClient.setQueryData(accountKey(accountId, "admin", "event", target.id), changed);
+      setStatus(translate(locale, "admin.intervened"));
+    },
+    onError: (error) => setStatus(errorText(error)),
+    retry: false,
+  });
+
+  const busy = eventQuery.isFetching || interveneMutation.isPending;
+  const shownStatus = status || (eventQuery.isError ? errorText(eventQuery.error) : "");
+
   const lookup = async (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
     const eventId = String(new FormData(formEvent.currentTarget).get("eventId") ?? "").trim();
     const client = await call();
     if (!client) return;
-    setBusy(true);
     setStatus("");
-    setEvent(null);
-    try {
-      setEvent(await client.api.getAdminEvent(client.token, eventId));
-    } catch (error) {
-      setStatus(errorText(error));
-    } finally {
-      setBusy(false);
-    }
+    if (eventId === lookupId) await eventQuery.refetch();
+    else setLookupId(eventId);
   };
 
   const intervene = async (formEvent: FormEvent<HTMLFormElement>) => {
@@ -65,12 +101,10 @@ export function AdminEventIntervention({
     const publicReason = String(form.get("publicReason") ?? "");
     const client = await call();
     if (!client) return;
-    setBusy(true);
     setStatus("");
-    try {
-      const result = await client.api.interveneInEvent(
-        client.token,
-        event.id,
+    interveneMutation.mutate({
+      ...client,
+      input:
         action === "end_early"
           ? { action: "end_early", expectedEventVersion: event.version, internalReason }
           : {
@@ -79,14 +113,8 @@ export function AdminEventIntervention({
               internalReason,
               publicReason,
             },
-      );
-      setEvent({ ...event, state: result.state, version: result.version });
-      setStatus(translate(locale, "admin.intervened"));
-    } catch (error) {
-      setStatus(errorText(error));
-    } finally {
-      setBusy(false);
-    }
+      target: event,
+    });
   };
 
   const canCancel = event?.state === "published" || event?.state === "postponed";
@@ -180,7 +208,7 @@ export function AdminEventIntervention({
             </article>
           ) : null}
           <p aria-live="polite" className="min-h-6 text-sm font-semibold">
-            {status}
+            {shownStatus}
           </p>
         </CardContent>
       </section>

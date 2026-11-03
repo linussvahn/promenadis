@@ -1,7 +1,8 @@
 import { PromenadisApiError } from "@promenadis/api-client";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { EventSellers } from "./event-sellers";
 
 const mocks = vi.hoisted(() => ({
@@ -70,7 +71,7 @@ afterEach(() => {
 describe("EventSellers", () => {
   it("shows seller places and map locations separately", async () => {
     mocks.listEventSellers.mockResolvedValue(data);
-    render(
+    await renderWithRouter(
       <EventSellers accessToken={accessToken} event={event} locale="en" onChanged={onChanged} />,
     );
     expect(await screen.findByText("1 of 30 seller places used · 1 map locations")).toBeVisible();
@@ -82,7 +83,7 @@ describe("EventSellers", () => {
     mocks.decideSeller.mockRejectedValueOnce(
       new PromenadisApiError("full", 409, "places_full", null),
     );
-    render(
+    await renderWithRouter(
       <EventSellers accessToken={accessToken} event={event} locale="en" onChanged={onChanged} />,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
@@ -98,7 +99,7 @@ describe("EventSellers", () => {
     mocks.listEventSellers.mockResolvedValue(data);
     mocks.decideSeller.mockResolvedValue({});
     mocks.updateEventAdmission.mockResolvedValue(data);
-    render(
+    await renderWithRouter(
       <EventSellers accessToken={accessToken} event={event} locale="en" onChanged={onChanged} />,
     );
     const reasons = await screen.findAllByLabelText(/Reason/u);
@@ -138,7 +139,7 @@ describe("EventSellers", () => {
     });
     mocks.reviewEventLocation.mockResolvedValue(data);
     mocks.correctLocationPin.mockResolvedValue(data);
-    render(
+    await renderWithRouter(
       <EventSellers accessToken={accessToken} event={event} locale="en" onChanged={onChanged} />,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Confirm separate stop" }));
@@ -163,7 +164,7 @@ describe("EventSellers", () => {
 
   it("hides admission settings from moderators", async () => {
     mocks.listEventSellers.mockResolvedValue(data);
-    render(
+    await renderWithRouter(
       <EventSellers
         accessToken={accessToken}
         event={{ ...(event as object), role: "moderator" } as never}
@@ -177,7 +178,7 @@ describe("EventSellers", () => {
 
   it("has no detectable automated accessibility violations", async () => {
     mocks.listEventSellers.mockResolvedValue(data);
-    const { container } = render(
+    const { container } = await renderWithRouter(
       <EventSellers accessToken={accessToken} event={event} locale="en" onChanged={onChanged} />,
     );
     await screen.findByText("Anna");

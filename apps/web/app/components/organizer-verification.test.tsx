@@ -1,7 +1,8 @@
 import { PromenadisApiError } from "@promenadis/api-client";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { OrganizerVerification } from "./organizer-verification";
 
 const mocks = vi.hoisted(() => ({
@@ -26,7 +27,7 @@ const none = {
   status: "none",
 };
 const renderVerification = () =>
-  render(<OrganizerVerification locale="en" organizerProfileId={organizerProfileId} />);
+  renderWithRouter(<OrganizerVerification locale="en" organizerProfileId={organizerProfileId} />);
 
 afterEach(() => {
   cleanup();
@@ -41,7 +42,7 @@ describe("OrganizerVerification", () => {
         new PromenadisApiError("bad", 400, "invalid_organization_number", null),
       )
       .mockResolvedValueOnce({ ...none, organizationNumber: "556016-0680", status: "pending" });
-    renderVerification();
+    await renderVerification();
     fireEvent.click(await screen.findByText("Request verification"));
     fireEvent.change(screen.getByLabelText("Organization number"), {
       target: { value: "811218-9876" },
@@ -76,7 +77,7 @@ describe("OrganizerVerification", () => {
       registeredName: "Example Förening",
       status: "verified",
     });
-    renderVerification();
+    await renderVerification();
     expect(
       await screen.findByText("Registered organization verified: Example Förening"),
     ).toBeVisible();
@@ -85,7 +86,7 @@ describe("OrganizerVerification", () => {
 
   it("has no detectable automated accessibility violations", async () => {
     mocks.getOrganizerVerification.mockResolvedValue(none);
-    const { container } = renderVerification();
+    const { container } = await renderVerification();
     await screen.findByText("Request verification");
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);

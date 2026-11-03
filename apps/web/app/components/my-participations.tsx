@@ -1,8 +1,10 @@
 import type { MyParticipation } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
@@ -14,25 +16,17 @@ export function MyParticipations({
   readonly accessToken: () => Promise<string | null>;
   readonly locale: Locale;
 }) {
-  const [items, setItems] = useState<MyParticipation[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
+  const { data: items = [] } = useQuery({
+    queryKey: accountKey(useExpectedAccountId(), "participations"),
+    queryFn: async (): Promise<MyParticipation[]> => {
       const api = getPromenadisApiClient();
       const token = await accessToken();
-      if (!api || !token) return;
-      try {
-        const next = await api.listMyParticipations(token);
-        if (!cancelled) setItems(next);
-      } catch {
-        // The events list above already reports session problems.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken]);
+      if (!api || !token) return [];
+      return api.listMyParticipations(token);
+    },
+    // The events list above already reports session problems.
+    throwOnError: false,
+  });
 
   if (items.length === 0) return null;
 
@@ -60,7 +54,11 @@ export function MyParticipations({
                     {formatDateTime(locale, item.startsAt, item.timezone)}
                   </span>
                 ) : null}
-                <Link className="font-semibold sm:ml-auto" to={`/events/${item.eventId}/join`}>
+                <Link
+                  className="font-semibold sm:ml-auto"
+                  params={{ eventId: item.eventId }}
+                  to="/events/$eventId/join"
+                >
                   {translate(locale, "seller.openApplication")}
                 </Link>
               </li>

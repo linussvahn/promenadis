@@ -1,10 +1,12 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { EventTeamSummary, InvitedEventTeamRole } from "@promenadis/contracts";
-import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
+import { formatDateTime, type Locale, type MessageKey, translate } from "@promenadis/i18n";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRightIcon } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
@@ -30,12 +32,11 @@ export function EventTeam({
   readonly locale: Locale;
 }) {
   const expectedAccountId = useExpectedAccountId();
-  const [busy, setBusy] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [confirmingRemoval, setConfirmingRemoval] = useState<string | null>(null);
   const [confirmingEmergencyClaim, setConfirmingEmergencyClaim] = useState(false);
   const [confirmingTransfer, setConfirmingTransfer] = useState<string | null>(null);
   const [status, setStatus] = useState("");
-  const [team, setTeam] = useState<EventTeamSummary | null>(null);
 
   const authenticatedClient = useCallback(async () => {
     const supabase = getBrowserAuthClient(expectedAccountId);
@@ -45,22 +46,24 @@ export function EventTeam({
     return data.session ? { api, token: data.session.user.id } : null;
   }, [expectedAccountId]);
 
-  const loadTeam = useCallback(async () => {
-    try {
+  const teamKey = accountKey(expectedAccountId, "event", eventId, "team");
+  const teamQuery = useQuery({
+    queryKey: teamKey,
+    queryFn: async () => {
       const authenticated = await authenticatedClient();
-      if (!authenticated) {
-        setStatus(translate(locale, "dashboard.sessionExpired"));
-        return;
-      }
-      setTeam(await authenticated.api.getEventTeam(authenticated.token, eventId));
-    } catch {
-      setStatus(translate(locale, "team.error"));
-    }
-  }, [authenticatedClient, eventId, locale]);
-
-  useEffect(() => {
-    void loadTeam();
-  }, [loadTeam]);
+      if (!authenticated) throw new MissingSessionError();
+      return authenticated.api.getEventTeam(authenticated.token, eventId);
+    },
+    retry: false,
+  });
+  const team = teamQuery.data ?? null;
+  const loadError = teamQuery.isError
+    ? translate(
+        locale,
+        teamQuery.error instanceof MissingSessionError ? "dashboard.sessionExpired" : "team.error",
+      )
+    : "";
+  const loadTeam = () => queryClient.invalidateQueries({ queryKey: teamKey });
 
   const errorMessage = (error: unknown) => {
     if (!(error instanceof PromenadisApiError)) return translate(locale, "team.error");
@@ -88,7 +91,7 @@ export function EventTeam({
   };
 
   const applyTeam = (nextTeam: EventTeamSummary) => {
-    setTeam((currentTeam) => ({
+    queryClient.setQueryData<EventTeamSummary>(teamKey, (currentTeam) => ({
       ...nextTeam,
       currentMembershipId: nextTeam.currentMembershipId ?? currentTeam?.currentMembershipId,
       pendingEmergencyClaim:
@@ -100,233 +103,161 @@ export function EventTeam({
     }));
   };
 
-  const invite = async (formEvent: FormEvent<HTMLFormElement>) => {
+  // Every team write returns the whole new team, which replaces the cached one.
+  const teamAction = useMutation({
+    mutationFn: async (action: TeamAction) => {
+      const authenticated = await authenticatedClient();
+      if (!authenticated) throw new MissingSessionError();
+      return action.run(authenticated.api, authenticated.token);
+    },
+    onError: (error) => setStatus(errorMessage(error)),
+    onMutate: () => setStatus(""),
+    onSuccess: (nextTeam, action) => {
+      applyTeam(nextTeam);
+      action.after?.();
+      setStatus(translate(locale, action.success));
+    },
+  });
+  const busy = teamAction.isPending ? teamAction.variables.busy : null;
+
+  const invite = (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
     if (!team) return;
     const form = formEvent.currentTarget;
     const formData = new FormData(form);
-    setBusy("invite");
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      const nextTeam = await authenticated.api.inviteEventTeamMember(authenticated.token, eventId, {
-        email: String(formData.get("email") ?? ""),
-        expectedTeamVersion: team.teamVersion,
-        role: String(formData.get("role") ?? "co_host") as InvitedEventTeamRole,
-      });
-      applyTeam(nextTeam);
-      form.reset();
-      setStatus(translate(locale, "team.invited"));
-    } catch (error) {
-      setStatus(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
+    teamAction.mutate({
+      after: () => form.reset(),
+      busy: "invite",
+      run: (api, token) =>
+        api.inviteEventTeamMember(token, eventId, {
+          email: String(formData.get("email") ?? ""),
+          expectedTeamVersion: team.teamVersion,
+          role: String(formData.get("role") ?? "co_host") as InvitedEventTeamRole,
+        }),
+      success: "team.invited",
+    });
   };
 
-  const cancelInvite = async (inviteId: string) => {
+  const cancelInvite = (inviteId: string) => {
     if (!team) return;
-    setBusy(inviteId);
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      applyTeam(
-        await authenticated.api.cancelEventTeamInvite(authenticated.token, eventId, inviteId, {
+    teamAction.mutate({
+      busy: inviteId,
+      run: (api, token) =>
+        api.cancelEventTeamInvite(token, eventId, inviteId, {
           expectedTeamVersion: team.teamVersion,
         }),
-      );
-      setStatus(translate(locale, "team.inviteCancelled"));
-    } catch (error) {
-      setStatus(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
+      success: "team.inviteCancelled",
+    });
   };
 
-  const updateMember = async (
-    membershipId: string,
-    nextRole: InvitedEventTeamRole,
-    remove: boolean,
-  ) => {
+  const updateMember = (membershipId: string, nextRole: InvitedEventTeamRole, remove: boolean) => {
     if (!team) return;
-    setBusy(membershipId);
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      applyTeam(
+    teamAction.mutate({
+      ...(remove ? { after: () => setConfirmingRemoval(null) } : {}),
+      busy: membershipId,
+      run: (api, token) =>
         remove
-          ? await authenticated.api.removeEventTeamMember(
-              authenticated.token,
-              eventId,
-              membershipId,
-              { expectedTeamVersion: team.teamVersion },
-            )
-          : await authenticated.api.updateEventTeamMemberRole(
-              authenticated.token,
-              eventId,
-              membershipId,
-              { expectedTeamVersion: team.teamVersion, role: nextRole },
-            ),
-      );
-      if (remove) setConfirmingRemoval(null);
-      setStatus(translate(locale, remove ? "team.memberRemoved" : "team.roleSaved"));
-    } catch (error) {
-      setStatus(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
+          ? api.removeEventTeamMember(token, eventId, membershipId, {
+              expectedTeamVersion: team.teamVersion,
+            })
+          : api.updateEventTeamMemberRole(token, eventId, membershipId, {
+              expectedTeamVersion: team.teamVersion,
+              role: nextRole,
+            }),
+      success: remove ? "team.memberRemoved" : "team.roleSaved",
+    });
   };
 
-  const initiateTransfer = async (optionValue: string) => {
+  const initiateTransfer = (optionValue: string) => {
     if (!team) return;
     const [membershipId, targetOrganizerProfileId] = optionValue.split(":");
     if (!membershipId || !targetOrganizerProfileId) return;
-    setBusy("transfer");
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      applyTeam(
-        await authenticated.api.initiateEventOwnershipTransfer(authenticated.token, eventId, {
+    teamAction.mutate({
+      after: () => setConfirmingTransfer(null),
+      busy: "transfer",
+      run: (api, token) =>
+        api.initiateEventOwnershipTransfer(token, eventId, {
           expectedTeamVersion: team.teamVersion,
           targetOrganizerProfileId,
           toMembershipId: membershipId,
         }),
-      );
-      setConfirmingTransfer(null);
-      setStatus(translate(locale, "team.transferInitiated"));
-    } catch (error) {
-      setStatus(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
+      success: "team.transferInitiated",
+    });
   };
 
-  const resolveTransfer = async (accept: boolean) => {
-    if (!team?.pendingTransfer) return;
-    setBusy("transfer");
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      const nextTeam = accept
-        ? await authenticated.api.acceptEventOwnershipTransfer(
-            authenticated.token,
-            eventId,
-            team.pendingTransfer.id,
-            { expectedTeamVersion: team.teamVersion },
-          )
-        : await authenticated.api.cancelEventOwnershipTransfer(
-            authenticated.token,
-            eventId,
-            team.pendingTransfer.id,
-            { expectedTeamVersion: team.teamVersion },
-          );
-      applyTeam(nextTeam);
-      setStatus(translate(locale, accept ? "team.transferAccepted" : "team.transferCancelled"));
-    } catch (error) {
-      setStatus(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
+  const resolveTransfer = (accept: boolean) => {
+    const pendingTransfer = team?.pendingTransfer;
+    if (!team || !pendingTransfer) return;
+    teamAction.mutate({
+      busy: "transfer",
+      run: (api, token) =>
+        accept
+          ? api.acceptEventOwnershipTransfer(token, eventId, pendingTransfer.id, {
+              expectedTeamVersion: team.teamVersion,
+            })
+          : api.cancelEventOwnershipTransfer(token, eventId, pendingTransfer.id, {
+              expectedTeamVersion: team.teamVersion,
+            }),
+      success: accept ? "team.transferAccepted" : "team.transferCancelled",
+    });
   };
 
-  const setSuccessor = async (optionValue: string) => {
+  const setSuccessor = (optionValue: string) => {
     if (!team) return;
     const [successorMembershipId, targetOrganizerProfileId] = optionValue.split(":");
     if (!successorMembershipId || !targetOrganizerProfileId) return;
-    setBusy("successor");
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      applyTeam(
-        await authenticated.api.setEventEmergencySuccessor(authenticated.token, eventId, {
+    teamAction.mutate({
+      busy: "successor",
+      run: (api, token) =>
+        api.setEventEmergencySuccessor(token, eventId, {
           expectedTeamVersion: team.teamVersion,
           successorMembershipId,
           targetOrganizerProfileId,
         }),
-      );
-      setStatus(translate(locale, "team.successorSaved"));
-    } catch (error) {
-      setStatus(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
+      success: "team.successorSaved",
+    });
   };
 
-  const clearSuccessor = async () => {
+  const clearSuccessor = () => {
     if (!team) return;
-    setBusy("successor");
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      applyTeam(
-        await authenticated.api.clearEventEmergencySuccessor(authenticated.token, eventId, {
+    teamAction.mutate({
+      busy: "successor",
+      run: (api, token) =>
+        api.clearEventEmergencySuccessor(token, eventId, {
           expectedTeamVersion: team.teamVersion,
         }),
-      );
-      setStatus(translate(locale, "team.successorCleared"));
-    } catch (error) {
-      setStatus(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
+      success: "team.successorCleared",
+    });
   };
 
-  const initiateEmergencyClaim = async () => {
+  const initiateEmergencyClaim = () => {
     if (!team) return;
-    setBusy("emergency-claim");
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      applyTeam(
-        await authenticated.api.initiateEmergencySuccessorClaim(authenticated.token, eventId, {
+    teamAction.mutate({
+      after: () => setConfirmingEmergencyClaim(false),
+      busy: "emergency-claim",
+      run: (api, token) =>
+        api.initiateEmergencySuccessorClaim(token, eventId, {
           expectedTeamVersion: team.teamVersion,
         }),
-      );
-      setConfirmingEmergencyClaim(false);
-      setStatus(translate(locale, "team.claimStarted"));
-    } catch (error) {
-      setStatus(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
+      success: "team.claimStarted",
+    });
   };
 
-  const resolveEmergencyClaim = async (complete: boolean) => {
-    if (!team?.pendingEmergencyClaim) return;
-    setBusy("emergency-claim");
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      applyTeam(
+  const resolveEmergencyClaim = (complete: boolean) => {
+    const claim = team?.pendingEmergencyClaim;
+    if (!team || !claim) return;
+    teamAction.mutate({
+      busy: "emergency-claim",
+      run: (api, token) =>
         complete
-          ? await authenticated.api.completeEmergencySuccessorClaim(
-              authenticated.token,
-              eventId,
-              team.pendingEmergencyClaim.id,
-              { expectedTeamVersion: team.teamVersion },
-            )
-          : await authenticated.api.cancelEmergencySuccessorClaim(
-              authenticated.token,
-              eventId,
-              team.pendingEmergencyClaim.id,
-              { expectedTeamVersion: team.teamVersion },
-            ),
-      );
-      setStatus(translate(locale, complete ? "team.claimCompleted" : "team.claimCancelled"));
-    } catch (error) {
-      setStatus(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
+          ? api.completeEmergencySuccessorClaim(token, eventId, claim.id, {
+              expectedTeamVersion: team.teamVersion,
+            })
+          : api.cancelEmergencySuccessorClaim(token, eventId, claim.id, {
+              expectedTeamVersion: team.teamVersion,
+            }),
+      success: complete ? "team.claimCompleted" : "team.claimCancelled",
+    });
   };
 
   const effectiveActorRole =
@@ -350,7 +281,7 @@ export function EventTeam({
         </CardHeader>
         <CardContent className="gap-6">
           {!team ? (
-            <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
+            <p aria-live="polite">{status || loadError || translate(locale, "common.loading")}</p>
           ) : (
             <>
               <ul aria-label={translate(locale, "team.members")} className={rowList}>
@@ -373,7 +304,7 @@ export function EventTeam({
                           onSubmit={(formEvent) => {
                             formEvent.preventDefault();
                             const nextRole = new FormData(formEvent.currentTarget).get("role");
-                            void updateMember(
+                            updateMember(
                               member.id,
                               String(nextRole) as InvitedEventTeamRole,
                               false,
@@ -406,7 +337,7 @@ export function EventTeam({
                                 <Button
                                   variant="destructive"
                                   disabled={busy !== null}
-                                  onClick={() => void updateMember(member.id, "moderator", true)}
+                                  onClick={() => updateMember(member.id, "moderator", true)}
                                   type="button"
                                 >
                                   {translate(locale, "team.confirmRemoveMember")}
@@ -454,7 +385,7 @@ export function EventTeam({
                     <Button
                       variant="outline"
                       disabled={busy !== null}
-                      onClick={() => void clearSuccessor()}
+                      onClick={() => clearSuccessor()}
                       type="button"
                     >
                       {translate(locale, "team.successorClear")}
@@ -486,7 +417,7 @@ export function EventTeam({
                     {isClaimant ? (
                       <Button
                         disabled={busy !== null || !claimIsReady}
-                        onClick={() => void resolveEmergencyClaim(true)}
+                        onClick={() => resolveEmergencyClaim(true)}
                         type="button"
                       >
                         {claimIsReady
@@ -498,7 +429,7 @@ export function EventTeam({
                       <Button
                         variant="outline"
                         disabled={busy !== null}
-                        onClick={() => void resolveEmergencyClaim(false)}
+                        onClick={() => resolveEmergencyClaim(false)}
                         type="button"
                       >
                         {translate(locale, "team.claimCancel")}
@@ -522,7 +453,7 @@ export function EventTeam({
                     disabled={busy !== null}
                     onClick={() =>
                       confirmingEmergencyClaim
-                        ? void initiateEmergencyClaim()
+                        ? initiateEmergencyClaim()
                         : setConfirmingEmergencyClaim(true)
                     }
                     type="button"
@@ -546,7 +477,7 @@ export function EventTeam({
                         <form
                           onSubmit={(formEvent) => {
                             formEvent.preventDefault();
-                            void setSuccessor(
+                            setSuccessor(
                               String(
                                 new FormData(formEvent.currentTarget).get("successorOption") ?? "",
                               ),
@@ -612,7 +543,7 @@ export function EventTeam({
                         <Button
                           variant="outline"
                           disabled={busy !== null}
-                          onClick={() => void resolveTransfer(false)}
+                          onClick={() => resolveTransfer(false)}
                           type="button"
                         >
                           {translate(locale, "team.transferCancel")}
@@ -627,8 +558,7 @@ export function EventTeam({
                           const optionValue = String(
                             new FormData(formEvent.currentTarget).get("transferOption") ?? "",
                           );
-                          if (confirmingTransfer === optionValue)
-                            void initiateTransfer(optionValue);
+                          if (confirmingTransfer === optionValue) initiateTransfer(optionValue);
                           else setConfirmingTransfer(optionValue);
                         }}
                       >
@@ -715,7 +645,7 @@ export function EventTeam({
                             <Button
                               variant="outline"
                               disabled={busy !== null}
-                              onClick={() => void cancelInvite(inviteItem.id)}
+                              onClick={() => cancelInvite(inviteItem.id)}
                               type="button"
                             >
                               {translate(locale, "team.cancelInvite")}
@@ -745,7 +675,7 @@ export function EventTeam({
                   ) : null}
                   <Button
                     disabled={busy !== null}
-                    onClick={() => void resolveTransfer(true)}
+                    onClick={() => resolveTransfer(true)}
                     type="button"
                   >
                     {busy === "transfer"
@@ -766,4 +696,21 @@ export function EventTeam({
       </section>
     </Card>
   );
+}
+
+class MissingSessionError extends Error {
+  constructor() {
+    super("missing_session");
+  }
+}
+
+interface TeamAction {
+  /** Which control is busy: "invite", "transfer", … or the row's ID. */
+  readonly busy: string;
+  readonly run: (
+    api: NonNullable<ReturnType<typeof getPromenadisApiClient>>,
+    token: string,
+  ) => Promise<EventTeamSummary>;
+  readonly success: MessageKey;
+  readonly after?: () => void;
 }

@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { BoundaryEditor } from "./boundary-editor";
 
 const mocks = vi.hoisted(() => ({
@@ -69,7 +70,7 @@ function addPoint(longitude: string, latitude: string) {
 
 describe("BoundaryEditor", () => {
   it("provides a non-map workflow and saves an open ordered ring", async () => {
-    render(<BoundaryEditor events={events} locale="sv" onSaved={mocks.onSaved} />);
+    await renderWithRouter(<BoundaryEditor events={events} locale="sv" onSaved={mocks.onSaved} />);
 
     fireEvent.click(screen.getByText("Avancerat: redigera koordinater"));
     addPoint("18", "59");
@@ -95,7 +96,7 @@ describe("BoundaryEditor", () => {
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(
+    const { container } = await renderWithRouter(
       <BoundaryEditor events={events} locale="sv" onSaved={mocks.onSaved} />,
     );
     await screen.findByTestId("map");

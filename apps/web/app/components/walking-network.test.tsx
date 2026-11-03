@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { WalkingNetwork } from "./walking-network";
 
 vi.mock("react-map-gl/maplibre", () => ({
@@ -67,7 +68,9 @@ describe("WalkingNetwork", () => {
     mocks.getEventRouting.mockResolvedValue(routing("disconnected"));
     mocks.addRoutingOverride.mockResolvedValue(routing("connected"));
     mocks.confirmRoutingBuild.mockResolvedValue(routing("connected", "ready"));
-    render(<WalkingNetwork accessToken={accessToken} event={event("owner")} locale="en" />);
+    await renderWithRouter(
+      <WalkingNetwork accessToken={accessToken} event={event("owner")} locale="en" />,
+    );
     expect(await screen.findByText("No walking path")).toBeVisible();
     expect(screen.getByText(/ODbL-1.0/u)).toBeVisible();
     fireEvent.change(screen.getAllByLabelText("Reason")[0] as HTMLElement, {
@@ -88,11 +91,13 @@ describe("WalkingNetwork", () => {
 
   it("gives moderators inspection only and hides connectors during the event", async () => {
     mocks.getEventRouting.mockResolvedValue(routing("connected"));
-    render(<WalkingNetwork accessToken={accessToken} event={event("moderator")} locale="en" />);
+    await renderWithRouter(
+      <WalkingNetwork accessToken={accessToken} event={event("moderator")} locale="en" />,
+    );
     expect(await screen.findByText(/inspect and report problems/u)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Build walking network" })).toBeNull();
     cleanup();
-    render(
+    await renderWithRouter(
       <WalkingNetwork accessToken={accessToken} event={event("owner", "active")} locale="en" />,
     );
     expect(await screen.findByRole("button", { name: "Block the segment" })).toBeVisible();

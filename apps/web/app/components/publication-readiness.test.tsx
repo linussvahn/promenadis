@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { PublicationReadiness } from "./publication-readiness";
 
 const event = {
@@ -77,11 +77,10 @@ describe("PublicationReadiness", () => {
       blockers: initial.blockers.filter((blocker) => blocker !== "publication_attestation_missing"),
     });
 
-    render(
-      <MemoryRouter>
-        <PublicationReadiness event={event} locale="en" />
-      </MemoryRouter>,
-    );
+    await renderWithRouter(<PublicationReadiness event={event} locale="en" />, {
+      path: "/events/$eventId",
+      url: `/events/${event.id}`,
+    });
     await screen.findByText("The safe public-delivery pipeline is not built yet.");
     fireEvent.click(screen.getByLabelText(/responsible for ensuring the event/u));
     fireEvent.click(screen.getByLabelText(/unlisted event is not private/u));

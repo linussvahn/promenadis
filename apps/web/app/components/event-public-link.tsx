@@ -1,9 +1,11 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary, EventPublicLink as PublicLink } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useCallback, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Field, FieldDescription } from "./ui/field";
@@ -15,15 +17,12 @@ import { Label } from "./ui/label";
 export function EventPublicLink({
   event,
   locale,
-  onChanged,
 }: {
   readonly event: DraftEventSummary;
   readonly locale: Locale;
-  readonly onChanged: () => Promise<void>;
 }) {
   const expectedAccountId = useExpectedAccountId();
-  const [link, setLink] = useState<PublicLink | null>(null);
-  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
 
   const authenticatedClient = useCallback(async () => {
@@ -34,24 +33,52 @@ export function EventPublicLink({
     return data.session ? { api, token: data.session.user.id } : null;
   }, [expectedAccountId]);
 
-  // Reload whenever the event version changes (publish, rotation, edits).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: event.version is the reload trigger.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
+  // Writes elsewhere on the event (publish, edits) invalidate the event's keys,
+  // which reloads the link.
+  const linkKey = accountKey(expectedAccountId, "event", event.id, "publicLink");
+  const linkQuery = useQuery({
+    queryKey: linkKey,
+    queryFn: async (): Promise<PublicLink | null> => {
       const authenticated = await authenticatedClient();
-      if (!authenticated) return;
-      try {
-        const loaded = await authenticated.api.getEventPublicLink(authenticated.token, event.id);
-        if (!cancelled) setLink(loaded);
-      } catch {
-        if (!cancelled) setStatus(translate(locale, "publication.error"));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authenticatedClient, event.id, event.version, locale]);
+      if (!authenticated) return null;
+      return authenticated.api.getEventPublicLink(authenticated.token, event.id);
+    },
+  });
+  const link = linkQuery.data ?? null;
+
+  const rotation = useMutation({
+    mutationFn: async (reason: string) => {
+      const authenticated = await authenticatedClient();
+      if (!authenticated) return null;
+      return authenticated.api.rotateUnlistedLink(authenticated.token, event.id, {
+        expectedEventVersion: event.version,
+        ...(reason ? { safetyReason: reason } : {}),
+      });
+    },
+    onError: (error) => {
+      const code = error instanceof PromenadisApiError ? error.code : "";
+      setStatus(
+        translate(
+          locale,
+          code === "recent_auth_required"
+            ? "lifecycle.recentAuth"
+            : code === "version_conflict"
+              ? "event.versionConflict"
+              : "lifecycle.error",
+        ),
+      );
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: async (rotated) => {
+      if (!rotated) return;
+      queryClient.setQueryData(linkKey, rotated);
+      setStatus(translate(locale, "publicLink.rotated"));
+      await queryClient.invalidateQueries({
+        queryKey: accountKey(expectedAccountId, "dashboard"),
+      });
+    },
+  });
+  const busy = rotation.isPending;
 
   if (!link) return null;
   const url = `${window.location.origin}/${link.visibility === "public" ? "e" : "u"}/${link.publicKey}`;
@@ -69,37 +96,9 @@ export function EventPublicLink({
     }
   };
 
-  const rotate = async (formEvent: FormEvent<HTMLFormElement>) => {
+  const rotate = (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
-    const reason = String(new FormData(formEvent.currentTarget).get("safetyReason") ?? "").trim();
-    setBusy(true);
-    setStatus("");
-    try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) return;
-      setLink(
-        await authenticated.api.rotateUnlistedLink(authenticated.token, event.id, {
-          expectedEventVersion: event.version,
-          ...(reason ? { safetyReason: reason } : {}),
-        }),
-      );
-      setStatus(translate(locale, "publicLink.rotated"));
-      await onChanged();
-    } catch (error) {
-      const code = error instanceof PromenadisApiError ? error.code : "";
-      setStatus(
-        translate(
-          locale,
-          code === "recent_auth_required"
-            ? "lifecycle.recentAuth"
-            : code === "version_conflict"
-              ? "event.versionConflict"
-              : "lifecycle.error",
-        ),
-      );
-    } finally {
-      setBusy(false);
-    }
+    rotation.mutate(String(new FormData(formEvent.currentTarget).get("safetyReason") ?? "").trim());
   };
 
   return (
@@ -131,10 +130,7 @@ export function EventPublicLink({
             </FieldDescription>
           ) : null}
           {canRotate ? (
-            <form
-              className="grid gap-3 rounded-xl border bg-muted/40 p-4"
-              onSubmit={(formEvent) => void rotate(formEvent)}
-            >
+            <form className="grid gap-3 rounded-xl border bg-muted/40 p-4" onSubmit={rotate}>
               <FieldDescription>{translate(locale, "publicLink.rotateIntro")}</FieldDescription>
               {link.state === "active" ? (
                 <Field>
@@ -155,7 +151,7 @@ export function EventPublicLink({
             </form>
           ) : null}
           <p aria-live="polite" className="min-h-6 text-sm font-semibold" role="status">
-            {status}
+            {status || (linkQuery.isError ? translate(locale, "publication.error") : "")}
           </p>
         </CardContent>
       </section>

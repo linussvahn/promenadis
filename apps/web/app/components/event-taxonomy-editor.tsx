@@ -1,7 +1,10 @@
 import { type createPromenadisApiClient, PromenadisApiError } from "@promenadis/api-client";
 import type { EventTaxonomy } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
+import { accountKey } from "../lib/use-account-data";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
@@ -24,29 +27,42 @@ export function EventTaxonomyEditor({
   readonly eventId: string;
   readonly locale: Locale;
 }) {
-  const [taxonomy, setTaxonomy] = useState<EventTaxonomy | null>(null);
+  const accountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
   const [order, setOrder] = useState<string[]>([]);
   const [enabled, setEnabled] = useState<ReadonlySet<string>>(new Set());
-  const [busy, setBusy] = useState(false);
+  const [synced, setSynced] = useState<EventTaxonomy | null>(null);
   const [status, setStatus] = useState("");
+  const taxonomyKey = accountKey(accountId, "event", eventId, "taxonomy");
 
-  const apply = useCallback((next: EventTaxonomy) => {
-    setTaxonomy(next);
-    setOrder(next.categories.map((category) => category.id));
-    setEnabled(new Set(next.categories.filter((category) => category.enabled).map((c) => c.id)));
-  }, []);
-
-  useEffect(() => {
-    void (async () => {
+  const taxonomyQuery = useQuery({
+    queryKey: taxonomyKey,
+    queryFn: async () => {
       const client = await call();
-      if (!client) return;
-      try {
-        apply(await client.api.getEventTaxonomy(client.token, eventId));
-      } catch {
-        setStatus(translate(locale, "taxonomy.error"));
-      }
-    })();
-  }, [apply, call, eventId, locale]);
+      return client ? client.api.getEventTaxonomy(client.token, eventId) : null;
+    },
+  });
+  const taxonomy = taxonomyQuery.data ?? null;
+
+  // Reset the local order and choices whenever the server copy changes.
+  if (taxonomy && taxonomy !== synced) {
+    setSynced(taxonomy);
+    setOrder(taxonomy.categories.map((category) => category.id));
+    setEnabled(
+      new Set(taxonomy.categories.filter((category) => category.enabled).map((c) => c.id)),
+    );
+  }
+
+  const saveTaxonomy = useMutation({
+    mutationFn: async (input: Parameters<ApiClient["saveEventTaxonomy"]>[2]) => {
+      const client = await call();
+      return client ? client.api.saveEventTaxonomy(client.token, eventId, input) : null;
+    },
+    onSuccess: (next) => {
+      if (next) queryClient.setQueryData(taxonomyKey, next);
+    },
+  });
+  const busy = saveTaxonomy.isPending;
 
   if (!taxonomy) return null;
 
@@ -64,19 +80,14 @@ export function EventTaxonomyEditor({
       .split("\n")
       .map((tag) => tag.trim())
       .filter(Boolean);
-    const client = await call();
-    if (!client) return;
-    setBusy(true);
     setStatus("");
     try {
-      apply(
-        await client.api.saveEventTaxonomy(client.token, eventId, {
-          enabledCategoryIds: order.filter((id) => enabled.has(id)),
-          expectedVersion: taxonomy.version,
-          suggestedTags: suggestions,
-        }),
-      );
-      setStatus(translate(locale, "taxonomy.saved"));
+      const saved = await saveTaxonomy.mutateAsync({
+        enabledCategoryIds: order.filter((id) => enabled.has(id)),
+        expectedVersion: taxonomy.version,
+        suggestedTags: suggestions,
+      });
+      if (saved) setStatus(translate(locale, "taxonomy.saved"));
     } catch (error) {
       const code = error instanceof PromenadisApiError ? error.code : "";
       setStatus(
@@ -89,8 +100,6 @@ export function EventTaxonomyEditor({
               : "taxonomy.error",
         ),
       );
-    } finally {
-      setBusy(false);
     }
   };
 

@@ -1,8 +1,10 @@
 import { translate } from "@promenadis/i18n";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
-import { useAccountData } from "../lib/use-account-data";
+import { accountKey, useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
 import { CreationProgress } from "./creation-progress";
 import { backLink, PageHeading, PageMain } from "./page";
@@ -39,8 +41,9 @@ export function NewEvent() {
 
 function NewEventContent({ locale }: { readonly locale: "sv" | "en" }) {
   const navigate = useNavigate();
+  const expectedAccountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
   const { accessToken, dashboard, loadFailed } = useAccountData();
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [scheduleDefaults, setScheduleDefaults] = useState<ReturnType<
     typeof defaultSchedule
@@ -49,6 +52,33 @@ function NewEventContent({ locale }: { readonly locale: "sv" | "en" }) {
   useEffect(() => {
     setScheduleDefaults(defaultSchedule());
   }, []);
+
+  // Stays pending until the new event's area page has opened.
+  const creation = useMutation({
+    mutationFn: async ({
+      api,
+      input,
+      token,
+    }: {
+      api: NonNullable<ReturnType<typeof getPromenadisApiClient>>;
+      input: Parameters<
+        NonNullable<ReturnType<typeof getPromenadisApiClient>>["createDraftEvent"]
+      >[1];
+      token: string;
+    }) => {
+      const created = await api.createDraftEvent(token, input);
+      // The workspace reads the event from the dashboard, so it must include the new draft.
+      await queryClient.invalidateQueries({ queryKey: accountKey(expectedAccountId, "dashboard") });
+      await navigate({
+        params: { eventId: created.id },
+        search: { new: "1" },
+        to: "/events/$eventId/area",
+      });
+    },
+    onError: () => setStatus(translate(locale, "dashboard.error")),
+    onMutate: () => setStatus(""),
+  });
+  const busy = creation.isPending;
 
   const createEvent = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -62,10 +92,9 @@ function NewEventContent({ locale }: { readonly locale: "sv" | "en" }) {
         ? String(form.get("organizerProfileId") ?? "")
         : (dashboard.organizers[0]?.id ?? null);
 
-    setBusy(true);
-    setStatus("");
-    try {
-      const created = await api.createDraftEvent(token, {
+    creation.mutate({
+      api,
+      input: {
         description: String(form.get("description") ?? ""),
         endsAt: new Date(String(form.get("endsAt") ?? "")).toISOString(),
         organizerProfileId: selectedOrganizerId,
@@ -75,12 +104,9 @@ function NewEventContent({ locale }: { readonly locale: "sv" | "en" }) {
         timezone: defaultTimeZone(),
         title: String(form.get("title") ?? ""),
         visibility: String(form.get("visibility") ?? "public") as "public" | "unlisted",
-      });
-      await navigate(`/events/${created.id}/area?new=1`);
-    } catch {
-      setStatus(translate(locale, "dashboard.error"));
-      setBusy(false);
-    }
+      },
+      token,
+    });
   };
 
   return (
@@ -103,7 +129,7 @@ function NewEventContent({ locale }: { readonly locale: "sv" | "en" }) {
         <p aria-live="polite">{translate(locale, "common.loading")}</p>
       ) : (
         <Card asChild className="gap-0 py-2">
-          <form onSubmit={createEvent}>
+          <form onSubmit={(event) => void createEvent(event)}>
             <CardContent className="gap-0 divide-y sm:px-8">
               {dashboard.organizers.length === 0 ? (
                 <Field className={section}>

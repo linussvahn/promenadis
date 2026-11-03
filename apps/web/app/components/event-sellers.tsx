@@ -9,8 +9,11 @@ import type {
   SellerParticipation,
 } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useCallback, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { EventCases } from "./event-cases";
 import { EventTaxonomyEditor } from "./event-taxonomy-editor";
 import { SellerInvites } from "./seller-invites";
@@ -61,8 +64,8 @@ export function EventSellers({
   readonly locale: Locale;
   readonly onChanged: () => Promise<void>;
 }) {
-  const [data, setData] = useState<EventSellersData | null>(null);
-  const [busy, setBusy] = useState(false);
+  const accountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
   const canManage = event.role === "owner" || event.role === "co_host";
 
@@ -72,36 +75,47 @@ export function EventSellers({
     return api && token ? { api, token } : null;
   }, [accessToken]);
 
-  const load = useCallback(async () => {
-    const client = await call();
-    if (!client) return;
-    try {
-      setData(await client.api.listEventSellers(client.token, event.id));
-    } catch {
-      setStatus(translate(locale, "sellers.error"));
-    }
-  }, [call, event.id, locale]);
+  const sellersQuery = useQuery({
+    queryKey: accountKey(accountId, "event", event.id, "sellers"),
+    queryFn: async () => {
+      const client = await call();
+      return client ? client.api.listEventSellers(client.token, event.id) : null;
+    },
+  });
+  const data = sellersQuery.data ?? null;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const load = useCallback(
+    () =>
+      queryClient.invalidateQueries({
+        queryKey: accountKey(accountId, "event", event.id, "sellers"),
+      }),
+    [accountId, event.id, queryClient],
+  );
+
+  const mutation = useMutation({
+    mutationFn: async (
+      action: (client: NonNullable<Awaited<ReturnType<typeof call>>>) => Promise<unknown>,
+    ) => {
+      const client = await call();
+      if (!client) return false;
+      await action(client);
+      return true;
+    },
+    onSuccess: async (done) => {
+      if (done) await load();
+    },
+  });
+  const busy = mutation.isPending;
 
   const run = async (
     action: (client: NonNullable<Awaited<ReturnType<typeof call>>>) => Promise<unknown>,
   ) => {
-    const client = await call();
-    if (!client) return;
-    setBusy(true);
     setStatus("");
     try {
-      await action(client);
-      await load();
-      setStatus(translate(locale, "sellers.saved"));
+      if (await mutation.mutateAsync(action)) setStatus(translate(locale, "sellers.saved"));
     } catch (error) {
       const code = error instanceof PromenadisApiError ? error.code : "";
       setStatus(translate(locale, errorKeys[code as keyof typeof errorKeys] ?? "sellers.error"));
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -149,7 +163,11 @@ export function EventSellers({
   };
 
   if (!data) {
-    return <p aria-live="polite">{status || translate(locale, "common.loading")}</p>;
+    return (
+      <p aria-live="polite">
+        {status || translate(locale, sellersQuery.isError ? "sellers.error" : "common.loading")}
+      </p>
+    );
   }
 
   const sellers = [...data.sellers].sort(
@@ -556,19 +574,51 @@ function SellerListingView({
   readonly onChanged: () => Promise<void>;
   readonly participation: SellerParticipation;
 }) {
-  const [listing, setListing] = useState<SellerListing | null>(null);
+  const accountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
+  const [opened, setOpened] = useState(false);
   const [status, setStatus] = useState("");
+  const listingKey = accountKey(accountId, "participation", participation.id, "listing");
 
-  const load = async () => {
-    if (listing) return;
-    const client = await call();
-    if (!client) return;
-    try {
-      setListing(await client.api.getSellerListing(client.token, participation.id));
-    } catch {
-      setStatus(translate(locale, "listing.loadFailed"));
-    }
-  };
+  const listingQuery = useQuery({
+    enabled: opened,
+    queryKey: listingKey,
+    queryFn: async () => {
+      const client = await call();
+      return client ? client.api.getSellerListing(client.token, participation.id) : null;
+    },
+  });
+  const listing: SellerListing | null = listingQuery.data ?? null;
+  const loadFailed = listingQuery.isError && !listing;
+
+  const moderation = useMutation({
+    mutationFn: async (input: ModerateParticipationRequest) => {
+      const client = await call();
+      if (!client) return false;
+      await client.api.moderateParticipation(client.token, participation.id, input);
+      return true;
+    },
+    onSuccess: async (done) => {
+      if (!done) return;
+      await queryClient.invalidateQueries({ queryKey: listingKey });
+      await onChanged();
+    },
+  });
+
+  const liveStatus = useMutation({
+    mutationFn: async (input: { reason: string; status: "open" | "away" | "closed_early" }) => {
+      const client = await call();
+      if (!client) return null;
+      return client.api.setSellerLiveStatus(client.token, participation.id, {
+        reason: input.reason,
+        status: input.status,
+        until: null,
+      });
+    },
+    onSuccess: (next) => {
+      if (next) queryClient.setQueryData(listingKey, next);
+    },
+  });
 
   const moderate = async (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
@@ -576,16 +626,14 @@ function SellerListingView({
     const submitter = (formEvent.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const [action, itemId] = (submitter?.value ?? "").split(":");
     const reason = String(new FormData(form).get("reason") ?? "").trim();
-    const client = await call();
-    if (!client || !action) return;
+    if (!action) return;
     try {
-      await client.api.moderateParticipation(client.token, participation.id, {
+      const done = await moderation.mutateAsync({
         action: action as ModerateParticipationRequest["action"],
         itemId: itemId ?? null,
         reason,
       });
-      setListing(await client.api.getSellerListing(client.token, participation.id));
-      await onChanged();
+      if (!done) return;
       form.reset();
       setStatus(translate(locale, "moderation.done"));
     } catch (error) {
@@ -608,17 +656,10 @@ function SellerListingView({
     const submitter = (formEvent.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const next = (submitter?.value ?? "open") as "open" | "away" | "closed_early";
     const reason = String(new FormData(formEvent.currentTarget).get("reason") ?? "").trim();
-    const client = await call();
-    if (!client) return;
     try {
-      setListing(
-        await client.api.setSellerLiveStatus(client.token, participation.id, {
-          reason,
-          status: next,
-          until: null,
-        }),
-      );
-      setStatus(translate(locale, `live.${next}`));
+      if (await liveStatus.mutateAsync({ reason, status: next })) {
+        setStatus(translate(locale, `live.${next}`));
+      }
     } catch (error) {
       setStatus(
         translate(
@@ -635,7 +676,7 @@ function SellerListingView({
     <details
       className={details}
       onToggle={(event) => {
-        if (event.currentTarget.open) void load();
+        if (event.currentTarget.open) setOpened(true);
       }}
     >
       <summary>{translate(locale, "listing.view")}</summary>
@@ -751,7 +792,7 @@ function SellerListingView({
         </div>
       ) : null}
       <p aria-live="polite" className="min-h-6 text-sm font-semibold">
-        {status}
+        {status || (loadFailed ? translate(locale, "listing.loadFailed") : "")}
       </p>
     </details>
   );

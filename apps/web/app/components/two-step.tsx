@@ -1,14 +1,23 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { MfaStatus, TotpEnrollment } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheckIcon } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+
+type Client = {
+  readonly api: NonNullable<ReturnType<typeof getPromenadisApiClient>>;
+  readonly token: string;
+};
+type AuthClient = NonNullable<ReturnType<typeof getBrowserAuthClient>>;
 
 export function TwoStep({
   accessToken,
@@ -17,25 +26,30 @@ export function TwoStep({
   readonly accessToken: () => Promise<string | null>;
   readonly locale: Locale;
 }) {
-  const [mfa, setMfa] = useState<MfaStatus | null>(null);
+  const queryClient = useQueryClient();
+  const mfaKey = accountKey(useExpectedAccountId(), "mfa");
+  // The TOTP secret lives only in component state, never in the query cache.
   const [enrollment, setEnrollment] = useState<TotpEnrollment | null>(null);
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
-  const load = useCallback(async () => {
+  const call = async (): Promise<Client | null> => {
     const api = getPromenadisApiClient();
     const token = await accessToken();
-    if (!api || !token) return;
-    try {
-      setMfa(await api.getMfaStatus(token));
-    } catch {
-      setStatus(translate(locale, "mfa.error"));
-    }
-  }, [accessToken, locale]);
+    return api && token ? { api, token } : null;
+  };
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // TOTP is security-sensitive: no automatic retries or background
+  // refetches, so the request sequence stays exactly as before.
+  const mfaQuery = useQuery({
+    queryKey: mfaKey,
+    queryFn: async (): Promise<MfaStatus | null> => {
+      const client = await call();
+      return client ? client.api.getMfaStatus(client.token) : null;
+    },
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const mfa = mfaQuery.data ?? null;
 
   const failure = (error: unknown) =>
     translate(
@@ -45,19 +59,47 @@ export function TwoStep({
         : "mfa.error",
     );
 
+  const startMutation = useMutation({
+    mutationFn: ({ api, token }: Client) => api.enrollTotp(token),
+    onSuccess: setEnrollment,
+    onError: (error) => setStatus(failure(error)),
+    retry: false,
+  });
+
+  const confirmMutation = useMutation({
+    mutationFn: ({ auth, code, factorId }: { auth: AuthClient; code: string; factorId: string }) =>
+      auth.auth.verifyTotp({ code, factorId }),
+    onSuccess: ({ error }) => {
+      if (error) {
+        setStatus(translate(locale, "mfa.failed"));
+        return;
+      }
+      setEnrollment(null);
+      setStatus(translate(locale, "mfa.enabled"));
+      void mfaQuery.refetch();
+    },
+    onError: () => setStatus(translate(locale, "mfa.failed")),
+    retry: false,
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: ({ api, token }: Client) => api.removeTotp(token),
+    onSuccess: (next) => {
+      queryClient.setQueryData(mfaKey, next);
+      setStatus(translate(locale, "mfa.removed"));
+    },
+    onError: (error) => setStatus(failure(error)),
+    retry: false,
+  });
+
+  const busy = startMutation.isPending || confirmMutation.isPending || removeMutation.isPending;
+  const shownStatus = status || (mfaQuery.isError ? translate(locale, "mfa.error") : "");
+
   const start = async () => {
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    setBusy(true);
+    const client = await call();
+    if (!client) return;
     setStatus("");
-    try {
-      setEnrollment(await api.enrollTotp(token));
-    } catch (error) {
-      setStatus(failure(error));
-    } finally {
-      setBusy(false);
-    }
+    startMutation.mutate(client);
   };
 
   const confirm = async (event: FormEvent<HTMLFormElement>) => {
@@ -66,33 +108,15 @@ export function TwoStep({
     const token = await accessToken();
     const auth = getBrowserAuthClient(token);
     if (!auth || !enrollment) return;
-    setBusy(true);
     setStatus("");
-    const { error } = await auth.auth.verifyTotp({ code, factorId: enrollment.factorId });
-    setBusy(false);
-    if (error) {
-      setStatus(translate(locale, "mfa.failed"));
-      return;
-    }
-    setEnrollment(null);
-    setStatus(translate(locale, "mfa.enabled"));
-    await load();
+    confirmMutation.mutate({ auth, code, factorId: enrollment.factorId });
   };
 
   const remove = async () => {
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    setBusy(true);
+    const client = await call();
+    if (!client) return;
     setStatus("");
-    try {
-      setMfa(await api.removeTotp(token));
-      setStatus(translate(locale, "mfa.removed"));
-    } catch (error) {
-      setStatus(failure(error));
-    } finally {
-      setBusy(false);
-    }
+    removeMutation.mutate(client);
   };
 
   return (
@@ -159,7 +183,7 @@ export function TwoStep({
             </div>
           )}
           <p aria-live="polite" className="min-h-6 text-sm font-semibold">
-            {status}
+            {shownStatus}
           </p>
         </CardContent>
       </section>

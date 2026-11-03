@@ -1,7 +1,10 @@
 import type { DraftEventSummary, RelayThread } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { RelayMessages } from "./organizer-contact";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -19,42 +22,52 @@ export function EventMessages({
   readonly event: DraftEventSummary;
   readonly locale: Locale;
 }) {
-  const [threads, setThreads] = useState<RelayThread[]>([]);
+  const expectedAccountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
   const host = event.role === "owner" || event.role === "co_host";
-  useEffect(() => {
-    if (!host) return;
-    void (async () => {
+  const threadsKey = accountKey(expectedAccountId, "event", event.id, "messages");
+  const { data: threads = [] } = useQuery({
+    enabled: host,
+    queryKey: threadsKey,
+    queryFn: async (): Promise<RelayThread[]> => {
       const api = getPromenadisApiClient();
       const token = await accessToken();
-      if (!api || !token) return;
+      if (!api || !token) return [];
       try {
-        setThreads(await api.listEventMessages(token, event.id));
+        return await api.listEventMessages(token, event.id);
       } catch {
         // Nothing to show.
+        return [];
       }
-    })();
-  }, [accessToken, event.id, host]);
-  if (!host || threads.length === 0) return null;
-  const reply = async (threadId: string, formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const form = formEvent.currentTarget;
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    try {
-      const updated = await api.replyEventMessage(
+    },
+  });
+  const replyMutation = useMutation({
+    mutationFn: async ({ form, threadId }: { form: HTMLFormElement; threadId: string }) => {
+      const api = getPromenadisApiClient();
+      const token = await accessToken();
+      if (!api || !token) return null;
+      return api.replyEventMessage(
         token,
         event.id,
         threadId,
         String(new FormData(form).get("message") ?? ""),
       );
-      setThreads((current) => current.map((thread) => (thread.id === threadId ? updated : thread)));
+    },
+    onError: () => setStatus(translate(locale, "contact.error")),
+    onSuccess: (updated, { form, threadId }) => {
+      if (!updated) return;
+      queryClient.setQueryData<RelayThread[]>(threadsKey, (current = []) =>
+        current.map((thread) => (thread.id === threadId ? updated : thread)),
+      );
       form.reset();
       setStatus(translate(locale, "contact.sent"));
-    } catch {
-      setStatus(translate(locale, "contact.error"));
-    }
+    },
+  });
+  if (!host || threads.length === 0) return null;
+  const reply = (threadId: string, formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    replyMutation.mutate({ form: formEvent.currentTarget, threadId });
   };
   return (
     <Card asChild>
@@ -69,10 +82,7 @@ export function EventMessages({
           {threads.map((thread) => (
             <article className="grid gap-4 py-5 first:pt-0" key={thread.id}>
               <RelayMessages locale={locale} thread={thread} />
-              <form
-                className="grid gap-3"
-                onSubmit={(formEvent) => void reply(thread.id, formEvent)}
-              >
+              <form className="grid gap-3" onSubmit={(formEvent) => reply(thread.id, formEvent)}>
                 <Field>
                   <Label htmlFor={`reply-${thread.id}`}>{translate(locale, "contact.reply")}</Label>
                   <Textarea
@@ -108,24 +118,23 @@ export function EventFeedbackSummary({
   readonly event: DraftEventSummary;
   readonly locale: Locale;
 }) {
-  const [summary, setSummary] = useState<{
-    responses: number;
-    averageRating: number | null;
-  } | null>(null);
+  const expectedAccountId = useExpectedAccountId();
   const ended = event.state === "ended" || event.state === "archived";
-  useEffect(() => {
-    if (!ended) return;
-    void (async () => {
+  const { data: summary } = useQuery({
+    enabled: ended,
+    queryKey: accountKey(expectedAccountId, "event", event.id, "feedbackSummary"),
+    queryFn: async (): Promise<{ responses: number; averageRating: number | null } | null> => {
       const api = getPromenadisApiClient();
       const token = await accessToken();
-      if (!api || !token) return;
+      if (!api || !token) return null;
       try {
-        setSummary(await api.getEventFeedbackSummary(token, event.id));
+        return await api.getEventFeedbackSummary(token, event.id);
       } catch {
         // Nothing to show.
+        return null;
       }
-    })();
-  }, [accessToken, ended, event.id]);
+    },
+  });
   if (!summary || summary.responses === 0) return null;
   return (
     <Card asChild>

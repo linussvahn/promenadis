@@ -1,7 +1,10 @@
 import type { createPromenadisApiClient } from "@promenadis/api-client";
 import type { AdminOperations, SupportRequests } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
+import { accountKey } from "../lib/use-account-data";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -11,6 +14,7 @@ import { Label } from "./ui/label";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
 type Call = () => Promise<{ api: ApiClient; token: string } | null>;
+type Client = NonNullable<Awaited<ReturnType<Call>>>;
 const switches = [
   "public_locations",
   "seller_applications",
@@ -27,38 +31,70 @@ export function AdminOperationsPanel({
   readonly call: Call;
   readonly locale: Locale;
 }) {
-  const [operations, setOperations] = useState<AdminOperations | null>(null);
-  const [requests, setRequests] = useState<SupportRequests>([]);
+  const queryClient = useQueryClient();
+  const accountId = useExpectedAccountId();
+  const operationsKey = accountKey(accountId, "admin", "operations");
+  const requestsKey = accountKey(accountId, "admin", "support-requests");
   const [status, setStatus] = useState("");
-  const load = useCallback(async () => {
-    const client = await call();
-    if (!client) return;
-    try {
-      setOperations(await client.api.getAdminOperations(client.token));
-      setRequests(await client.api.listSupportRequests(client.token));
-    } catch {
-      setStatus(translate(locale, "admin.elevationExpired"));
-    }
-  }, [call, locale]);
-  useEffect(() => {
-    void load();
-  }, [load]);
+
+  const operationsQuery = useQuery({
+    queryKey: operationsKey,
+    queryFn: async (): Promise<AdminOperations | null> => {
+      const client = await call();
+      return client ? client.api.getAdminOperations(client.token) : null;
+    },
+  });
+  const operations = operationsQuery.data ?? null;
+  // The support inbox is read only after job health loaded, as before.
+  const requestsQuery = useQuery({
+    enabled: operations !== null,
+    queryKey: requestsKey,
+    queryFn: async (): Promise<SupportRequests> => {
+      const client = await call();
+      return client ? client.api.listSupportRequests(client.token) : [];
+    },
+  });
+  const requests = requestsQuery.data ?? [];
+
+  const toggleMutation = useMutation({
+    mutationFn: ({
+      api,
+      token,
+      key,
+      enabled,
+      reason,
+    }: Client & { key: string; enabled: boolean; reason: string }) =>
+      api.setKillSwitch(token, key, enabled, reason),
+    onSuccess: (next) => {
+      queryClient.setQueryData(operationsKey, next);
+      setStatus(translate(locale, "operations.switchSaved"));
+    },
+    onError: () => setStatus(translate(locale, "operations.switchFailed")),
+  });
+
+  const resolveMutation = useMutation({
+    mutationFn: ({ api, token, id }: Client & { id: string }) =>
+      api.resolveSupportRequest(token, id),
+    onSuccess: (next) => queryClient.setQueryData(requestsKey, next),
+  });
+
+  const shownStatus =
+    status ||
+    (operationsQuery.isError || requestsQuery.isError
+      ? translate(locale, "admin.elevationExpired")
+      : "");
+
   const toggle = async (key: string, enabled: boolean, formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
+    const reason = String(new FormData(formEvent.currentTarget).get("reason") ?? "");
     const client = await call();
     if (!client) return;
-    try {
-      const reason = String(new FormData(formEvent.currentTarget).get("reason") ?? "");
-      setOperations(await client.api.setKillSwitch(client.token, key, enabled, reason));
-      setStatus(translate(locale, "operations.switchSaved"));
-    } catch {
-      setStatus(translate(locale, "operations.switchFailed"));
-    }
+    toggleMutation.mutate({ ...client, enabled, key, reason });
   };
   const resolve = async (id: string) => {
     const client = await call();
     if (!client) return;
-    setRequests(await client.api.resolveSupportRequest(client.token, id));
+    resolveMutation.mutate({ ...client, id });
   };
   if (!operations) return null;
   return (
@@ -155,7 +191,7 @@ export function AdminOperationsPanel({
             </ul>
           </div>
           <p aria-live="polite" className="min-h-6 text-sm font-semibold" role="status">
-            {status}
+            {shownStatus}
           </p>
         </CardContent>
       </section>

@@ -456,6 +456,33 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### TanStack Start, Router and Query (2026-11-04)
+
+No migration. The web app moved from React Router v8 to TanStack Start
+(Vite) with TanStack Router file routes (`app/routes/`, generated
+`app/routeTree.gen.ts`) and TanStack Query. `docs/DATA.md` records the
+routing, data and test rules.
+
+- `app/server.ts` adds the security headers and a per-request CSP nonce,
+  passed through the request context to `getRouter()` (`router.ssr.nonce`),
+  which stamps every inline and module script. Route `headers` set
+  `x-robots-tag` / `referrer-policy` (map, unlisted, contact pages).
+- Public reads are server functions in `app/lib/public-api.ts`; 404/410 from
+  the BFF become not-found pages with that status, anything else a 503.
+- robots.txt and sitemap.xml are server routes.
+- Signed-in screens read with `useQuery` (keys start with the account id via
+  `accountKey`) and write with `useMutation`; sign-out clears the cache.
+  The public map keeps its own polling/offline loader.
+- Search params are plain query strings (`lib/search.ts`), not JSON-encoded.
+- Submit buttons stay disabled until hydration, so an early tap never posts
+  a form natively.
+- Production: `pnpm build` writes `dist/`; `node scripts/serve-production.mjs`
+  serves it with srvx (MIT). `serve-local-production.mjs` and the offline
+  test use it.
+- Unit tests render through `app/test/render.tsx` (`renderWithRouter`).
+- Fixed on the way: reopening the same recovery link now re-reads the claim;
+  admin switch toggles read their form before awaiting.
+
 ### shadcn/ui migration (2026-11-03)
 
 No migration. The web UI now uses shadcn/ui (MIT) on Tailwind CSS v4

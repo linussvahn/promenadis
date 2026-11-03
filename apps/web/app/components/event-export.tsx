@@ -1,6 +1,7 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { Button } from "./ui/button";
@@ -16,26 +17,21 @@ export function EventExport({
   readonly event: DraftEventSummary;
   readonly locale: Locale;
 }) {
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  if (event.role !== "owner" && event.role !== "co_host") return null;
-  const download = async () => {
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    setBusy(true);
-    setStatus("");
-    try {
+  // Each export is a new, rate-limited server job, so it is a mutation.
+  const exportMutation = useMutation({
+    mutationFn: async ({
+      api,
+      token,
+    }: {
+      api: NonNullable<ReturnType<typeof getPromenadisApiClient>>;
+      token: string;
+    }) => {
       const created = await api.createEventExport(token, event.id);
       const csv = await api.downloadEventExport(token, event.id, created.exportId, created.token);
-      const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "promenadis-saljare.csv";
-      link.click();
-      URL.revokeObjectURL(url);
-      setStatus(`${translate(locale, "export.done")} (${created.rows})`);
-    } catch (error) {
+      return { csv, rows: created.rows };
+    },
+    onError: (error) => {
       const code = error instanceof PromenadisApiError ? error.code : "";
       setStatus(
         translate(
@@ -49,9 +45,27 @@ export function EventExport({
                 : "export.error",
         ),
       );
-    } finally {
-      setBusy(false);
-    }
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: ({ csv, rows }) => {
+      const url = URL.createObjectURL(
+        new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "promenadis-saljare.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+      setStatus(`${translate(locale, "export.done")} (${rows})`);
+    },
+  });
+  const busy = exportMutation.isPending;
+  if (event.role !== "owner" && event.role !== "co_host") return null;
+  const download = async () => {
+    const api = getPromenadisApiClient();
+    const token = await accessToken();
+    if (!api || !token) return;
+    exportMutation.mutate({ api, token });
   };
   return (
     <Card asChild>

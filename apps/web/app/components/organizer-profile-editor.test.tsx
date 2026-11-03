@@ -1,7 +1,8 @@
 import { PromenadisApiError } from "@promenadis/api-client";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { OrganizerProfileEditor } from "./organizer-profile-editor";
 
 const mocks = vi.hoisted(() => ({ updateOrganizer: vi.fn() }));
@@ -28,7 +29,7 @@ afterEach(() => {
 describe("OrganizerProfileEditor", () => {
   it("saves the edited fields with the current version", async () => {
     mocks.updateOrganizer.mockResolvedValue({ ...organizer, version: 3 });
-    render(
+    await renderWithRouter(
       <OrganizerProfileEditor
         accessToken={accessToken}
         locale="en"
@@ -58,7 +59,7 @@ describe("OrganizerProfileEditor", () => {
     mocks.updateOrganizer.mockRejectedValue(
       new PromenadisApiError("changed", 409, "version_conflict", "correlation"),
     );
-    render(
+    await renderWithRouter(
       <OrganizerProfileEditor
         accessToken={accessToken}
         locale="en"
@@ -73,7 +74,7 @@ describe("OrganizerProfileEditor", () => {
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(
+    const { container } = await renderWithRouter(
       <OrganizerProfileEditor
         accessToken={accessToken}
         locale="en"

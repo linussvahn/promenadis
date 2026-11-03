@@ -1,9 +1,11 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { wallTimeToIso } from "../lib/wall-time";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -17,14 +19,12 @@ import { Textarea } from "./ui/textarea";
 export function EventLifecycle({
   event,
   locale,
-  onChanged,
 }: {
   readonly event: DraftEventSummary;
   readonly locale: Locale;
-  readonly onChanged: () => Promise<void>;
 }) {
   const expectedAccountId = useExpectedAccountId();
-  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
   const [confirmTitle, setConfirmTitle] = useState("");
   const [reason, setReason] = useState("");
@@ -35,20 +35,32 @@ export function EventLifecycle({
   const canEnd = event.state === "active" && teamLead;
   const canPostpone = teamLead && (event.state === "published" || event.state === "active");
   const canReschedule = teamLead && event.state === "postponed";
-  if (!canCancel && !canEnd && !canPostpone && !canReschedule) return null;
 
-  const runPostponement = async (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const form = new FormData(formEvent.currentTarget);
+  const authenticatedClient = async () => {
     const supabase = getBrowserAuthClient(expectedAccountId);
     const api = getPromenadisApiClient();
-    if (!supabase || !api) return;
+    if (!supabase || !api) return null;
     const { data } = await supabase.auth.getSession();
-    if (!data.session) return;
-    const token = data.session.user.id;
-    setBusy(true);
-    setStatus("");
-    try {
+    return data.session ? { api, token: data.session.user.id } : null;
+  };
+
+  const refreshEvent = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: accountKey(expectedAccountId, "dashboard") }),
+      queryClient.invalidateQueries({
+        queryKey: accountKey(expectedAccountId, "event", event.id),
+      }),
+    ]);
+
+  const postponement = useMutation({
+    mutationFn: async ({
+      authenticated,
+      form,
+    }: {
+      authenticated: NonNullable<Awaited<ReturnType<typeof authenticatedClient>>>;
+      form: FormData;
+    }) => {
+      const { api, token } = authenticated;
       if (canReschedule) {
         await api.rescheduleEvent(token, event.id, {
           endsAt: wallTimeToIso(String(form.get("endsAt") ?? ""), event.timezone),
@@ -63,8 +75,9 @@ export function EventLifecycle({
         });
         setStatus(translate(locale, "lifecycle.postponed"));
       }
-      await onChanged();
-    } catch (error) {
+      await refreshEvent();
+    },
+    onError: (error) => {
       const code = error instanceof PromenadisApiError ? error.code : null;
       setStatus(
         translate(
@@ -80,21 +93,19 @@ export function EventLifecycle({
                   : "lifecycle.error",
         ),
       );
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+    onMutate: () => setStatus(""),
+  });
 
-  const run = async (action: "cancel" | "end") => {
-    const supabase = getBrowserAuthClient(expectedAccountId);
-    const api = getPromenadisApiClient();
-    if (!supabase || !api) return;
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) return;
-    const token = data.session.user.id;
-    setBusy(true);
-    setStatus("");
-    try {
+  const lifecycleAction = useMutation({
+    mutationFn: async ({
+      action,
+      authenticated,
+    }: {
+      action: "cancel" | "end";
+      authenticated: NonNullable<Awaited<ReturnType<typeof authenticatedClient>>>;
+    }) => {
+      const { api, token } = authenticated;
       if (action === "cancel") {
         await api.cancelEvent(token, event.id, {
           confirmTitle: confirmTitle.trim(),
@@ -105,8 +116,9 @@ export function EventLifecycle({
         await api.endEventEarly(token, event.id, event.version);
       }
       setStatus(translate(locale, action === "cancel" ? "lifecycle.cancelled" : "lifecycle.ended"));
-      await onChanged();
-    } catch (error) {
+      await refreshEvent();
+    },
+    onError: (error) => {
       const code = error instanceof PromenadisApiError ? error.code : null;
       setStatus(
         translate(
@@ -118,9 +130,26 @@ export function EventLifecycle({
               : "lifecycle.error",
         ),
       );
-    } finally {
-      setBusy(false);
-    }
+    },
+    onMutate: () => setStatus(""),
+  });
+
+  if (!canCancel && !canEnd && !canPostpone && !canReschedule) return null;
+  const busy = postponement.isPending || lifecycleAction.isPending;
+
+  const runPostponement = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    const form = new FormData(formEvent.currentTarget);
+    // Without a session nothing happens, as before the request starts.
+    const authenticated = await authenticatedClient();
+    if (!authenticated) return;
+    postponement.mutate({ authenticated, form });
+  };
+
+  const run = async (action: "cancel" | "end") => {
+    const authenticated = await authenticatedClient();
+    if (!authenticated) return;
+    lifecycleAction.mutate({ action, authenticated });
   };
 
   return (

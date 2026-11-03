@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import axe from "axe-core";
-import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { Welcome } from "./welcome";
 
 afterEach(() => {
@@ -11,12 +11,8 @@ afterEach(() => {
 });
 
 describe("Welcome", () => {
-  it("renders Swedish by default and switches to English", () => {
-    render(
-      <MemoryRouter>
-        <Welcome />
-      </MemoryRouter>,
-    );
+  it("renders Swedish by default and switches to English", async () => {
+    await renderWithRouter(<Welcome />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Upptäck kvarteret till fots.",
     );
@@ -31,11 +27,7 @@ describe("Welcome", () => {
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(
-      <MemoryRouter>
-        <Welcome />
-      </MemoryRouter>,
-    );
+    const { container } = await renderWithRouter(<Welcome />);
     const result = await axe.run(container, {
       rules: {
         "color-contrast": { enabled: false },

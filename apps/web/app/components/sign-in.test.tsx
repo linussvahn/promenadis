@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { SignIn } from "./sign-in";
 
 const mocks = vi.hoisted(() => ({
@@ -28,13 +28,9 @@ afterEach(() => {
 describe("SignIn", () => {
   it("submits the actual form value when a browser autofills without an input event", async () => {
     mocks.signInWithOtp.mockResolvedValue({ error: null });
-    render(
-      <MemoryRouter>
-        <SignIn />
-      </MemoryRouter>,
-    );
+    await renderWithRouter(<SignIn />, { path: "/sign-in" });
 
-    const input = screen.getByRole("textbox", { name: "E-postadress" });
+    const input = await screen.findByRole("textbox", { name: "E-postadress" });
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     valueSetter?.call(input, "autofilled@example.invalid");
     fireEvent.submit(input.closest("form") as HTMLFormElement);
@@ -50,11 +46,7 @@ describe("SignIn", () => {
     mocks.signInWithOtp.mockResolvedValue({
       error: { code: "over_email_send_rate_limit", status: 429 },
     });
-    render(
-      <MemoryRouter>
-        <SignIn />
-      </MemoryRouter>,
-    );
+    await renderWithRouter(<SignIn />, { path: "/sign-in" });
 
     fireEvent.change(screen.getByRole("textbox", { name: "E-postadress" }), {
       target: { value: "tester@example.invalid" },

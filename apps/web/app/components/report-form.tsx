@@ -1,8 +1,9 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { SubmitReportRequest } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation } from "@tanstack/react-query";
+import { useSearch } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { useSearchParams } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { PageHeading, PageMain } from "./page";
@@ -40,26 +41,26 @@ export function ReportPage() {
 // Anonymous structured report about one location, seller or item. The page
 // never tells the reporter what happened to the subject.
 export function ReportForm({ locale }: { readonly locale: Locale }) {
-  const [params] = useSearchParams();
+  // The route declares no search schema, so read the raw values as text.
+  const params = useSearch({ strict: false }) as Readonly<Record<string, unknown>>;
+  const param = (name: string) => {
+    const value = params[name];
+    return typeof value === "string" ? value : typeof value === "number" ? String(value) : "";
+  };
   // Links from the public map carry the event key and opaque public IDs.
-  const eventKey = params.get("key") ?? "";
-  const eventId = params.get("event") ?? "";
-  const subjectType = params.get("type") as SubmitReportRequest["subjectType"] | null;
-  const subjectId = params.get("subject") ?? "";
+  const eventKey = param("key");
+  const eventId = param("event");
+  const subjectType = (param("type") || null) as SubmitReportRequest["subjectType"] | null;
+  const subjectId = param("subject");
   const [reason, setReason] = useState<(typeof reasons)[number]>("unauthorized_address");
-  const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [status, setStatus] = useState("");
 
-  const submit = async (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const api = getPromenadisApiClient();
-    if (!api || !subjectType) return;
-    const form = new FormData(formEvent.currentTarget);
-    setBusy(true);
-    setStatus("");
-    try {
-      const report = {
+  const report = useMutation({
+    mutationFn: async (form: FormData) => {
+      const api = getPromenadisApiClient();
+      if (!api || !subjectType) return;
+      const body = {
         confirmsNoConsent: form.get("confirmsNoConsent") === "on",
         details: String(form.get("details") ?? ""),
         reason,
@@ -72,16 +73,16 @@ export function ReportForm({ locale }: { readonly locale: Locale }) {
       };
       if (eventKey && subjectType !== "item") {
         await api.submitPublicReport({
-          ...report,
+          ...body,
           eventKey,
           publicSubjectId: subjectId,
           subjectType,
         });
       } else {
-        await api.submitReport({ ...report, eventId, subjectId, subjectType });
+        await api.submitReport({ ...body, eventId, subjectId, subjectType });
       }
-      setSent(true);
-    } catch (error) {
+    },
+    onError: (error) => {
       setStatus(
         translate(
           locale,
@@ -92,9 +93,16 @@ export function ReportForm({ locale }: { readonly locale: Locale }) {
               : "report.error",
         ),
       );
-    } finally {
-      setBusy(false);
-    }
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: () => setSent(true),
+  });
+  const busy = report.isPending;
+
+  const submit = (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    if (!getPromenadisApiClient() || !subjectType) return;
+    report.mutate(new FormData(formEvent.currentTarget));
   };
 
   if (

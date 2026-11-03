@@ -1,6 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { NewEvent } from "./new-event";
 
 const mocks = vi.hoisted(() => ({
@@ -39,11 +39,7 @@ afterEach(() => {
 
 describe("NewEvent", () => {
   it("lets a person start an event without creating an organizer first", async () => {
-    render(
-      <MemoryRouter>
-        <NewEvent />
-      </MemoryRouter>,
-    );
+    await renderWithRouter(<NewEvent />, { path: "/events/new" });
 
     expect(await screen.findByText("Arrangeras av dig")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Namn som visas offentligt" })).toBeRequired();
@@ -80,11 +76,7 @@ describe("NewEvent", () => {
       schemaVersion: "1.0",
     });
 
-    render(
-      <MemoryRouter>
-        <NewEvent />
-      </MemoryRouter>,
-    );
+    await renderWithRouter(<NewEvent />, { path: "/events/new" });
 
     expect(await screen.findByRole("combobox", { name: "Arrangeras som" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Namn som visas offentligt" })).toBeNull();

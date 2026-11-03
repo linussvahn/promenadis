@@ -1,9 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { EventTeam } from "./event-team";
 
 const eventId = "01991dd3-a7c7-7ea2-aee5-43ec2cb5f606";
+const render = (ui: ReactNode) =>
+  renderWithRouter(ui, { path: "/events/$eventId", url: `/events/${eventId}` });
 const ownerMembershipId = "01991dd3-a7c7-7ea2-aee5-43ec2cb5f607";
 const initialTeam = {
   eventId,
@@ -77,7 +81,7 @@ describe("EventTeam", () => {
       teamVersion: 2,
     });
 
-    render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
+    await render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
     await screen.findByText("Test Owner");
 
     fireEvent.change(screen.getByLabelText("Email address"), {
@@ -109,7 +113,7 @@ describe("EventTeam", () => {
       ],
     });
 
-    render(<EventTeam actorRole="co_host" eventId={eventId} locale="en" />);
+    await render(<EventTeam actorRole="co_host" eventId={eventId} locale="en" />);
     expect(await screen.findByText("Helpful Co-host")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Invite someone" })).not.toBeInTheDocument();
     expect(screen.queryByText("Manage member")).not.toBeInTheDocument();
@@ -131,7 +135,7 @@ describe("EventTeam", () => {
     mocks.getEventTeam.mockResolvedValue(teamWithMember);
     mocks.removeEventTeamMember.mockResolvedValue(initialTeam);
 
-    render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
+    await render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
     await screen.findByText("Helpful Co-host");
     fireEvent.click(screen.getByText("Manage member"));
     fireEvent.click(screen.getByRole("button", { name: "Remove from team" }));
@@ -188,7 +192,7 @@ describe("EventTeam", () => {
       teamVersion: 2,
     });
 
-    render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
+    await render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
     await screen.findByRole("heading", { name: "Transfer ownership" });
     fireEvent.click(screen.getByRole("button", { name: "Review transfer" }));
     expect(mocks.initiateEventOwnershipTransfer).not.toHaveBeenCalled();
@@ -241,7 +245,7 @@ describe("EventTeam", () => {
       teamVersion: 2,
     });
 
-    render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
+    await render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
     fireEvent.click(await screen.findByRole("button", { name: "Designate successor" }));
 
     await waitFor(() =>
@@ -286,7 +290,7 @@ describe("EventTeam", () => {
       teamVersion: 3,
     });
 
-    render(<EventTeam actorRole="co_host" eventId={eventId} locale="en" />);
+    await render(<EventTeam actorRole="co_host" eventId={eventId} locale="en" />);
     fireEvent.click(await screen.findByRole("button", { name: "Accept and become owner" }));
 
     await waitFor(() =>
@@ -337,7 +341,7 @@ describe("EventTeam", () => {
       teamVersion: 3,
     });
 
-    render(<EventTeam actorRole="co_host" eventId={eventId} locale="en" />);
+    await render(<EventTeam actorRole="co_host" eventId={eventId} locale="en" />);
     fireEvent.click(await screen.findByRole("button", { name: "Review emergency transfer" }));
     expect(mocks.initiateEmergencySuccessorClaim).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Start 24-hour waiting period" }));
@@ -385,7 +389,9 @@ describe("EventTeam", () => {
       teamVersion: 4,
     });
 
-    const { unmount } = render(<EventTeam actorRole="co_host" eventId={eventId} locale="en" />);
+    const { unmount } = await render(
+      <EventTeam actorRole="co_host" eventId={eventId} locale="en" />,
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Complete and take ownership" }));
     await waitFor(() =>
       expect(mocks.completeEmergencySuccessorClaim).toHaveBeenCalledWith(
@@ -407,7 +413,7 @@ describe("EventTeam", () => {
       pendingEmergencyClaim: null,
       teamVersion: 4,
     });
-    render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
+    await render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
     fireEvent.click(await screen.findByRole("button", { name: "Cancel emergency transfer" }));
     await waitFor(() =>
       expect(mocks.cancelEmergencySuccessorClaim).toHaveBeenCalledWith(
@@ -421,7 +427,9 @@ describe("EventTeam", () => {
 
   it("has no detectable automated accessibility violations", async () => {
     mocks.getEventTeam.mockResolvedValue(initialTeam);
-    const { container } = render(<EventTeam actorRole="owner" eventId={eventId} locale="en" />);
+    const { container } = await render(
+      <EventTeam actorRole="owner" eventId={eventId} locale="en" />,
+    );
     await screen.findByText("Test Owner");
     const result = await axe.run(container, {
       rules: { "color-contrast": { enabled: false } },

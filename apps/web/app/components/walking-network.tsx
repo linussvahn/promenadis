@@ -6,10 +6,13 @@ import type {
   RoutingPackageContract,
 } from "@promenadis/contracts";
 import { type Locale, type MessageKey, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import MapView, { Layer, type MapLayerMouseEvent, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { DEFAULT_CENTER, MAP_STYLE, MapErrorBoundary } from "./boundary-editor";
 import { SummaryList } from "./page";
 import { Badge } from "./ui/badge";
@@ -59,18 +62,34 @@ export function WalkingNetwork({
   readonly event: DraftEventSummary;
   readonly locale: Locale;
 }) {
-  const [routing, setRouting] = useState<EventRouting | null>(null);
-  const [preview, setPreview] = useState<RoutingPackageContract | null>(null);
-  const [busy, setBusy] = useState(false);
+  const accountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
   const [edgeKey, setEdgeKey] = useState("");
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = event.role === "owner" || event.role === "co_host";
   const live = event.state === "active";
+  const routingKey = accountKey(accountId, "event", event.id, "routing");
 
-  const run = useCallback(
-    async (
+  const errorText = (error: unknown) => {
+    const code = error instanceof PromenadisApiError ? error.code : "";
+    return translate(locale, errorKeys[code] ?? "walking.error.generic");
+  };
+
+  const routingQuery = useQuery({
+    queryKey: routingKey,
+    queryFn: async () => {
+      const api = getPromenadisApiClient();
+      const token = await accessToken();
+      return api && token ? api.getEventRouting(token, event.id) : null;
+    },
+  });
+  const routing: EventRouting | null = routingQuery.data ?? null;
+
+  // Every routing write answers with the event's current routing state.
+  const write = useMutation({
+    mutationFn: async (
       action: (
         api: NonNullable<ReturnType<typeof getPromenadisApiClient>>,
         token: string,
@@ -78,46 +97,42 @@ export function WalkingNetwork({
     ) => {
       const api = getPromenadisApiClient();
       const token = await accessToken();
-      if (!api || !token) return;
-      setBusy(true);
-      setStatus("");
-      try {
-        setRouting(await action(api, token));
-      } catch (error) {
-        const code = error instanceof PromenadisApiError ? error.code : "";
-        setStatus(translate(locale, errorKeys[code] ?? "walking.error.generic"));
-      } finally {
-        setBusy(false);
-      }
+      return api && token ? action(api, token) : null;
     },
-    [accessToken, locale],
-  );
+    onSuccess: (next) => {
+      if (next) queryClient.setQueryData(routingKey, next);
+    },
+  });
+  const busy = write.isPending;
 
-  useEffect(() => {
-    void run((api, token) => api.getEventRouting(token, event.id));
-  }, [event.id, run]);
+  const run = async (
+    action: (
+      api: NonNullable<ReturnType<typeof getPromenadisApiClient>>,
+      token: string,
+    ) => Promise<EventRouting>,
+  ) => {
+    setStatus("");
+    try {
+      await write.mutateAsync(action);
+    } catch (error) {
+      setStatus(errorText(error));
+    }
+  };
 
   const latest = routing?.latest ?? null;
-  useEffect(() => {
-    const api = getPromenadisApiClient();
-    if (!api || !latest?.packageId) {
-      setPreview(null);
-      return;
-    }
-    let cancelled = false;
-    const buildId = latest.id;
-    void accessToken()
-      .then((token) => (token ? api.getRoutingPreviewPackage(token, event.id, buildId) : null))
-      .then((pkg) => {
-        if (!cancelled) setPreview(pkg);
-      })
-      .catch(() => {
-        if (!cancelled) setPreview(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, event.id, latest?.id, latest?.packageId]);
+  const previewQuery = useQuery({
+    enabled: Boolean(latest?.packageId),
+    queryKey: accountKey(accountId, "event", event.id, "routing-preview", latest?.id),
+    queryFn: async () => {
+      const api = getPromenadisApiClient();
+      const token = await accessToken();
+      return api && token && latest
+        ? api.getRoutingPreviewPackage(token, event.id, latest.id)
+        : null;
+    },
+  });
+  const preview: RoutingPackageContract | null =
+    latest?.packageId && !previewQuery.isError ? (previewQuery.data ?? null) : null;
 
   const lines = useMemo(() => (preview ? packageLines(preview) : null), [preview]);
   const center = preview
@@ -171,7 +186,10 @@ export function WalkingNetwork({
   if (!routing) {
     return (
       <p aria-live="polite" className="text-muted-foreground">
-        {status || translate(locale, "common.loading")}
+        {status ||
+          (routingQuery.isError
+            ? errorText(routingQuery.error)
+            : translate(locale, "common.loading"))}
       </p>
     );
   }

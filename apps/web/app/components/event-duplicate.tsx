@@ -1,6 +1,7 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary, OrganizerProfileSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { toDateTimeLocal, wallTimeToIso } from "../lib/wall-time";
@@ -26,8 +27,35 @@ export function EventDuplicate({
   readonly onCreated: (eventId: string) => Promise<void>;
   readonly organizers: readonly OrganizerProfileSummary[];
 }) {
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+
+  // Stays pending through onCreated, which opens the copy.
+  const duplication = useMutation({
+    mutationFn: async (input: {
+      api: NonNullable<ReturnType<typeof getPromenadisApiClient>>;
+      form: FormData;
+      organizerProfileId: string;
+      token: string;
+    }) => {
+      const created = await input.api.duplicateEvent(input.token, event.id, {
+        endsAt: wallTimeToIso(String(input.form.get("endsAt") ?? ""), event.timezone),
+        organizerProfileId: String(
+          input.form.get("organizerProfileId") ?? input.organizerProfileId,
+        ),
+        startsAt: wallTimeToIso(String(input.form.get("startsAt") ?? ""), event.timezone),
+        title: String(input.form.get("title") ?? ""),
+      });
+      await onCreated(created.id);
+    },
+    onError: (error) => {
+      const code = error instanceof PromenadisApiError ? error.code : null;
+      setStatus(
+        translate(locale, code === "invalid_request" ? "details.invalid" : "duplicate.error"),
+      );
+    },
+    onMutate: () => setStatus(""),
+  });
+  const busy = duplication.isPending;
 
   if (!["owner", "co_host"].includes(event.role)) return null;
 
@@ -46,23 +74,7 @@ export function EventDuplicate({
     const api = getPromenadisApiClient();
     const token = await accessToken();
     if (!api || !token || !defaultOrganizer) return;
-    setBusy(true);
-    setStatus("");
-    try {
-      const created = await api.duplicateEvent(token, event.id, {
-        endsAt: wallTimeToIso(String(form.get("endsAt") ?? ""), event.timezone),
-        organizerProfileId: String(form.get("organizerProfileId") ?? defaultOrganizer.id),
-        startsAt: wallTimeToIso(String(form.get("startsAt") ?? ""), event.timezone),
-        title: String(form.get("title") ?? ""),
-      });
-      await onCreated(created.id);
-    } catch (error) {
-      const code = error instanceof PromenadisApiError ? error.code : null;
-      setStatus(
-        translate(locale, code === "invalid_request" ? "details.invalid" : "duplicate.error"),
-      );
-      setBusy(false);
-    }
+    duplication.mutate({ api, form, organizerProfileId: defaultOrganizer.id, token });
   };
 
   return (
@@ -73,7 +85,7 @@ export function EventDuplicate({
         </summary>
         <div className="grid gap-3 border-t px-6 pt-5 pb-6">
           {defaultOrganizer ? (
-            <form className="grid gap-5" onSubmit={duplicate}>
+            <form className="grid gap-5" onSubmit={(formEvent) => void duplicate(formEvent)}>
               <FieldDescription>{translate(locale, "duplicate.help")}</FieldDescription>
               {organizers.length > 1 ? (
                 <Field>

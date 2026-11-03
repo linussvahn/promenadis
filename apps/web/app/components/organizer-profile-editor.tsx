@@ -1,6 +1,7 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { OrganizerProfileSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation } from "@tanstack/react-query";
 import { ChevronRightIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
@@ -22,27 +23,40 @@ export function OrganizerProfileEditor({
   readonly onSaved: () => Promise<void>;
   readonly organizer: OrganizerProfileSummary;
 }) {
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const idPrefix = `organizer-edit-${organizer.id}`;
+
+  // The parent's onSaved re-reads the organizer, so the form shows the new version.
+  const update = useMutation({
+    mutationFn: async (
+      input: Parameters<
+        NonNullable<ReturnType<typeof getPromenadisApiClient>>["updateOrganizer"]
+      >[2],
+    ) => {
+      const api = getPromenadisApiClient();
+      const token = await accessToken();
+      if (!api || !token) return false;
+      await api.updateOrganizer(token, organizer.id, input);
+      return true;
+    },
+    onSuccess: async (done) => {
+      if (done) await onSaved();
+    },
+  });
+  const busy = update.isPending;
 
   const save = async (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
     const form = new FormData(formEvent.currentTarget);
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    setBusy(true);
     setStatus("");
     try {
-      await api.updateOrganizer(token, organizer.id, {
+      const done = await update.mutateAsync({
         displayName: String(form.get("displayName") ?? ""),
         expectedVersion: organizer.version,
         locality: String(form.get("locality") ?? ""),
         website: String(form.get("website") ?? "").trim(),
       });
-      await onSaved();
-      setStatus(translate(locale, "organizerEdit.saved"));
+      if (done) setStatus(translate(locale, "organizerEdit.saved"));
     } catch (error) {
       const code = error instanceof PromenadisApiError ? error.code : null;
       setStatus(
@@ -55,8 +69,6 @@ export function OrganizerProfileEditor({
               : "dashboard.error",
         ),
       );
-    } finally {
-      setBusy(false);
     }
   };
 

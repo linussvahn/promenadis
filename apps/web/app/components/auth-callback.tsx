@@ -1,6 +1,6 @@
 import { translate } from "@promenadis/i18n";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getBrowserAuthClient } from "../lib/supabase";
 import { Eyebrow } from "./page";
@@ -36,7 +36,7 @@ export function AuthCallback() {
         setFailed(true);
         return;
       }
-      await navigate("/dashboard", { replace: true });
+      await navigate({ replace: true, to: "/dashboard" });
     };
 
     void complete();

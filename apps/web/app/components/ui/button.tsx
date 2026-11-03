@@ -1,3 +1,4 @@
+import { useHydrated } from "@tanstack/react-router";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
 import type * as React from "react";
@@ -34,16 +35,22 @@ function Button({
   variant,
   size,
   asChild = false,
+  disabled,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
   }) {
+  // Forms here submit through JavaScript; before hydration a click would
+  // post the form natively and reload the page with its fields cleared.
+  const hydrated = useHydrated();
   const Comp = asChild ? Slot.Root : "button";
+  const waiting = !asChild && props.type === "submit" && !hydrated;
   return (
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      disabled={disabled || waiting}
       {...props}
     />
   );

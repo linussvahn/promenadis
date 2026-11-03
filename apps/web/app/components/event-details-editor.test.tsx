@@ -1,6 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { accountKey } from "../lib/use-account-data";
+import { renderWithRouter } from "../test/render";
 import { EventDetailsEditor } from "./event-details-editor";
 
 const mocks = vi.hoisted(() => ({ updateDraftEventDetails: vi.fn() }));
@@ -18,7 +21,8 @@ const draft = {
   version: 3,
 } as never;
 const accessToken = async () => "owner";
-const onSaved = vi.fn(async () => {});
+const render = (ui: ReactNode) =>
+  renderWithRouter(ui, { path: "/events/$eventId", url: `/events/${eventId}` });
 
 afterEach(() => {
   cleanup();
@@ -34,9 +38,10 @@ describe("EventDetailsEditor", () => {
       version: 4,
       visibility: "public",
     });
-    render(
-      <EventDetailsEditor accessToken={accessToken} event={draft} locale="en" onSaved={onSaved} />,
+    const { queryClient } = await render(
+      <EventDetailsEditor accessToken={accessToken} event={draft} locale="en" />,
     );
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     fireEvent.click(screen.getByText("Edit details"));
     expect(screen.getByLabelText("Starts")).toHaveValue("2031-09-09T10:00");
     fireEvent.change(screen.getByLabelText("Event title"), { target: { value: "Autumn walk" } });
@@ -54,33 +59,32 @@ describe("EventDetailsEditor", () => {
       }),
     );
     expect(await screen.findByText(/registration window no longer fitted/u)).toBeVisible();
-    expect(onSaved).toHaveBeenCalled();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: accountKey(null, "dashboard") });
   });
 
-  it("is hidden for moderators and published events", () => {
-    const { container, rerender } = render(
+  it("is hidden for moderators and published events", async () => {
+    const first = await render(
       <EventDetailsEditor
         accessToken={accessToken}
         event={{ ...(draft as object), role: "moderator" } as never}
         locale="en"
-        onSaved={onSaved}
       />,
     );
-    expect(container).toBeEmptyDOMElement();
-    rerender(
+    expect(first.container).toBeEmptyDOMElement();
+    cleanup();
+    const { container } = await render(
       <EventDetailsEditor
         accessToken={accessToken}
         event={{ ...(draft as object), state: "published" } as never}
         locale="en"
-        onSaved={onSaved}
       />,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(
-      <EventDetailsEditor accessToken={accessToken} event={draft} locale="en" onSaved={onSaved} />,
+    const { container } = await render(
+      <EventDetailsEditor accessToken={accessToken} event={draft} locale="en" />,
     );
     fireEvent.click(screen.getByText("Edit details"));
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });

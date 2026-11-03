@@ -1,7 +1,8 @@
 import { PromenadisApiError } from "@promenadis/api-client";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { SellerListingEditor } from "./seller-listing-editor";
 
 const api = {
@@ -75,7 +76,7 @@ describe("SellerListingEditor", () => {
     api.getEventTaxonomy.mockResolvedValue(taxonomy);
     api.getSellerListing.mockResolvedValue(emptyListing);
     api.saveSellerListing.mockResolvedValue({ ...emptyListing, version: 1 });
-    render(<SellerListingEditor {...props} eventActive={false} />);
+    await renderWithRouter(<SellerListingEditor {...props} eventActive={false} />);
     fireEvent.click(await screen.findByLabelText("Books & media"));
     fireEvent.change(screen.getByLabelText("Short description"), { target: { value: "Records" } });
     fireEvent.click(screen.getByRole("button", { name: "+ Vinyl" }));
@@ -120,7 +121,7 @@ describe("SellerListingEditor", () => {
     api.saveSellerListing.mockRejectedValue(
       new PromenadisApiError("other", 400, "other_needs_description", null),
     );
-    render(<SellerListingEditor {...props} eventActive={false} />);
+    await renderWithRouter(<SellerListingEditor {...props} eventActive={false} />);
     fireEvent.click(await screen.findByRole("button", { name: "Save listing" }));
     expect(await screen.findByText(/Describe what you sell/u)).toBeVisible();
   });
@@ -132,11 +133,12 @@ describe("SellerListingEditor", () => {
       ...emptyListing,
       liveStatus: { setAt: "2031-09-09T09:00:00Z", status: "away", until: null },
     });
-    const { rerender } = render(<SellerListingEditor {...props} eventActive={false} />);
+    await renderWithRouter(<SellerListingEditor {...props} eventActive={false} />);
     await screen.findByLabelText("Books & media");
     expect(screen.queryByRole("button", { name: "Back soon" })).not.toBeInTheDocument();
-    rerender(<SellerListingEditor {...props} eventActive />);
-    fireEvent.click(screen.getByRole("button", { name: "Back soon" }));
+    cleanup();
+    await renderWithRouter(<SellerListingEditor {...props} eventActive />);
+    fireEvent.click(await screen.findByRole("button", { name: "Back soon" }));
     await waitFor(() =>
       expect(api.setSellerLiveStatus).toHaveBeenCalledWith("seller", participationId, {
         status: "away",
@@ -162,7 +164,7 @@ describe("SellerListingEditor", () => {
       ],
       version: 1,
     });
-    const { container } = render(<SellerListingEditor {...props} eventActive />);
+    const { container } = await renderWithRouter(<SellerListingEditor {...props} eventActive />);
     await screen.findByLabelText("Books & media");
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);

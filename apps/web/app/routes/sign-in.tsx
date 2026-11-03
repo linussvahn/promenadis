@@ -1,8 +1,9 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { SignIn } from "../components/sign-in";
-import type { Route } from "./+types/sign-in";
 
-export const meta: Route.MetaFunction = () => [{ title: "Logga in — Promenadis" }];
-
-export default function SignInRoute() {
-  return <SignIn />;
-}
+export const Route = createFileRoute("/sign-in")({
+  validateSearch: (search: Record<string, unknown>): { step?: "mfa" } =>
+    search.step === "mfa" ? { step: "mfa" } : {},
+  component: () => <SignIn />,
+  head: () => ({ meta: [{ title: "Logga in — Promenadis" }] }),
+});

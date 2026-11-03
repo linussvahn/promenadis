@@ -1,9 +1,11 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { OrganizerTeamSummary } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useCallback, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -18,10 +20,10 @@ export function OrganizerTeam({
   readonly owner: boolean;
 }) {
   const expectedAccountId = useExpectedAccountId();
-  const [busy, setBusy] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [confirmingRemoval, setConfirmingRemoval] = useState<string | null>(null);
   const [status, setStatus] = useState("");
-  const [team, setTeam] = useState<OrganizerTeamSummary | null>(null);
+  const teamKey = accountKey(expectedAccountId, "organizer", organizerProfileId, "team");
 
   const authenticatedClient = useCallback(async () => {
     const supabase = getBrowserAuthClient(expectedAccountId);
@@ -31,25 +33,38 @@ export function OrganizerTeam({
     return data.session ? { api, token: data.session.user.id } : null;
   }, [expectedAccountId]);
 
-  const load = useCallback(async () => {
-    try {
+  const teamQuery = useQuery({
+    queryKey: teamKey,
+    queryFn: async () => {
       const authenticated = await authenticatedClient();
-      if (authenticated) {
-        setTeam(await authenticated.api.getOrganizerTeam(authenticated.token, organizerProfileId));
-      }
-    } catch {
-      setStatus(translate(locale, "organizerTeam.error"));
-    }
-  }, [authenticatedClient, locale, organizerProfileId]);
+      return authenticated
+        ? authenticated.api.getOrganizerTeam(authenticated.token, organizerProfileId)
+        : null;
+    },
+  });
+  const team: OrganizerTeamSummary | null = teamQuery.data ?? null;
 
-  useEffect(() => void load(), [load]);
+  // Every team write answers with the current team.
+  const write = useMutation({
+    mutationFn: async (
+      action: (
+        authenticated: NonNullable<Awaited<ReturnType<typeof authenticatedClient>>>,
+      ) => Promise<OrganizerTeamSummary>,
+    ) => {
+      const authenticated = await authenticatedClient();
+      if (!authenticated) throw new Error("missing_session");
+      return action(authenticated);
+    },
+    onSuccess: (next) => queryClient.setQueryData(teamKey, next),
+  });
+  const busy = write.isPending;
 
   const message = (error: unknown) => {
     if (error instanceof PromenadisApiError && error.code === "recent_auth_required") {
       return translate(locale, "team.recentAuth");
     }
     if (error instanceof PromenadisApiError && error.code === "version_conflict") {
-      void load();
+      void queryClient.invalidateQueries({ queryKey: teamKey });
       return translate(locale, "organizerTeam.versionConflict");
     }
     return translate(locale, "organizerTeam.error");
@@ -59,13 +74,10 @@ export function OrganizerTeam({
     formEvent.preventDefault();
     if (!team) return;
     const form = formEvent.currentTarget;
-    setBusy("invite");
     setStatus("");
     try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      setTeam(
-        await authenticated.api.inviteOrganizerManager(authenticated.token, organizerProfileId, {
+      await write.mutateAsync(({ api, token }) =>
+        api.inviteOrganizerManager(token, organizerProfileId, {
           email: String(new FormData(form).get("email") ?? ""),
           expectedTeamVersion: team.teamVersion,
         }),
@@ -74,53 +86,35 @@ export function OrganizerTeam({
       setStatus(translate(locale, "organizerTeam.invited"));
     } catch (error) {
       setStatus(message(error));
-    } finally {
-      setBusy(null);
     }
   };
 
   const cancelInvite = async (inviteId: string) => {
     if (!team) return;
-    setBusy(inviteId);
     try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      setTeam(
-        await authenticated.api.cancelOrganizerManagerInvite(
-          authenticated.token,
-          organizerProfileId,
-          inviteId,
-          { expectedTeamVersion: team.teamVersion },
-        ),
+      await write.mutateAsync(({ api, token }) =>
+        api.cancelOrganizerManagerInvite(token, organizerProfileId, inviteId, {
+          expectedTeamVersion: team.teamVersion,
+        }),
       );
       setStatus(translate(locale, "organizerTeam.inviteCancelled"));
     } catch (error) {
       setStatus(message(error));
-    } finally {
-      setBusy(null);
     }
   };
 
   const remove = async (membershipId: string) => {
     if (!team) return;
-    setBusy(membershipId);
     try {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) throw new Error("missing_session");
-      setTeam(
-        await authenticated.api.removeOrganizerManager(
-          authenticated.token,
-          organizerProfileId,
-          membershipId,
-          { expectedTeamVersion: team.teamVersion },
-        ),
+      await write.mutateAsync(({ api, token }) =>
+        api.removeOrganizerManager(token, organizerProfileId, membershipId, {
+          expectedTeamVersion: team.teamVersion,
+        }),
       );
       setConfirmingRemoval(null);
       setStatus(translate(locale, "organizerTeam.removed"));
     } catch (error) {
       setStatus(message(error));
-    } finally {
-      setBusy(null);
     }
   };
 
@@ -128,7 +122,10 @@ export function OrganizerTeam({
     <div className="grid gap-3">
       <h3 className="text-base font-bold">{translate(locale, "organizerTeam.title")}</h3>
       {!team ? (
-        <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
+        <p aria-live="polite">
+          {status ||
+            translate(locale, teamQuery.isError ? "organizerTeam.error" : "common.loading")}
+        </p>
       ) : (
         <>
           <ul className="m-0 grid list-none divide-y border-y p-0">
@@ -147,7 +144,7 @@ export function OrganizerTeam({
                   confirmingRemoval === member.id ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
-                        disabled={busy !== null}
+                        disabled={busy}
                         onClick={() => void remove(member.id)}
                         size="sm"
                         type="button"
@@ -167,7 +164,7 @@ export function OrganizerTeam({
                   ) : (
                     <Button
                       className="text-destructive-foreground hover:bg-destructive-soft"
-                      disabled={busy !== null}
+                      disabled={busy}
                       onClick={() => setConfirmingRemoval(member.id)}
                       size="sm"
                       type="button"
@@ -193,7 +190,7 @@ export function OrganizerTeam({
                     required
                     type="email"
                   />
-                  <Button disabled={busy !== null} type="submit" variant="outline">
+                  <Button disabled={busy} type="submit" variant="outline">
                     {translate(locale, "organizerTeam.send")}
                   </Button>
                 </div>
@@ -213,7 +210,7 @@ export function OrganizerTeam({
                         </span>
                       </div>
                       <Button
-                        disabled={busy !== null}
+                        disabled={busy}
                         onClick={() => void cancelInvite(inviteItem.id)}
                         size="sm"
                         type="button"

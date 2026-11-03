@@ -1,6 +1,7 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { BoundaryPoint, DraftEventSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation } from "@tanstack/react-query";
 import { Component, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import MapView, { Layer, Source } from "react-map-gl/maplibre";
 import { useExpectedAccountId } from "../lib/account-session";
@@ -73,7 +74,6 @@ export function BoundaryEditor({
   const [latitude, setLatitude] = useState(String(DEFAULT_CENTER[1]));
   const [addingOnMap, setAddingOnMap] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const loadedEventId = useRef<string | null>(null);
 
@@ -106,6 +106,31 @@ export function BoundaryEditor({
       geometry: { type: "Point" as const, coordinates: point },
     })),
   };
+
+  // The parent's onSaved re-reads the events, which carry the boundary.
+  const save = useMutation({
+    mutationFn: async ({
+      api,
+      eventId,
+      input,
+      supabase,
+    }: {
+      readonly api: NonNullable<ReturnType<typeof getPromenadisApiClient>>;
+      readonly eventId: string;
+      readonly input: Parameters<
+        NonNullable<ReturnType<typeof getPromenadisApiClient>>["saveEventBoundary"]
+      >[2];
+      readonly supabase: NonNullable<ReturnType<typeof getBrowserAuthClient>>;
+    }) => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) return null;
+      return api.saveEventBoundary(data.session.user.id, eventId, input);
+    },
+    onSuccess: async (boundary) => {
+      if (boundary) await onSaved();
+    },
+  });
+  const busy = save.isPending;
 
   if (!selectedEvent) {
     return <p>{translate(locale, "boundary.needsEvent")}</p>;
@@ -180,20 +205,22 @@ export function BoundaryEditor({
     const api = getPromenadisApiClient();
     const supabase = getBrowserAuthClient(expectedAccountId);
     if (!api || !supabase) return;
-    setBusy(true);
     setStatus("");
     try {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
+      const boundary = await save.mutateAsync({
+        api,
+        eventId: selectedEvent.id,
+        input: {
+          displayLabel,
+          expectedVersion: selectedEvent.boundary?.version ?? null,
+          ring,
+        },
+        supabase,
+      });
+      if (!boundary) {
         setStatus(translate(locale, "dashboard.sessionExpired"));
         return;
       }
-      const boundary = await api.saveEventBoundary(data.session.user.id, selectedEvent.id, {
-        displayLabel,
-        expectedVersion: selectedEvent.boundary?.version ?? null,
-        ring,
-      });
-      await onSaved();
       setStatus(
         `${translate(locale, "boundary.saved")} ${boundary.areaSquareKilometers.toFixed(2)} km² · ${boundary.spanKilometers.toFixed(2)} km`,
       );
@@ -207,8 +234,6 @@ export function BoundaryEditor({
               ? "boundary.spanLimit"
               : "boundary.invalid";
       setStatus(translate(locale, key));
-    } finally {
-      setBusy(false);
     }
   };
 

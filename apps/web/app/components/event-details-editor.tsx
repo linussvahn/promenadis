@@ -1,8 +1,11 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { toDateTimeLocal, wallTimeToIso } from "../lib/wall-time";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -17,30 +20,20 @@ export function EventDetailsEditor({
   accessToken,
   event,
   locale,
-  onSaved,
 }: {
   readonly accessToken: () => Promise<string | null>;
   readonly event: DraftEventSummary;
   readonly locale: Locale;
-  readonly onSaved: () => Promise<void>;
 }) {
-  const [busy, setBusy] = useState(false);
+  const expectedAccountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
   const interval = event.intervals[0];
 
-  if (event.state !== "draft" || !["owner", "co_host"].includes(event.role) || !interval) {
-    return null;
-  }
-
-  const save = async (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const form = new FormData(formEvent.currentTarget);
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    setBusy(true);
-    setStatus("");
-    try {
+  const details = useMutation({
+    mutationFn: async ({ form, token }: { form: FormData; token: string }) => {
+      const api = getPromenadisApiClient();
+      if (!api) return null;
       const result = await api.updateDraftEventDetails(token, event.id, {
         description: String(form.get("description") ?? ""),
         endsAt: wallTimeToIso(String(form.get("endsAt") ?? ""), event.timezone),
@@ -49,11 +42,15 @@ export function EventDetailsEditor({
         timezone: event.timezone,
         title: String(form.get("title") ?? ""),
       });
-      await onSaved();
-      setStatus(
-        translate(locale, result.registrationReset ? "details.registrationReset" : "details.saved"),
-      );
-    } catch (error) {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: accountKey(expectedAccountId, "dashboard") }),
+        queryClient.invalidateQueries({
+          queryKey: accountKey(expectedAccountId, "event", event.id),
+        }),
+      ]);
+      return result;
+    },
+    onError: (error) => {
       const code = error instanceof PromenadisApiError ? error.code : null;
       setStatus(
         translate(
@@ -65,9 +62,28 @@ export function EventDetailsEditor({
               : "dashboard.error",
         ),
       );
-    } finally {
-      setBusy(false);
-    }
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: (result) => {
+      if (!result) return;
+      setStatus(
+        translate(locale, result.registrationReset ? "details.registrationReset" : "details.saved"),
+      );
+    },
+  });
+  const busy = details.isPending;
+
+  if (event.state !== "draft" || !["owner", "co_host"].includes(event.role) || !interval) {
+    return null;
+  }
+
+  const save = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    const form = new FormData(formEvent.currentTarget);
+    const api = getPromenadisApiClient();
+    const token = await accessToken();
+    if (!api || !token) return;
+    details.mutate({ form, token });
   };
 
   return (
@@ -76,7 +92,11 @@ export function EventDetailsEditor({
         <summary className="flex min-h-11 items-center px-6 py-5 font-display text-lg font-extrabold">
           {translate(locale, "details.title")}
         </summary>
-        <form className="grid gap-5 border-t px-6 pt-5 pb-6" key={event.version} onSubmit={save}>
+        <form
+          className="grid gap-5 border-t px-6 pt-5 pb-6"
+          key={event.version}
+          onSubmit={(formEvent) => void save(formEvent)}
+        >
           <FieldDescription>{translate(locale, "details.help")}</FieldDescription>
           <Field>
             <Label htmlFor="details-title">{translate(locale, "dashboard.eventTitle")}</Label>

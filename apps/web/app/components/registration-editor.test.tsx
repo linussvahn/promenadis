@@ -1,13 +1,14 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { accountKey } from "../lib/use-account-data";
+import { renderWithRouter } from "../test/render";
 import { RegistrationEditor } from "./registration-editor";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn().mockResolvedValue({
     data: { session: { user: { id: "synthetic-session", email: "fixture@example.invalid" } } },
   }),
-  onSaved: vi.fn().mockResolvedValue(undefined),
   saveEventRegistration: vi.fn().mockResolvedValue({
     allowDuringEvent: true,
     closesAt: "2030-09-08T08:30:00.000Z",
@@ -50,6 +51,8 @@ const event = {
   visibility: "public" as const,
 };
 
+const route = { path: "/events/$eventId/registration", url: `/events/${event.id}/registration` };
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -57,7 +60,11 @@ afterEach(() => {
 
 describe("RegistrationEditor", () => {
   it("saves event-zone wall times and explicit active-event consent", async () => {
-    render(<RegistrationEditor event={event} locale="sv" onSaved={mocks.onSaved} />);
+    const { queryClient } = await renderWithRouter(
+      <RegistrationEditor event={event} locale="sv" />,
+      route,
+    );
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
 
     fireEvent.change(screen.getByLabelText("Anmälan stänger"), {
       target: { value: "2030-09-08T10:30" },
@@ -77,12 +84,15 @@ describe("RegistrationEditor", () => {
         opensAt: "2030-09-07T06:00:00.000Z",
       }),
     );
-    expect(mocks.onSaved).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: accountKey(null, "dashboard") }),
+    );
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(
-      <RegistrationEditor event={event} locale="sv" onSaved={mocks.onSaved} />,
+    const { container } = await renderWithRouter(
+      <RegistrationEditor event={event} locale="sv" />,
+      route,
     );
     const result = await axe.run(container, {
       rules: { "color-contrast": { enabled: false } },

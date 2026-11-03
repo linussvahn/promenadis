@@ -1,5 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { accountKey } from "../lib/use-account-data";
+import { renderWithRouter } from "../test/render";
 import { EventPublicLink } from "./event-public-link";
 
 const mocks = vi.hoisted(() => ({ getEventPublicLink: vi.fn(), rotateUnlistedLink: vi.fn() }));
@@ -22,7 +25,8 @@ const link = (overrides: object = {}) => ({
   ...overrides,
 });
 const event = (role: string) => ({ id: eventId, role, version: 3 }) as never;
-const onChanged = vi.fn(async () => {});
+const render = (ui: ReactNode) =>
+  renderWithRouter(ui, { path: "/events/$eventId", url: `/events/${eventId}` });
 
 afterEach(() => {
   cleanup();
@@ -33,7 +37,8 @@ describe("EventPublicLink", () => {
   it("shows the unlisted link with its sharing warning and lets the owner replace it", async () => {
     mocks.getEventPublicLink.mockResolvedValue(link());
     mocks.rotateUnlistedLink.mockResolvedValue(link({ publicKey: "d".repeat(32), version: 4 }));
-    render(<EventPublicLink event={event("owner")} locale="en" onChanged={onChanged} />);
+    const { queryClient } = await render(<EventPublicLink event={event("owner")} locale="en" />);
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     expect(await screen.findByText(`${window.location.origin}/u/${"c".repeat(32)}`)).toBeVisible();
     expect(screen.getByText(/may let that service fetch the title/u)).toBeVisible();
     expect(screen.queryByLabelText(/Safety reason/u)).toBeNull();
@@ -44,23 +49,25 @@ describe("EventPublicLink", () => {
       }),
     );
     expect(await screen.findByText(`${window.location.origin}/u/${"d".repeat(32)}`)).toBeVisible();
-    expect(onChanged).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: accountKey("owner", "dashboard") }),
+    );
   });
 
   it("asks for a safety reason during a live event", async () => {
     mocks.getEventPublicLink.mockResolvedValue(link({ state: "active" }));
-    render(<EventPublicLink event={event("owner")} locale="en" onChanged={onChanged} />);
+    await render(<EventPublicLink event={event("owner")} locale="en" />);
     expect(await screen.findByLabelText(/Safety reason/u)).toBeRequired();
   });
 
   it("offers no replacement to co-hosts or for public links", async () => {
     mocks.getEventPublicLink.mockResolvedValue(link({ visibility: "public" }));
-    render(<EventPublicLink event={event("owner")} locale="en" onChanged={onChanged} />);
+    await render(<EventPublicLink event={event("owner")} locale="en" />);
     expect(await screen.findByText(`${window.location.origin}/e/${"c".repeat(32)}`)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Replace link" })).toBeNull();
     cleanup();
     mocks.getEventPublicLink.mockResolvedValue(link());
-    render(<EventPublicLink event={event("co_host")} locale="en" onChanged={onChanged} />);
+    await render(<EventPublicLink event={event("co_host")} locale="en" />);
     await screen.findByText(/\/u\//u);
     expect(screen.queryByRole("button", { name: "Replace link" })).toBeNull();
   });

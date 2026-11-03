@@ -1,8 +1,8 @@
 import type { PublicEventSummary } from "@promenadis/contracts";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import axe from "axe-core";
-import { createRoutesStub } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { DiscoveryPage, EventLanding, OrganizerPublicPage } from "./public-pages";
 
 const event: PublicEventSummary = {
@@ -26,16 +26,13 @@ const event: PublicEventSummary = {
   visibility: "public",
 };
 
-const renderAt = (element: React.ReactNode) => {
-  const Stub = createRoutesStub([{ Component: () => element, path: "/" }]);
-  return render(<Stub initialEntries={["/"]} />);
-};
+const renderAt = (element: React.ReactNode) => renderWithRouter(element);
 
 afterEach(cleanup);
 
 describe("EventLanding", () => {
   it("shows event-level fields and escaped structured data for indexable events", async () => {
-    const { container } = renderAt(
+    const { container } = await renderAt(
       <EventLanding canonicalUrl="https://example.test/e/x" event={event} locale="en" />,
     );
     expect(screen.getByRole("heading", { name: "Spring market" })).toBeVisible();
@@ -55,8 +52,8 @@ describe("EventLanding", () => {
     expect(result.violations).toEqual([]);
   });
 
-  it("emits no structured data and warns about link sharing when unlisted", () => {
-    const { container } = renderAt(
+  it("emits no structured data and warns about link sharing when unlisted", async () => {
+    const { container } = await renderAt(
       <EventLanding
         canonicalUrl="https://example.test/u/x"
         event={{
@@ -73,8 +70,8 @@ describe("EventLanding", () => {
     expect(screen.getByText(/Anyone with the link can view it/u)).toBeVisible();
   });
 
-  it("shows the public cancellation notice", () => {
-    renderAt(
+  it("shows the public cancellation notice", async () => {
+    await renderAt(
       <EventLanding
         canonicalUrl="https://example.test/e/x"
         event={{ ...event, publicNotice: "Storm warning", state: "cancelled" }}
@@ -87,7 +84,7 @@ describe("EventLanding", () => {
 
 describe("DiscoveryPage", () => {
   it("lists events, keeps the search and links to the next page", async () => {
-    const { container } = renderAt(
+    const { container, router } = await renderAt(
       <DiscoveryPage
         list={{
           events: [event],
@@ -109,15 +106,23 @@ describe("DiscoveryPage", () => {
       "href",
       `/e/${"b".repeat(32)}`,
     );
-    expect(screen.getByRole("link", { name: "Show more" }).getAttribute("href")).toContain(
-      "q=books&live=1&after=2031-09-09T08%3A00%3A00%2B00%3A00_01992026",
+    // The router encodes search values its own way; compare what it reads back.
+    const more = new URL(
+      screen.getByRole("link", { name: "Show more" }).getAttribute("href") ?? "",
+      "https://example.test",
     );
+    expect(more.pathname).toBe("/discover");
+    expect(router.options.parseSearch(more.search)).toEqual({
+      after: "2031-09-09T08:00:00+00:00_01992026-1104-7100-8000-000000000001",
+      live: "1",
+      q: "books",
+    });
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);
   });
 
-  it("says when nothing matched", () => {
-    renderAt(
+  it("says when nothing matched", async () => {
+    await renderAt(
       <DiscoveryPage
         list={{ events: [], nextCursor: null }}
         liveOnly={false}
@@ -130,8 +135,8 @@ describe("DiscoveryPage", () => {
 });
 
 describe("OrganizerPublicPage", () => {
-  it("lists the organizer's public events with a safe website link", () => {
-    renderAt(
+  it("lists the organizer's public events with a safe website link", async () => {
+    await renderAt(
       <OrganizerPublicPage
         locale="en"
         organizer={{

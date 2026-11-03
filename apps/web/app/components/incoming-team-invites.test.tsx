@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { IncomingTeamInvites } from "./incoming-team-invites";
 
 const mocks = vi.hoisted(() => ({
@@ -35,7 +36,7 @@ afterEach(() => {
 
 describe("IncomingTeamInvites", () => {
   it("accepts an invitation using an event-facing display name", async () => {
-    render(
+    await renderWithRouter(
       <IncomingTeamInvites displayName="Test Person" locale="en" onAccepted={mocks.onAccepted} />,
     );
     await screen.findByText("Neighbourhood walk");

@@ -1,6 +1,6 @@
 import { translate } from "@promenadis/i18n";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getBrowserAuthClient, hasLocalBackendConfiguration } from "../lib/supabase";
 import { backLink, PageHeading, PageMain } from "./page";
@@ -20,8 +20,7 @@ export function SignIn() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const configured = hasLocalBackendConfiguration();
-  const [searchParams] = useSearchParams();
-  const mfaStep = searchParams.get("step") === "mfa";
+  const mfaStep = useSearch({ strict: false }).step === "mfa";
 
   const verifyTotp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -36,7 +35,7 @@ export function SignIn() {
       setStatus(translate(locale, "mfa.failed"));
       return;
     }
-    await navigate("/dashboard", { replace: true });
+    await navigate({ replace: true, to: "/dashboard" });
   };
 
   const sendCode = async (event: FormEvent<HTMLFormElement>) => {
@@ -93,7 +92,7 @@ export function SignIn() {
       setStatus(translate(locale, "auth.error"));
       return;
     }
-    await navigate("/dashboard");
+    await navigate({ to: "/dashboard" });
   };
 
   return (

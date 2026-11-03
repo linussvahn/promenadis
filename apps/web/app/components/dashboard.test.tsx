@@ -1,7 +1,7 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
-import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { Dashboard } from "./dashboard";
 
 const mocks = vi.hoisted(() => ({
@@ -43,11 +43,7 @@ afterEach(() => {
 
 describe("Dashboard", () => {
   it("keeps the empty dashboard focused on creating an event", async () => {
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>,
-    );
+    await renderWithRouter(<Dashboard />, { path: "/dashboard" });
 
     expect(
       await screen.findByRole("heading", { name: "Mina evenemang", level: 1 }),
@@ -98,11 +94,7 @@ describe("Dashboard", () => {
       schemaVersion: "1.0",
     });
 
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>,
-    );
+    await renderWithRouter(<Dashboard />, { path: "/dashboard" });
 
     expect(await screen.findByRole("heading", { name: "Syntetisk promenad" })).toBeInTheDocument();
     expect(screen.getByText("Område saknas")).toBeInTheDocument();
@@ -113,11 +105,7 @@ describe("Dashboard", () => {
   });
 
   it("has no detectable automated accessibility violations after loading", async () => {
-    const { container } = render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>,
-    );
+    const { container } = await renderWithRouter(<Dashboard />, { path: "/dashboard" });
     await screen.findByRole("heading", { name: "Mina evenemang", level: 1 });
     await waitFor(() => expect(screen.getByRole("button", { name: /English/u })).toBeEnabled());
 

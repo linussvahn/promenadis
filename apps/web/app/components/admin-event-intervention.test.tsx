@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { AdminEventIntervention } from "./admin-event-intervention";
 
 const api = { getAdminEvent: vi.fn(), interveneInEvent: vi.fn() };
@@ -33,7 +34,7 @@ describe("AdminEventIntervention", () => {
   it("cancels a published event with public and internal reasons", async () => {
     api.getAdminEvent.mockResolvedValue(summary);
     api.interveneInEvent.mockResolvedValue({ state: "cancelled", version: 6 });
-    render(<AdminEventIntervention call={call} locale="en" />);
+    await renderWithRouter(<AdminEventIntervention call={call} locale="en" />);
     await lookUp();
     fireEvent.change(screen.getByLabelText("Public explanation"), {
       target: { value: "Unsafe area" },
@@ -57,7 +58,7 @@ describe("AdminEventIntervention", () => {
   it("ends a live event with only an internal reason", async () => {
     api.getAdminEvent.mockResolvedValue({ ...summary, state: "active" });
     api.interveneInEvent.mockResolvedValue({ state: "ended", version: 6 });
-    render(<AdminEventIntervention call={call} locale="en" />);
+    await renderWithRouter(<AdminEventIntervention call={call} locale="en" />);
     await lookUp();
     fireEvent.change(screen.getByLabelText(/Internal reason/u), {
       target: { value: "Report 43" },
@@ -74,7 +75,9 @@ describe("AdminEventIntervention", () => {
 
   it("has no detectable automated accessibility violations", async () => {
     api.getAdminEvent.mockResolvedValue(summary);
-    const { container } = render(<AdminEventIntervention call={call} locale="en" />);
+    const { container } = await renderWithRouter(
+      <AdminEventIntervention call={call} locale="en" />,
+    );
     await lookUp();
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);

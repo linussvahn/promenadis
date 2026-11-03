@@ -1,6 +1,7 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { AccountRecoveryClaim } from "@promenadis/contracts";
 import { formatDateTime, translate } from "@promenadis/i18n";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
 import { useStoredLocale } from "../lib/locale";
 import { getPromenadisApiClient, hasLocalBackendConfiguration } from "../lib/supabase";
@@ -16,12 +17,14 @@ import { Label } from "./ui/label";
 
 export function RecoverAccount() {
   const { locale, setLocale } = useStoredLocale();
-  const [claim, setClaim] = useState<AccountRecoveryClaim | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [confirmedClaim, setConfirmedClaim] = useState<AccountRecoveryClaim | null>(null);
   const [status, setStatus] = useState("");
-  const [link, setLink] = useState<{ claimId: string; verificationToken: string } | null>(null);
+  const [link, setLink] = useState<{
+    claimId: string;
+    opened: number;
+    verificationToken: string;
+  } | null>(null);
   const [completion, setCompletion] = useState<"completed" | "finishing" | null>(null);
-  const [checking, setChecking] = useState(false);
   const [factor, setFactor] = useState<"recoveryCode" | "totp">("recoveryCode");
 
   useEffect(() => {
@@ -31,8 +34,9 @@ export function RecoverAccount() {
       const claimId = fragment.get("claim");
       const verificationToken = fragment.get("token");
       if (claimId && verificationToken) {
-        setLink({ claimId, verificationToken });
-        setClaim(null);
+        // Each opening reads the claim afresh, even for the same link.
+        setLink({ claimId, opened: Date.now(), verificationToken });
+        setConfirmedClaim(null);
         setCompletion(null);
         setStatus("");
         window.history.replaceState(window.history.state, "", window.location.pathname);
@@ -43,57 +47,54 @@ export function RecoverAccount() {
     return () => window.removeEventListener("hashchange", readLink);
   }, []);
 
-  useEffect(() => {
-    // A reopened link for an already verified request goes straight to the
-    // wait or finish step. Reading never verifies or consumes the code.
-    const api = getPromenadisApiClient();
-    if (!api || !link) return;
-    let current = true;
-    setChecking(true);
-    api
-      .readAccountRecoveryClaim(link.claimId, { verificationToken: link.verificationToken })
-      .then((summary) => {
-        if (current && summary.emailVerified) setClaim(summary);
-      })
-      .catch(() => {
-        if (current) setStatus(translate(locale, "accountRecovery.unavailable"));
-      })
-      .finally(() => {
-        if (current) setChecking(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, [link, locale]);
-
-  const confirm = async () => {
-    const api = getPromenadisApiClient();
-    if (!api || !link) return;
-    setBusy(true);
-    setStatus("");
-    try {
-      setClaim(
-        await api.confirmAccountRecoveryEmail(link.claimId, {
-          verificationToken: link.verificationToken,
-        }),
-      );
-      setStatus(translate(locale, "accountRecovery.verified"));
-    } catch {
-      setStatus(translate(locale, "accountRecovery.unavailable"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const complete = async () => {
-    const api = getPromenadisApiClient();
-    if (!api || !link) return;
-    setBusy(true);
-    setStatus("");
-    try {
-      const result = await api.completeAccountRecovery(link.claimId, {
+  // A reopened link for an already verified request goes straight to the
+  // wait or finish step. Reading never verifies or consumes the code.
+  const api = getPromenadisApiClient();
+  const claimQuery = useQuery({
+    enabled: Boolean(api && link),
+    // The token stays in memory only and is dropped as soon as the page unmounts.
+    gcTime: 0,
+    queryFn: () => {
+      if (!api || !link) throw new Error("unavailable");
+      return api.readAccountRecoveryClaim(link.claimId, {
         verificationToken: link.verificationToken,
       });
+    },
+    queryKey: ["account-recovery-claim", link?.claimId, link?.verificationToken, link?.opened],
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const checking = claimQuery.isLoading;
+  const claim = confirmedClaim ?? (claimQuery.data?.emailVerified ? claimQuery.data : null);
+  const shownStatus =
+    status || (claimQuery.isError ? translate(locale, "accountRecovery.unavailable") : "");
+
+  const confirmMutation = useMutation({
+    mutationFn: (current: { claimId: string; verificationToken: string }) => {
+      if (!api) throw new Error("unavailable");
+      return api.confirmAccountRecoveryEmail(current.claimId, {
+        verificationToken: current.verificationToken,
+      });
+    },
+    onError: () => setStatus(translate(locale, "accountRecovery.unavailable")),
+    onMutate: () => setStatus(""),
+    onSuccess: (summary) => {
+      setConfirmedClaim(summary);
+      setStatus(translate(locale, "accountRecovery.verified"));
+    },
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: (current: { claimId: string; verificationToken: string }) => {
+      if (!api) throw new Error("unavailable");
+      return api.completeAccountRecovery(current.claimId, {
+        verificationToken: current.verificationToken,
+      });
+    },
+    onError: () => setStatus(translate(locale, "accountRecovery.completeUnavailable")),
+    onMutate: () => setStatus(""),
+    onSuccess: (result) => {
       setCompletion(result.state);
       if (result.state === "completed") setLink(null);
       setStatus(
@@ -102,22 +103,12 @@ export function RecoverAccount() {
           result.state === "completed" ? "accountRecovery.completed" : "accountRecovery.finishing",
         ),
       );
-    } catch {
-      setStatus(translate(locale, "accountRecovery.completeUnavailable"));
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+  });
 
-  const start = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const api = getPromenadisApiClient();
-    if (!api) return;
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    setBusy(true);
-    setStatus("");
-    try {
+  const startMutation = useMutation({
+    mutationFn: async ({ data }: { data: FormData; form: HTMLFormElement }) => {
+      if (!api) throw new Error("unavailable");
       const emails = {
         currentEmail: String(data.get("currentEmail") ?? "").trim(),
         newEmail: String(data.get("newEmail") ?? "").trim(),
@@ -132,9 +123,8 @@ export function RecoverAccount() {
                 .toUpperCase(),
             },
       );
-      form.reset();
-      setStatus(translate(locale, "accountRecovery.sentLocal"));
-    } catch (error) {
+    },
+    onError: (error) => {
       const code = error instanceof PromenadisApiError ? error.code : null;
       setStatus(
         translate(
@@ -148,9 +138,31 @@ export function RecoverAccount() {
                 : "accountRecovery.invalid",
         ),
       );
-    } finally {
-      setBusy(false);
-    }
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: (_result, { form }) => {
+      form.reset();
+      setStatus(translate(locale, "accountRecovery.sentLocal"));
+    },
+  });
+
+  const busy = confirmMutation.isPending || completeMutation.isPending || startMutation.isPending;
+
+  const confirm = () => {
+    if (!api || !link) return;
+    confirmMutation.mutate(link);
+  };
+
+  const complete = () => {
+    if (!api || !link) return;
+    completeMutation.mutate(link);
+  };
+
+  const start = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!api) return;
+    const form = event.currentTarget;
+    startMutation.mutate({ data: new FormData(form), form });
   };
 
   return (
@@ -193,12 +205,7 @@ export function RecoverAccount() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button
-                  className="w-full"
-                  disabled={busy}
-                  onClick={() => void complete()}
-                  type="button"
-                >
+                <Button className="w-full" disabled={busy} onClick={complete} type="button">
                   {translate(locale, "accountRecovery.complete")}
                 </Button>
               </CardContent>
@@ -228,12 +235,7 @@ export function RecoverAccount() {
             <section>
               <CardContent>
                 <p>{translate(locale, "accountRecovery.confirmHelp")}</p>
-                <Button
-                  className="w-full"
-                  disabled={busy}
-                  onClick={() => void confirm()}
-                  type="button"
-                >
+                <Button className="w-full" disabled={busy} onClick={confirm} type="button">
                   {translate(locale, "accountRecovery.confirm")}
                 </Button>
               </CardContent>
@@ -334,7 +336,7 @@ export function RecoverAccount() {
           </Card>
         )}
         <p aria-live="polite" className="min-h-6 text-sm font-semibold">
-          {status}
+          {shownStatus}
         </p>
       </PageMain>
     </SiteFrame>

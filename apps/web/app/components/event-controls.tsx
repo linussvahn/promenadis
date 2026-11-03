@@ -1,9 +1,11 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Field, FieldDescription } from "./ui/field";
@@ -15,15 +17,13 @@ export function EventControls({
   event,
   locale,
   onDeleted,
-  onSaved,
 }: {
   readonly event: DraftEventSummary;
   readonly locale: Locale;
   readonly onDeleted: () => Promise<void>;
-  readonly onSaved: () => Promise<void>;
 }) {
   const expectedAccountId = useExpectedAccountId();
-  const [busyAction, setBusyAction] = useState<"delete" | "visibility" | null>(null);
+  const queryClient = useQueryClient();
   const [confirmTitle, setConfirmTitle] = useState("");
   const [status, setStatus] = useState("");
   const [visibility, setVisibility] = useState(event.visibility);
@@ -31,8 +31,6 @@ export function EventControls({
   useEffect(() => {
     setVisibility(event.visibility);
   }, [event.visibility]);
-
-  if (event.state !== "draft" || !["owner", "co_host"].includes(event.role)) return null;
 
   const accessToken = async () => {
     const supabase = getBrowserAuthClient(expectedAccountId);
@@ -42,47 +40,47 @@ export function EventControls({
     return data.session ? { api, token: data.session.user.id } : null;
   };
 
-  const saveVisibility = async () => {
-    setBusyAction("visibility");
-    setStatus("");
-    try {
+  const visibilityMutation = useMutation({
+    mutationFn: async () => {
       const authenticated = await accessToken();
-      if (!authenticated) {
-        setStatus(translate(locale, "dashboard.sessionExpired"));
-        return;
-      }
+      if (!authenticated) return false;
       await authenticated.api.updateDraftEventVisibility(authenticated.token, event.id, {
         expectedVersion: event.version,
         visibility,
       });
-      await onSaved();
-      setStatus(translate(locale, "event.visibilitySaved"));
-    } catch (error) {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: accountKey(expectedAccountId, "dashboard") }),
+        queryClient.invalidateQueries({
+          queryKey: accountKey(expectedAccountId, "event", event.id),
+        }),
+      ]);
+      return true;
+    },
+    onError: (error) => {
       const key =
         error instanceof PromenadisApiError && error.code === "version_conflict"
           ? "event.versionConflict"
           : "dashboard.error";
       setStatus(translate(locale, key));
-    } finally {
-      setBusyAction(null);
-    }
-  };
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: (saved) => {
+      setStatus(translate(locale, saved ? "event.visibilitySaved" : "dashboard.sessionExpired"));
+    },
+  });
 
-  const deleteDraft = async () => {
-    setBusyAction("delete");
-    setStatus("");
-    try {
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
       const authenticated = await accessToken();
-      if (!authenticated) {
-        setStatus(translate(locale, "dashboard.sessionExpired"));
-        return;
-      }
+      if (!authenticated) return false;
       await authenticated.api.deleteDraftEvent(authenticated.token, event.id, {
         confirmTitle,
         expectedVersion: event.version,
       });
       await onDeleted();
-    } catch (error) {
+      return true;
+    },
+    onError: (error) => {
       const key =
         error instanceof PromenadisApiError && error.code === "recent_auth_required"
           ? "event.deleteRecentAuth"
@@ -92,10 +90,22 @@ export function EventControls({
               ? "event.deleteConfirmationMismatch"
               : "dashboard.error";
       setStatus(translate(locale, key));
-    } finally {
-      setBusyAction(null);
-    }
-  };
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: (deleted) => {
+      if (!deleted) setStatus(translate(locale, "dashboard.sessionExpired"));
+    },
+  });
+
+  if (event.state !== "draft" || !["owner", "co_host"].includes(event.role)) return null;
+
+  const busyAction = visibilityMutation.isPending
+    ? "visibility"
+    : deleteMutation.isPending
+      ? "delete"
+      : null;
+  const saveVisibility = () => visibilityMutation.mutate();
+  const deleteDraft = () => deleteMutation.mutate();
 
   return (
     <Card asChild>
@@ -110,7 +120,7 @@ export function EventControls({
             className="grid gap-2"
             onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
               formEvent.preventDefault();
-              void saveVisibility();
+              saveVisibility();
             }}
           >
             <Label htmlFor="event-visibility">{translate(locale, "dashboard.visibility")}</Label>
@@ -158,7 +168,7 @@ export function EventControls({
                   className="grid gap-3"
                   onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
                     formEvent.preventDefault();
-                    void deleteDraft();
+                    deleteDraft();
                   }}
                 >
                   <Field>

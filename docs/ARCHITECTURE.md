@@ -55,8 +55,8 @@ on overages or recharge.
 ## 2. Web application
 
 - TypeScript and React.
-- Vite-compatible, server-capable framework configuration, likely React Router
-  framework mode rather than a browser-only SPA.
+- TanStack Start (Vite) with TanStack Router file routes and TanStack Query,
+  server-rendered rather than a browser-only SPA. See `docs/DATA.md`.
 - Mobile-first PWA.
 - Server rendering or prerendering for public event landing pages, link previews,
   and event discovery.
@@ -1010,7 +1010,7 @@ AWS SES in Stockholm is the initial transactional email provider.
 
 - `local` runs the full Supabase CLI/Docker stack bound to localhost, local mail
   capture, deterministic synthetic seeds, fixture provider adapters, and
-  Netlify/React Router development tooling. It is never network-exposed.
+  Netlify/TanStack Start development tooling. It is never network-exposed.
 - Netlify Deploy Previews are fixture-backed by default and receive no Supabase,
   AWS, Geoapify, or production secrets. Backend changes run against a fresh
   local Supabase stack in CI rather than sharing one mutable remote schema.

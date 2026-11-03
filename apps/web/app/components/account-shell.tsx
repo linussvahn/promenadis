@@ -1,6 +1,6 @@
 import { type Locale, translate } from "@promenadis/i18n";
 import { type ReactNode, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { AccountSessionContext } from "../lib/account-session";
 import { useStoredLocale } from "../lib/locale";
 import { hasLocalBackendConfiguration } from "../lib/supabase";
@@ -32,7 +32,7 @@ function AccountContent({
   const { accountId, failed } = useSiteSession();
 
   useEffect(() => {
-    if (accountId === null && !failed) void navigate("/sign-in", { replace: true });
+    if (accountId === null && !failed) void navigate({ replace: true, to: "/sign-in" });
   }, [accountId, failed, navigate]);
 
   if (!hasLocalBackendConfiguration()) {

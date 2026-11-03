@@ -1,8 +1,8 @@
 import { PromenadisApiError } from "@promenadis/api-client";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
-import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { SellerJoinContent } from "./seller-join";
 
 vi.mock("react-map-gl/maplibre", () => ({
@@ -22,7 +22,10 @@ const accountData = vi.hoisted(() => ({
   accessToken: async () => "seller",
   dashboard: { profile: { displayName: "Anna" } },
 }));
-vi.mock("../lib/use-account-data", () => ({ useAccountData: () => accountData }));
+vi.mock("../lib/use-account-data", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/use-account-data")>()),
+  useAccountData: () => accountData,
+}));
 
 const eventId = "01992026-1103-7000-8000-000000000001";
 const participationId = "01992026-1103-7000-8000-000000000002";
@@ -71,13 +74,10 @@ const participation = {
 };
 
 const renderPage = () =>
-  render(
-    <MemoryRouter initialEntries={[`/events/${eventId}/join`]}>
-      <Routes>
-        <Route element={<SellerJoinContent locale="en" />} path="/events/:eventId/join" />
-      </Routes>
-    </MemoryRouter>,
-  );
+  renderWithRouter(<SellerJoinContent locale="en" />, {
+    path: "/events/$eventId/join",
+    url: `/events/${eventId}/join`,
+  });
 
 afterEach(() => {
   cleanup();
@@ -90,7 +90,7 @@ describe("SellerJoin", () => {
       .mockResolvedValueOnce(event)
       .mockResolvedValueOnce({ ...event, participation });
     mocks.applyToEvent.mockResolvedValue(participation);
-    renderPage();
+    await renderPage();
     fireEvent.change(await screen.findByLabelText("Address"), {
       target: { value: "Testgatan 1" },
     });
@@ -127,7 +127,7 @@ describe("SellerJoin", () => {
         new PromenadisApiError("shared", 409, "shared_entrance_question", null),
       )
       .mockResolvedValueOnce(participation);
-    renderPage();
+    await renderPage();
     fireEvent.change(await screen.findByLabelText("Address"), {
       target: { value: "Testgatan 1" },
     });
@@ -154,7 +154,7 @@ describe("SellerJoin", () => {
   it("changes an approved seller's address", async () => {
     mocks.getEventForSeller.mockResolvedValue({ ...event, participation });
     mocks.changeParticipationAddress.mockResolvedValue({});
-    renderPage();
+    await renderPage();
     fireEvent.click(await screen.findByText("Change address"));
     expect(screen.getByText(/organizer must approve the new address/u)).toBeVisible();
     fireEvent.change(screen.getByLabelText("Address"), { target: { value: "Provgatan 9" } });
@@ -177,7 +177,7 @@ describe("SellerJoin", () => {
         participation: { ...participation, location: null, state: "withdrawn", version: 2 },
       });
     mocks.withdrawParticipation.mockResolvedValue({});
-    renderPage();
+    await renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Withdraw application" }));
     expect(await screen.findByText(/application is withdrawn/u)).toBeVisible();
     expect(mocks.withdrawParticipation).toHaveBeenCalledWith("seller", participationId, 1);
@@ -189,14 +189,14 @@ describe("SellerJoin", () => {
       admissionMode: "invite_only",
       registrationOpen: false,
     });
-    renderPage();
+    await renderPage();
     expect(await screen.findByText("This event only takes invited sellers.")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Send application" })).not.toBeInTheDocument();
   });
 
   it("has no detectable automated accessibility violations", async () => {
     mocks.getEventForSeller.mockResolvedValue(event);
-    const { container } = renderPage();
+    const { container } = await renderPage();
     await screen.findByLabelText("Address");
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);

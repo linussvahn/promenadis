@@ -1,7 +1,10 @@
 import { type createPromenadisApiClient, PromenadisApiError } from "@promenadis/api-client";
 import type { SellerInvite } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
+import { accountKey } from "../lib/use-account-data";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
@@ -21,29 +24,41 @@ export function SellerInvites({
   readonly locale: Locale;
   readonly timezone: string;
 }) {
-  const [invites, setInvites] = useState<SellerInvite[] | null>(null);
+  const accountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
+  const invitesKey = accountKey(accountId, "event", eventId, "seller-invites");
 
-  useEffect(() => {
-    void (async () => {
+  const invitesQuery = useQuery({
+    queryKey: invitesKey,
+    queryFn: async () => {
       const client = await call();
-      if (!client) return;
-      try {
-        setInvites(await client.api.listSellerInvites(client.token, eventId));
-      } catch {
-        setInvites(null);
-      }
-    })();
-  }, [call, eventId]);
+      return client ? client.api.listSellerInvites(client.token, eventId) : null;
+    },
+  });
+  const invites: SellerInvite[] | null = invitesQuery.isError ? null : (invitesQuery.data ?? null);
+
+  // Both writes answer with the event's current invite list.
+  const write = useMutation({
+    mutationFn: async (
+      action: (client: { api: ApiClient; token: string }) => Promise<SellerInvite[]>,
+    ) => {
+      const client = await call();
+      return client ? action(client) : null;
+    },
+    onSuccess: (next) => {
+      if (next) queryClient.setQueryData(invitesKey, next);
+    },
+  });
 
   const invite = async (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
     const form = formEvent.currentTarget;
     const email = String(new FormData(form).get("email") ?? "").trim();
-    const client = await call();
-    if (!client) return;
     try {
-      setInvites(await client.api.inviteSeller(client.token, eventId, email));
+      if (!(await write.mutateAsync(({ api, token }) => api.inviteSeller(token, eventId, email)))) {
+        return;
+      }
       form.reset();
       setStatus(translate(locale, "sellerInvite.sent"));
     } catch (error) {
@@ -59,10 +74,8 @@ export function SellerInvites({
   };
 
   const cancel = async (id: string) => {
-    const client = await call();
-    if (!client) return;
     try {
-      setInvites(await client.api.cancelSellerInvite(client.token, id));
+      await write.mutateAsync(({ api, token }) => api.cancelSellerInvite(token, id));
     } catch {
       setStatus(translate(locale, "sellerInvite.error"));
     }

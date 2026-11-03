@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { MyNotifications } from "./my-notifications";
 import { NotificationPreferences } from "./notification-preferences";
 
@@ -29,7 +30,7 @@ describe("MyNotifications", () => {
   it("lists notices with their event and marks them read", async () => {
     mocks.listNotifications.mockResolvedValue([notice(false)]);
     mocks.markNotificationsRead.mockResolvedValue([notice(true)]);
-    render(<MyNotifications accessToken={accessToken} locale="en" />);
+    await renderWithRouter(<MyNotifications accessToken={accessToken} locale="en" />);
     expect(await screen.findByRole("heading", { name: "Notices (1)" })).toBeVisible();
     expect(screen.getByText("You have a seller place")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
@@ -41,7 +42,7 @@ describe("NotificationPreferences", () => {
   it("keeps reminders off until the account opts in", async () => {
     mocks.getNotificationPreferences.mockResolvedValue({ eventReminders: false });
     mocks.setNotificationPreferences.mockResolvedValue({ eventReminders: true });
-    render(<NotificationPreferences accessToken={accessToken} locale="en" />);
+    await renderWithRouter(<NotificationPreferences accessToken={accessToken} locale="en" />);
     const checkbox = await screen.findByLabelText(/Remind me the day before/u);
     await waitFor(() => expect(checkbox).toBeEnabled());
     expect(checkbox).not.toBeChecked();

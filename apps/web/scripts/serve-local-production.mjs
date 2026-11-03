@@ -9,21 +9,17 @@ const PUBLIC_PORT = 4173;
 const APP_PORT = 4174;
 const API_TARGET = { host: "127.0.0.1", port: 54321, prefix: "/functions/v1/api-v1/browser" };
 
-if (!existsSync(new URL("../build/server/index.js", import.meta.url))) {
+if (!existsSync(new URL("../dist/server/server.js", import.meta.url))) {
   console.error("No production build found. Run `pnpm --filter @promenadis/web build` first.");
   process.exit(1);
 }
 
 // Run the server binary directly so stopping this script stops it too.
-const app = spawn(
-  process.execPath,
-  ["node_modules/@react-router/serve/bin.cjs", "./build/server/index.js"],
-  {
-    cwd: new URL("..", import.meta.url),
-    env: { ...process.env, HOST: "127.0.0.1", PORT: String(APP_PORT) },
-    stdio: "inherit",
-  },
-);
+const app = spawn(process.execPath, ["scripts/serve-production.mjs"], {
+  cwd: new URL("..", import.meta.url),
+  env: { ...process.env, HOST: "127.0.0.1", PORT: String(APP_PORT) },
+  stdio: "inherit",
+});
 
 function forward(request, response, target) {
   const upstream = http.request(

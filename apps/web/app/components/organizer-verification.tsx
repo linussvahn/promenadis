@@ -1,10 +1,12 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { OrganizerVerificationStatus } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheckIcon, ChevronRightIcon } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Field, FieldDescription } from "./ui/field";
@@ -21,9 +23,14 @@ export function OrganizerVerification({
   readonly organizerProfileId: string;
 }) {
   const expectedAccountId = useExpectedAccountId();
-  const [verification, setVerification] = useState<OrganizerVerificationStatus | null>(null);
-  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
+  const verificationKey = accountKey(
+    expectedAccountId,
+    "organizer",
+    organizerProfileId,
+    "verification",
+  );
 
   const client = useCallback(async () => {
     const supabase = getBrowserAuthClient(expectedAccountId);
@@ -33,43 +40,52 @@ export function OrganizerVerification({
     return data.session ? { api, token: data.session.user.id } : null;
   }, [expectedAccountId]);
 
-  useEffect(() => {
-    void (async () => {
+  const verificationQuery = useQuery({
+    queryKey: verificationKey,
+    queryFn: async () => {
       const authenticated = await client();
-      if (!authenticated) return;
-      try {
-        setVerification(
-          await authenticated.api.getOrganizerVerification(authenticated.token, organizerProfileId),
-        );
-      } catch {
-        setStatus(translate(locale, "verification.error"));
-      }
-    })();
-  }, [client, locale, organizerProfileId]);
+      return authenticated
+        ? authenticated.api.getOrganizerVerification(authenticated.token, organizerProfileId)
+        : null;
+    },
+  });
+  const verification: OrganizerVerificationStatus | null = verificationQuery.data ?? null;
+
+  const request = useMutation({
+    mutationFn: async (
+      input: Parameters<
+        NonNullable<ReturnType<typeof getPromenadisApiClient>>["requestOrganizerVerification"]
+      >[2],
+    ) => {
+      const authenticated = await client();
+      return authenticated
+        ? authenticated.api.requestOrganizerVerification(
+            authenticated.token,
+            organizerProfileId,
+            input,
+          )
+        : null;
+    },
+    onSuccess: (next) => {
+      if (next) queryClient.setQueryData(verificationKey, next);
+    },
+  });
+  const busy = request.isPending;
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const authenticated = await client();
-    if (!authenticated) return;
-    setBusy(true);
     setStatus("");
     try {
-      setVerification(
-        await authenticated.api.requestOrganizerVerification(
-          authenticated.token,
-          organizerProfileId,
-          {
-            controlMethod: String(form.get("controlMethod")) as
-              | "organization_email"
-              | "official_website"
-              | "official_contact",
-            controlReference: String(form.get("controlReference") ?? ""),
-            organizationNumber: String(form.get("organizationNumber") ?? ""),
-          },
-        ),
-      );
-      setStatus(translate(locale, "verification.requested"));
+      const next = await request.mutateAsync({
+        controlMethod: String(form.get("controlMethod")) as
+          | "organization_email"
+          | "official_website"
+          | "official_contact",
+        controlReference: String(form.get("controlReference") ?? ""),
+        organizationNumber: String(form.get("organizationNumber") ?? ""),
+      });
+      if (next) setStatus(translate(locale, "verification.requested"));
     } catch (error) {
       setStatus(
         translate(
@@ -79,8 +95,6 @@ export function OrganizerVerification({
             : "verification.error",
         ),
       );
-    } finally {
-      setBusy(false);
     }
   };
 

@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { MyModeration } from "./my-moderation";
 
 const mocks = vi.hoisted(() => ({ listMyModeration: vi.fn(), submitAppeal: vi.fn() }));
@@ -28,7 +29,7 @@ describe("MyModeration", () => {
     mocks.submitAppeal.mockResolvedValue([
       { ...action, appeal: { decisionReason: null, independent: null, state: "pending" } },
     ]);
-    render(<MyModeration accessToken={accessToken} locale="en" />);
+    await renderWithRouter(<MyModeration accessToken={accessToken} locale="en" />);
     fireEvent.change(await screen.findByLabelText("Why should the decision change?"), {
       target: { value: "It was a book title." },
     });
@@ -43,13 +44,15 @@ describe("MyModeration", () => {
     mocks.listMyModeration.mockResolvedValue([
       { ...action, appeal: { decisionReason: "Checked", independent: false, state: "upheld" } },
     ]);
-    render(<MyModeration accessToken={accessToken} locale="en" />);
+    await renderWithRouter(<MyModeration accessToken={accessToken} locale="en" />);
     expect(await screen.findByText(/same administrator/u)).toBeVisible();
   });
 
   it("has no detectable automated accessibility violations", async () => {
     mocks.listMyModeration.mockResolvedValue([action]);
-    const { container } = render(<MyModeration accessToken={accessToken} locale="en" />);
+    const { container } = await renderWithRouter(
+      <MyModeration accessToken={accessToken} locale="en" />,
+    );
     await screen.findByText(/Spring market/u);
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);

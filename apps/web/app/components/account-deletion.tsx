@@ -1,15 +1,23 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { AccountDeletionStatus } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { type FormEvent, useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+
+type Client = {
+  readonly api: NonNullable<ReturnType<typeof getPromenadisApiClient>>;
+  readonly token: string;
+};
 
 export function AccountDeletion({
   accessToken,
@@ -21,38 +29,35 @@ export function AccountDeletion({
   readonly onCancelled: () => Promise<void>;
 }) {
   const navigate = useNavigate();
-  const [deletion, setDeletion] = useState<AccountDeletionStatus | null>(null);
-  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
+  const deletionKey = accountKey(useExpectedAccountId(), "account-deletion");
   const [status, setStatus] = useState("");
 
-  const load = useCallback(async () => {
+  const call = async (): Promise<Client | null> => {
     const api = getPromenadisApiClient();
     const token = await accessToken();
-    if (!api || !token) return;
-    try {
-      setDeletion(await api.getAccountDeletion(token));
-    } catch {
-      setStatus(translate(locale, "deletion.error"));
-    }
-  }, [accessToken, locale]);
+    return api && token ? { api, token } : null;
+  };
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Account deletion is security-sensitive: no automatic retries or
+  // background refetches, so the request sequence stays exactly as before.
+  const deletionQuery = useQuery({
+    queryKey: deletionKey,
+    queryFn: async (): Promise<AccountDeletionStatus | null> => {
+      const client = await call();
+      return client ? client.api.getAccountDeletion(client.token) : null;
+    },
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const deletion = deletionQuery.data ?? null;
 
-  const request = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const confirmationEmail = String(new FormData(event.currentTarget).get("confirmationEmail"));
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    setBusy(true);
-    setStatus("");
-    try {
-      await api.requestAccountDeletion(token, { confirmationEmail });
-      // Every session was revoked; signing in again only reaches cancellation.
-      await navigate("/sign-in", { replace: true });
-    } catch (error) {
+  const requestMutation = useMutation({
+    mutationFn: ({ api, token, confirmationEmail }: Client & { confirmationEmail: string }) =>
+      api.requestAccountDeletion(token, { confirmationEmail }),
+    // Every session was revoked; signing in again only reaches cancellation.
+    onSuccess: () => navigate({ replace: true, to: "/sign-in" }),
+    onError: async (error) => {
       const code = error instanceof PromenadisApiError ? error.code : null;
       setStatus(
         translate(
@@ -66,27 +71,39 @@ export function AccountDeletion({
                 : "deletion.error",
         ),
       );
-      await load();
-    } finally {
-      setBusy(false);
-    }
+      await deletionQuery.refetch();
+    },
+    retry: false,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ api, token }: Client) => api.cancelAccountDeletion(token),
+    onSuccess: async (next) => {
+      queryClient.setQueryData(deletionKey, next);
+      setStatus(translate(locale, "deletion.cancelled"));
+      await onCancelled();
+    },
+    onError: () => setStatus(translate(locale, "deletion.error")),
+    retry: false,
+  });
+
+  const busy = requestMutation.isPending || cancelMutation.isPending;
+  const shownStatus = status || (deletionQuery.isError ? translate(locale, "deletion.error") : "");
+
+  const request = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const confirmationEmail = String(new FormData(event.currentTarget).get("confirmationEmail"));
+    const client = await call();
+    if (!client) return;
+    setStatus("");
+    requestMutation.mutate({ ...client, confirmationEmail });
   };
 
   const cancel = async () => {
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    setBusy(true);
+    const client = await call();
+    if (!client) return;
     setStatus("");
-    try {
-      setDeletion(await api.cancelAccountDeletion(token));
-      setStatus(translate(locale, "deletion.cancelled"));
-      await onCancelled();
-    } catch {
-      setStatus(translate(locale, "deletion.error"));
-    } finally {
-      setBusy(false);
-    }
+    cancelMutation.mutate(client);
   };
 
   return (
@@ -131,7 +148,11 @@ export function AccountDeletion({
                     {deletion.blockers.map((blocker) => (
                       <li key={`${blocker.kind}-${blocker.id}`}>
                         {blocker.kind === "owned_event" ? (
-                          <Link className="font-semibold" to={`/events/${blocker.id}`}>
+                          <Link
+                            className="font-semibold"
+                            params={{ eventId: blocker.id }}
+                            to="/events/$eventId"
+                          >
                             {blocker.title}
                           </Link>
                         ) : (
@@ -169,7 +190,7 @@ export function AccountDeletion({
             </>
           )}
           <p aria-live="polite" className="min-h-6 text-sm font-semibold">
-            {status}
+            {shownStatus}
           </p>
         </CardContent>
       </section>

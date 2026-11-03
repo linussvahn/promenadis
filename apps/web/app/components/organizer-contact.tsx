@@ -1,9 +1,10 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { RelayThread } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { ChevronDownIcon, MessageCircleIcon } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";
@@ -33,27 +34,30 @@ export function ContactOrganizer({
   readonly route: "public" | "unlisted";
 }) {
   const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  const submit = async (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const form = new FormData(formEvent.currentTarget);
-    const api = getPromenadisApiClient();
-    if (!api) return;
-    setBusy(true);
-    setStatus("");
-    try {
+  const contact = useMutation({
+    mutationFn: async (form: FormData) => {
+      const api = getPromenadisApiClient();
+      if (!api) return;
       const started = await api.contactOrganizer(route, eventKey, {
         message: String(form.get("message") ?? ""),
         visitorEmail: String(form.get("email") ?? "").trim(),
         website: String(form.get("website") ?? ""),
       });
-      await navigate(`/contact/${started.threadId}#${started.token}`);
-    } catch (error) {
-      setStatus(translate(locale, errorKey(error)));
-    } finally {
-      setBusy(false);
-    }
+      await navigate({
+        hash: started.token,
+        params: { threadId: started.threadId },
+        to: "/contact/$threadId",
+      });
+    },
+    onError: (error) => setStatus(translate(locale, errorKey(error))),
+    onMutate: () => setStatus(""),
+  });
+  const busy = contact.isPending;
+  const submit = (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    if (!getPromenadisApiClient()) return;
+    contact.mutate(new FormData(formEvent.currentTarget));
   };
   return (
     <Card asChild className="group gap-0 py-0">
@@ -66,10 +70,7 @@ export function ContactOrganizer({
             className="ml-auto size-5 text-muted-foreground transition-transform group-open:rotate-180"
           />
         </summary>
-        <form
-          className="grid max-w-2xl gap-4 px-6 pt-1 pb-6"
-          onSubmit={(formEvent) => void submit(formEvent)}
-        >
+        <form className="grid max-w-2xl gap-4 px-6 pt-1 pb-6" onSubmit={submit}>
           <FieldDescription>{translate(locale, "contact.intro")}</FieldDescription>
           <Field>
             <Label htmlFor="contact-email">{translate(locale, "contact.email")}</Label>
@@ -154,40 +155,45 @@ export function ContactThread({
   readonly locale: Locale;
   readonly threadId: string;
 }) {
-  const [thread, setThread] = useState<RelayThread | null>(null);
-  const [token, setToken] = useState("");
+  const queryClient = useQueryClient();
+  // `null` until the fragment has been read in the browser.
+  const [token, setToken] = useState<string | null>(null);
   const [status, setStatus] = useState("");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: another thread brings its own fragment.
   useEffect(() => {
-    const fragment = window.location.hash.slice(1);
-    setToken(fragment);
-    const api = getPromenadisApiClient();
-    if (!api || !fragment) {
-      setStatus(translate(locale, "contact.closed"));
-      return;
-    }
-    void api
-      .readContactThread(threadId, fragment)
-      .then(setThread)
-      .catch(() => setStatus(translate(locale, "contact.closed")));
-  }, [locale, threadId]);
-  const reply = async (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    const form = formEvent.currentTarget;
-    const api = getPromenadisApiClient();
-    if (!api) return;
-    try {
-      setThread(
-        await api.replyContactThread(
-          threadId,
-          token,
-          String(new FormData(form).get("message") ?? ""),
-        ),
-      );
+    setToken(window.location.hash.slice(1));
+  }, [threadId]);
+  const api = getPromenadisApiClient();
+  const threadKey = ["contact-thread", threadId, token] as const;
+  const threadQuery = useQuery({
+    enabled: Boolean(api && token),
+    queryFn: () => {
+      if (!api || !token) throw new Error("closed");
+      return api.readContactThread(threadId, token);
+    },
+    queryKey: threadKey,
+    retry: false,
+  });
+  const thread: RelayThread | null = threadQuery.data ?? null;
+  const closed = token !== null && (!api || !token || threadQuery.isError);
+  const shownStatus = status || (closed ? translate(locale, "contact.closed") : "");
+  const send = useMutation({
+    mutationFn: ({ message }: { form: HTMLFormElement; message: string }) => {
+      if (!api || !token) throw new Error("closed");
+      return api.replyContactThread(threadId, token, message);
+    },
+    onError: (error) => setStatus(translate(locale, errorKey(error))),
+    onSuccess: (next, { form }) => {
+      queryClient.setQueryData(threadKey, next);
       form.reset();
       setStatus(translate(locale, "contact.sent"));
-    } catch (error) {
-      setStatus(translate(locale, errorKey(error)));
-    }
+    },
+  });
+  const reply = (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    const form = formEvent.currentTarget;
+    if (!api) return;
+    send.mutate({ form, message: String(new FormData(form).get("message") ?? "") });
   };
   return (
     <section aria-labelledby="thread-title" className="grid gap-5">
@@ -203,7 +209,7 @@ export function ContactThread({
       {thread ? <RelayMessages locale={locale} thread={thread} /> : null}
       {thread ? (
         <Card asChild className="max-w-2xl">
-          <form onSubmit={(formEvent) => void reply(formEvent)}>
+          <form onSubmit={reply}>
             <CardContent>
               <Field>
                 <Label htmlFor="thread-reply">{translate(locale, "contact.reply")}</Label>
@@ -223,7 +229,7 @@ export function ContactThread({
         </Card>
       ) : null}
       <p aria-live="polite" className="min-h-6 text-sm font-semibold" role="status">
-        {status}
+        {shownStatus}
       </p>
     </section>
   );

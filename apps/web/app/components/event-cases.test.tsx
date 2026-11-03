@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { EventCases } from "./event-cases";
 
 const api = { listEventCases: vi.fn(), reviewCase: vi.fn() };
@@ -42,7 +43,7 @@ describe("EventCases", () => {
   it("shows a quarantined location and restores it with a reason", async () => {
     api.listEventCases.mockResolvedValue([quarantined]);
     api.reviewCase.mockResolvedValue([{ ...quarantined, state: "closed" }]);
-    render(
+    await renderWithRouter(
       <EventCases
         call={call}
         eventId={eventId}
@@ -68,7 +69,7 @@ describe("EventCases", () => {
 
   it("has no detectable automated accessibility violations", async () => {
     api.listEventCases.mockResolvedValue([quarantined]);
-    const { container } = render(
+    const { container } = await renderWithRouter(
       <EventCases
         call={call}
         eventId={eventId}

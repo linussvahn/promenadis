@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { EventDuplicate } from "./event-duplicate";
 
 const mocks = vi.hoisted(() => ({ duplicateEvent: vi.fn() }));
@@ -29,6 +31,8 @@ const organizer = {
 } as const;
 const accessToken = async () => "owner";
 const onCreated = vi.fn(async () => {});
+const render = (ui: ReactNode) =>
+  renderWithRouter(ui, { path: "/events/$eventId", url: `/events/${eventId}` });
 
 afterEach(() => {
   cleanup();
@@ -38,7 +42,7 @@ afterEach(() => {
 describe("EventDuplicate", () => {
   it("copies an old event a year later and opens the copy", async () => {
     mocks.duplicateEvent.mockResolvedValue({ id: copyId, schemaVersion: "1.0" });
-    render(
+    await render(
       <EventDuplicate
         accessToken={accessToken}
         event={event}
@@ -58,11 +62,11 @@ describe("EventDuplicate", () => {
         title: "Spring walk",
       }),
     );
-    expect(onCreated).toHaveBeenCalledWith(copyId);
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(copyId));
   });
 
-  it("explains that a co-host needs an organizer of their own", () => {
-    render(
+  it("explains that a co-host needs an organizer of their own", async () => {
+    await render(
       <EventDuplicate
         accessToken={accessToken}
         event={{ ...(event as object), role: "co_host" } as never}
@@ -77,7 +81,7 @@ describe("EventDuplicate", () => {
   });
 
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(
+    const { container } = await render(
       <EventDuplicate
         accessToken={accessToken}
         event={event}

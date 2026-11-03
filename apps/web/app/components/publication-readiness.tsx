@@ -1,10 +1,12 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary, EventPublicationReadiness } from "@promenadis/contracts";
 import { type Locale, type MessageKey, translate } from "@promenadis/i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { Link } from "react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { type FormEvent, useCallback, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -33,15 +35,12 @@ const recommendationKeys = {
 export function PublicationReadiness({
   event,
   locale,
-  onPublished,
 }: {
   readonly event: DraftEventSummary;
   readonly locale: Locale;
-  readonly onPublished?: () => Promise<void>;
 }) {
   const expectedAccountId = useExpectedAccountId();
-  const [busy, setBusy] = useState(false);
-  const [readiness, setReadiness] = useState<EventPublicationReadiness | null>(null);
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("");
 
   const authenticatedClient = useCallback(async () => {
@@ -52,44 +51,45 @@ export function PublicationReadiness({
     return data.session ? { api, token: data.session.user.id } : null;
   }, [expectedAccountId]);
 
-  const loadReadiness = useCallback(async () => {
-    try {
+  const readinessKey = accountKey(expectedAccountId, "event", event.id, "publicationReadiness");
+  const readinessQuery = useQuery({
+    queryKey: readinessKey,
+    queryFn: async (): Promise<EventPublicationReadiness | null> => {
       const authenticated = await authenticatedClient();
-      if (!authenticated) return;
-      setReadiness(
-        await authenticated.api.getEventPublicationReadiness(authenticated.token, event.id),
-      );
-    } catch {
-      setStatus(translate(locale, "publication.error"));
-    }
-  }, [authenticatedClient, event.id, locale]);
+      if (!authenticated) return null;
+      return authenticated.api.getEventPublicationReadiness(authenticated.token, event.id);
+    },
+  });
+  const readiness = readinessQuery.data ?? null;
+  const loadError = readinessQuery.isError ? translate(locale, "publication.error") : "";
+  const loadReadiness = () => queryClient.invalidateQueries({ queryKey: readinessKey });
 
-  useEffect(() => {
-    void loadReadiness();
-  }, [loadReadiness]);
-
-  const attest = async (formEvent: FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault();
-    if (!event.boundary || !event.registration) return;
-    setBusy(true);
-    setStatus("");
-    try {
+  const rejected = readiness?.blockers.includes("first_event_review_rejected") ?? false;
+  const reviewQuery = useQuery({
+    enabled: rejected,
+    queryKey: accountKey(expectedAccountId, "event", event.id, "firstEventReview"),
+    queryFn: async () => {
       const authenticated = await authenticatedClient();
-      if (!authenticated) return;
-      const nextReadiness = await authenticated.api.attestEventPublication(
-        authenticated.token,
-        event.id,
-        {
-          expectedBoundaryVersion: event.boundary.version,
-          expectedEventVersion: event.version,
-          expectedRegistrationVersion: event.registration.version,
-          locationAuthorityConfirmed: true,
-          visibilityUnderstood: true,
-        },
-      );
-      setReadiness(nextReadiness);
-      setStatus(translate(locale, "publication.attested"));
-    } catch (error) {
+      if (!authenticated) return null;
+      return authenticated.api.getFirstEventReview(authenticated.token, event.id);
+    },
+  });
+  const rejectionReason = rejected ? (reviewQuery.data?.reason ?? null) : null;
+
+  const attestation = useMutation({
+    mutationFn: async () => {
+      if (!event.boundary || !event.registration) return null;
+      const authenticated = await authenticatedClient();
+      if (!authenticated) return null;
+      return authenticated.api.attestEventPublication(authenticated.token, event.id, {
+        expectedBoundaryVersion: event.boundary.version,
+        expectedEventVersion: event.version,
+        expectedRegistrationVersion: event.registration.version,
+        locationAuthorityConfirmed: true,
+        visibilityUnderstood: true,
+      });
+    },
+    onError: async (error) => {
       if (error instanceof PromenadisApiError && error.code === "recent_auth_required") {
         setStatus(translate(locale, "publication.recentAuth"));
       } else if (error instanceof PromenadisApiError && error.code === "version_conflict") {
@@ -98,28 +98,20 @@ export function PublicationReadiness({
       } else {
         setStatus(translate(locale, "publication.error"));
       }
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: (nextReadiness) => {
+      if (!nextReadiness) return;
+      queryClient.setQueryData(readinessKey, nextReadiness);
+      setStatus(translate(locale, "publication.attested"));
+    },
+  });
 
-  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
-  useEffect(() => {
-    if (!readiness?.blockers.includes("first_event_review_rejected")) {
-      setRejectionReason(null);
-      return;
-    }
-    void (async () => {
-      const authenticated = await authenticatedClient();
-      if (!authenticated) return;
-      try {
-        const review = await authenticated.api.getFirstEventReview(authenticated.token, event.id);
-        setRejectionReason(review.reason);
-      } catch {
-        setRejectionReason(null);
-      }
-    })();
-  }, [authenticatedClient, event.id, readiness]);
+  const attest = (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    if (!event.boundary || !event.registration) return;
+    attestation.mutate();
+  };
 
   // Review is requested once only system gates (and the review itself) remain.
   const reviewable =
@@ -138,42 +130,49 @@ export function PublicationReadiness({
       ].includes(blocker),
     );
 
-  const requestReview = async () => {
-    setBusy(true);
-    setStatus("");
-    try {
+  const reviewRequest = useMutation({
+    mutationFn: async () => {
       const authenticated = await authenticatedClient();
-      if (!authenticated) return;
-      setReadiness(
-        await authenticated.api.requestFirstEventReview(
-          authenticated.token,
-          event.id,
-          event.version,
-        ),
+      if (!authenticated) return null;
+      return authenticated.api.requestFirstEventReview(
+        authenticated.token,
+        event.id,
+        event.version,
       );
-      setStatus(translate(locale, "publication.reviewRequested"));
-    } catch (error) {
+    },
+    onError: async (error) => {
       if (error instanceof PromenadisApiError && error.code === "version_conflict") {
         await loadReadiness();
         setStatus(translate(locale, "publication.versionConflict"));
       } else {
         setStatus(translate(locale, "publication.error"));
       }
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: (nextReadiness) => {
+      if (!nextReadiness) return;
+      queryClient.setQueryData(readinessKey, nextReadiness);
+      setStatus(translate(locale, "publication.reviewRequested"));
+    },
+  });
+  const requestReview = () => reviewRequest.mutate();
 
-  const publish = async () => {
-    setBusy(true);
-    setStatus("");
-    try {
+  const publication = useMutation({
+    mutationFn: async () => {
       const authenticated = await authenticatedClient();
-      if (!authenticated) return;
+      if (!authenticated) return false;
       await authenticated.api.publishEvent(authenticated.token, event.id, event.version);
       setStatus(translate(locale, "publication.published"));
-      await onPublished?.();
-    } catch (error) {
+      // The event leaves the draft state, so reload it and everything under it.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: accountKey(expectedAccountId, "dashboard") }),
+        queryClient.invalidateQueries({
+          queryKey: accountKey(expectedAccountId, "event", event.id),
+        }),
+      ]);
+      return true;
+    },
+    onError: async (error) => {
       setStatus(
         translate(
           locale,
@@ -183,10 +182,12 @@ export function PublicationReadiness({
         ),
       );
       await loadReadiness();
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+    onMutate: () => setStatus(""),
+  });
+  const publish = () => publication.mutate();
+
+  const busy = attestation.isPending || reviewRequest.isPending || publication.isPending;
 
   const attestationMissing = readiness?.blockers.includes("publication_attestation_missing");
   const canAttest = event.role === "owner" && event.boundary && event.registration;
@@ -202,7 +203,7 @@ export function PublicationReadiness({
         </CardHeader>
         <CardContent>
           {!readiness ? (
-            <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
+            <p aria-live="polite">{status || loadError || translate(locale, "common.loading")}</p>
           ) : (
             <>
               <h3 className={subheading}>{translate(locale, "publication.blockers")}</h3>
@@ -221,12 +222,12 @@ export function PublicationReadiness({
               readiness.blockers.includes("recovery_code_missing") ? (
                 <div className="flex flex-wrap items-center gap-3">
                   {readiness.readyToPublish && event.role === "owner" ? (
-                    <Button disabled={busy} onClick={() => void publish()} type="button">
+                    <Button disabled={busy} onClick={publish} type="button">
                       {translate(locale, "publication.publish")}
                     </Button>
                   ) : null}
                   {reviewable ? (
-                    <Button disabled={busy} onClick={() => void requestReview()} type="button">
+                    <Button disabled={busy} onClick={requestReview} type="button">
                       {translate(locale, "publication.requestReview")}
                     </Button>
                   ) : null}

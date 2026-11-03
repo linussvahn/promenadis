@@ -1,9 +1,11 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { toDateTimeLocal, wallTimeToIso } from "../lib/wall-time";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -31,47 +33,45 @@ function initialWindow(event: DraftEventSummary) {
 export function RegistrationEditor({
   event,
   locale,
-  onSaved,
 }: {
   readonly event: DraftEventSummary;
   readonly locale: Locale;
-  readonly onSaved: () => Promise<void>;
 }) {
   const expectedAccountId = useExpectedAccountId();
+  const queryClient = useQueryClient();
   const [window, setWindow] = useState(() => initialWindow(event));
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
     setWindow(initialWindow(event));
   }, [event]);
 
-  const saveRegistration = async (form: HTMLFormElement) => {
-    const input = new FormData(form);
-    const opensAt = String(input.get("opensAt") ?? "");
-    const closesAt = String(input.get("closesAt") ?? "");
-    const allowDuringEvent = input.get("allowDuringEvent") === "on";
-    const api = getPromenadisApiClient();
-    const supabase = getBrowserAuthClient(expectedAccountId);
-    if (!api || !supabase) return;
-
-    setBusy(true);
-    setStatus("");
-    try {
+  const registration = useMutation({
+    mutationFn: async (form: HTMLFormElement) => {
+      const input = new FormData(form);
+      const opensAt = String(input.get("opensAt") ?? "");
+      const closesAt = String(input.get("closesAt") ?? "");
+      const allowDuringEvent = input.get("allowDuringEvent") === "on";
+      const api = getPromenadisApiClient();
+      const supabase = getBrowserAuthClient(expectedAccountId);
+      if (!api || !supabase) return null;
       const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        setStatus(translate(locale, "dashboard.sessionExpired"));
-        return;
-      }
+      if (!data.session) return "sessionExpired" as const;
       await api.saveEventRegistration(data.session.user.id, event.id, {
         allowDuringEvent,
         closesAt: wallTimeToIso(closesAt, event.timezone),
         expectedVersion: event.registration?.version ?? null,
         opensAt: wallTimeToIso(opensAt, event.timezone),
       });
-      await onSaved();
-      setStatus(translate(locale, "registration.saved"));
-    } catch (error) {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: accountKey(expectedAccountId, "dashboard") }),
+        queryClient.invalidateQueries({
+          queryKey: accountKey(expectedAccountId, "event", event.id),
+        }),
+      ]);
+      return "saved" as const;
+    },
+    onError: (error) => {
       const key =
         error instanceof PromenadisApiError && error.code === "version_conflict"
           ? "registration.versionConflict"
@@ -81,17 +81,21 @@ export function RegistrationEditor({
               ? "registration.invalid"
               : "dashboard.error";
       setStatus(translate(locale, key));
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+    onMutate: () => setStatus(""),
+    onSuccess: (outcome) => {
+      if (outcome === "saved") setStatus(translate(locale, "registration.saved"));
+      if (outcome === "sessionExpired") setStatus(translate(locale, "dashboard.sessionExpired"));
+    },
+  });
+  const busy = registration.isPending;
 
   return (
     <Card asChild className="gap-0 py-2">
       <form
         onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
           formEvent.preventDefault();
-          void saveRegistration(formEvent.currentTarget);
+          registration.mutate(formEvent.currentTarget);
         }}
       >
         <CardContent className="gap-0 divide-y sm:px-8">

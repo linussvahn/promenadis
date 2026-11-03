@@ -4,8 +4,8 @@ import type {
   PublicOrganizerPage,
 } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import type { ReactNode } from "react";
-import { Form, Link } from "react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import type { FormEvent, ReactNode } from "react";
 import { useStoredLocale } from "../lib/locale";
 import { ContactOrganizer } from "./organizer-contact";
 import { PageHeading, PageMain, SiteFooter, SummaryList } from "./page";
@@ -38,8 +38,22 @@ export function PublicShell({ children }: { readonly children: (locale: Locale) 
 const cardGrid =
   "m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,22rem),1fr))] gap-5 p-0";
 
-function eventPath(event: PublicEventSummary) {
-  return `/${event.visibility === "public" ? "e" : "u"}/${event.publicKey}`;
+function EventLink({
+  children,
+  event,
+}: {
+  readonly children: ReactNode;
+  readonly event: PublicEventSummary;
+}) {
+  return event.visibility === "public" ? (
+    <Link params={{ key: event.publicKey }} to="/e/$key">
+      {children}
+    </Link>
+  ) : (
+    <Link params={{ key: event.publicKey }} to="/u/$key">
+      {children}
+    </Link>
+  );
 }
 
 function Schedule({
@@ -72,7 +86,9 @@ function OrganizerName({
   return (
     <>
       {organizer.publicKey ? (
-        <Link to={`/o/${organizer.publicKey}`}>{organizer.displayName}</Link>
+        <Link params={{ key: organizer.publicKey }} to="/o/$key">
+          {organizer.displayName}
+        </Link>
       ) : (
         organizer.displayName
       )}
@@ -114,7 +130,7 @@ function EventCard({
         </CardContent>
         <CardFooter className="mt-auto border-t">
           <Button asChild variant="outline">
-            <Link to={eventPath(event)}>{translate(locale, "public.event.open")}</Link>
+            <EventLink event={event}>{translate(locale, "public.event.open")}</EventLink>
           </Button>
         </CardFooter>
       </li>
@@ -237,7 +253,11 @@ export function EventLanding({
       {event.state === "published" || event.state === "active" ? (
         <p>
           <Button asChild size="lg">
-            <Link rel="nofollow" to={`${eventPath(event)}/map`}>
+            <Link
+              params={{ key: event.publicKey, route: event.visibility === "public" ? "e" : "u" }}
+              rel="nofollow"
+              to="/$route/$key/map"
+            >
               {translate(locale, "map.showMap")}
             </Link>
           </Button>
@@ -269,11 +289,21 @@ export function DiscoveryPage({
   readonly query: string;
   readonly liveOnly: boolean;
 }) {
+  const navigate = useNavigate();
   const next = list.nextCursor;
-  const moreParams = new URLSearchParams();
-  if (query) moreParams.set("q", query);
-  if (liveOnly) moreParams.set("live", "1");
-  if (next) moreParams.set("after", `${next.afterStartsAt}_${next.afterId}`);
+  // A plain GET search form: the fields become the new query string.
+  const search = (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    const form = new FormData(formEvent.currentTarget);
+    const q = String(form.get("q") ?? "");
+    void navigate({
+      search: {
+        ...(form.get("live") === "1" ? { live: "1" as const } : {}),
+        ...(q ? { q } : {}),
+      },
+      to: "/discover",
+    });
+  };
   return (
     <section aria-labelledby="discover-title" className="grid gap-6">
       <PageHeading
@@ -283,7 +313,8 @@ export function DiscoveryPage({
         titleId="discover-title"
       />
       <Card asChild>
-        <Form className="px-6" method="get" role="search">
+        {/* biome-ignore lint/a11y/useSemanticElements: the card itself is the search landmark. */}
+        <form className="px-6" onSubmit={search} role="search">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <Field className="flex-1">
               <Label htmlFor="discover-query">{translate(locale, "public.discover.search")}</Label>
@@ -301,7 +332,7 @@ export function DiscoveryPage({
             <Checkbox defaultChecked={liveOnly} name="live" value="1" />
             <span>{translate(locale, "public.discover.liveOnly")}</span>
           </ChoiceField>
-        </Form>
+        </form>
       </Card>
       {list.events.length === 0 ? (
         <p className="text-muted-foreground" role="status">
@@ -317,7 +348,14 @@ export function DiscoveryPage({
       {next ? (
         <p>
           <Button asChild variant="outline">
-            <Link to={`/discover?${moreParams.toString()}`}>
+            <Link
+              search={{
+                after: `${next.afterStartsAt}_${next.afterId}`,
+                ...(liveOnly ? { live: "1" as const } : {}),
+                ...(query ? { q: query } : {}),
+              }}
+              to="/discover"
+            >
               {translate(locale, "public.discover.more")}
             </Link>
           </Button>

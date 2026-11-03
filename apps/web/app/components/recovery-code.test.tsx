@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { RecoveryCode } from "./recovery-code";
 
 const mocks = vi.hoisted(() => ({
@@ -38,7 +39,9 @@ describe("RecoveryCode", () => {
       version: 1,
       pendingClaim: null,
     });
-    render(<RecoveryCode accessToken={async () => "synthetic-session"} locale="en" />);
+    await renderWithRouter(
+      <RecoveryCode accessToken={async () => "synthetic-session"} locale="en" />,
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Cancel account recovery" }));
     await screen.findByText(/request was cancelled/u);
     expect(mocks.cancelAccountRecovery).toHaveBeenCalledWith("synthetic-session", "claim-id");
@@ -59,7 +62,9 @@ describe("RecoveryCode", () => {
       version: 1,
     });
 
-    render(<RecoveryCode accessToken={async () => "synthetic-session"} locale="en" />);
+    await renderWithRouter(
+      <RecoveryCode accessToken={async () => "synthetic-session"} locale="en" />,
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Create recovery code" }));
 
     await waitFor(() =>
@@ -78,7 +83,7 @@ describe("RecoveryCode", () => {
       rotatedAt: null,
       version: 1,
     });
-    const { container } = render(
+    const { container } = await renderWithRouter(
       <RecoveryCode accessToken={async () => "synthetic-session"} locale="en" />,
     );
     await screen.findByText("An active recovery code is saved.");

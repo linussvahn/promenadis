@@ -1,13 +1,21 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { AccountRecoveryStatus } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRightIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useExpectedAccountId } from "../lib/account-session";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { accountKey } from "../lib/use-account-data";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { FieldDescription } from "./ui/field";
+
+type Client = {
+  readonly api: NonNullable<ReturnType<typeof getPromenadisApiClient>>;
+  readonly token: string;
+};
 
 export function RecoveryCode({
   accessToken,
@@ -16,65 +24,60 @@ export function RecoveryCode({
   readonly accessToken: () => Promise<string | null>;
   readonly locale: Locale;
 }) {
-  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
+  const recoveryKey = accountKey(useExpectedAccountId(), "recovery");
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-  const [recovery, setRecovery] = useState<AccountRecoveryStatus | null>(null);
   const [status, setStatus] = useState("");
 
-  const loadRecovery = useCallback(async () => {
+  const call = async (): Promise<Client | null> => {
     const api = getPromenadisApiClient();
     const token = await accessToken();
-    if (!api || !token) return;
-    try {
-      setRecovery(await api.getAccountRecoveryStatus(token));
-    } catch {
-      setStatus(translate(locale, "recovery.error"));
-    }
-  }, [accessToken, locale]);
+    return api && token ? { api, token } : null;
+  };
 
-  useEffect(() => {
-    void loadRecovery();
-  }, [loadRecovery]);
+  // Recovery is security-sensitive: no automatic retries or background
+  // refetches, so the request sequence stays exactly as before.
+  const recoveryQuery = useQuery({
+    queryKey: recoveryKey,
+    queryFn: async (): Promise<AccountRecoveryStatus | null> => {
+      const client = await call();
+      return client ? client.api.getAccountRecoveryStatus(client.token) : null;
+    },
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const recovery = recoveryQuery.data ?? null;
 
-  const enroll = async () => {
-    if (!recovery) return;
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    setBusy(true);
-    setGeneratedCode(null);
-    setStatus("");
-    try {
-      const result = await api.enrollRecoveryCode(token, {
-        expectedVersion: recovery.version,
-      });
-      setRecovery(result);
-      setGeneratedCode(result.code);
+  const enrollMutation = useMutation({
+    mutationFn: ({ api, token, expectedVersion }: Client & { expectedVersion: number }) =>
+      api.enrollRecoveryCode(token, { expectedVersion }),
+    onSuccess: ({ code, ...next }) => {
+      // The code is shown once from component state and never kept in the cache.
+      queryClient.setQueryData<AccountRecoveryStatus | null>(recoveryKey, next);
+      setGeneratedCode(code);
       setStatus(translate(locale, "recovery.created"));
-    } catch (error) {
+    },
+    onError: async (error) => {
       if (error instanceof PromenadisApiError && error.code === "recent_auth_required") {
         setStatus(translate(locale, "recovery.recentAuth"));
       } else if (error instanceof PromenadisApiError && error.code === "version_conflict") {
-        await loadRecovery();
+        await recoveryQuery.refetch();
         setStatus(translate(locale, "recovery.versionConflict"));
       } else {
         setStatus(translate(locale, "recovery.error"));
       }
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+    retry: false,
+  });
 
-  const cancelRecovery = async () => {
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token || !recovery?.pendingClaim) return;
-    setBusy(true);
-    setStatus("");
-    try {
-      setRecovery(await api.cancelAccountRecovery(token, recovery.pendingClaim.id));
+  const cancelMutation = useMutation({
+    mutationFn: ({ api, token, claimId }: Client & { claimId: string }) =>
+      api.cancelAccountRecovery(token, claimId),
+    onSuccess: (next) => {
+      queryClient.setQueryData(recoveryKey, next);
       setStatus(translate(locale, "accountRecovery.cancelled"));
-    } catch (error) {
+    },
+    onError: (error) =>
       setStatus(
         translate(
           locale,
@@ -82,10 +85,27 @@ export function RecoveryCode({
             ? "recovery.recentAuth"
             : "recovery.error",
         ),
-      );
-    } finally {
-      setBusy(false);
-    }
+      ),
+    retry: false,
+  });
+
+  const busy = enrollMutation.isPending || cancelMutation.isPending;
+  const shownStatus = status || (recoveryQuery.isError ? translate(locale, "recovery.error") : "");
+
+  const enroll = async () => {
+    if (!recovery) return;
+    const client = await call();
+    if (!client) return;
+    setGeneratedCode(null);
+    setStatus("");
+    enrollMutation.mutate({ ...client, expectedVersion: recovery.version });
+  };
+
+  const cancelRecovery = async () => {
+    const client = await call();
+    if (!client || !recovery?.pendingClaim) return;
+    setStatus("");
+    cancelMutation.mutate({ ...client, claimId: recovery.pendingClaim.id });
   };
 
   return (
@@ -97,7 +117,7 @@ export function RecoveryCode({
         </CardHeader>
         <CardContent>
           {!recovery ? (
-            <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
+            <p aria-live="polite">{shownStatus || translate(locale, "common.loading")}</p>
           ) : (
             <>
               {recovery.pendingClaim ? (
@@ -186,7 +206,7 @@ export function RecoveryCode({
           )}
           {recovery ? (
             <p aria-live="polite" className="min-h-6 text-sm font-semibold">
-              {status}
+              {shownStatus}
             </p>
           ) : null}
         </CardContent>

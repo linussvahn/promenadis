@@ -1,8 +1,9 @@
 import type { OrganizerProfileSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { useMutation } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { PlusIcon } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountDeletion } from "./account-deletion";
@@ -23,7 +24,11 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 
-type BusyAction = "profile" | "organizer" | null;
+type Client = {
+  readonly api: NonNullable<ReturnType<typeof getPromenadisApiClient>>;
+  readonly token: string;
+};
+type OrganizerType = "individual" | "informal_group" | "association" | "company";
 
 export function Settings() {
   return <AccountShell>{({ locale }) => <SettingsContent locale={locale} />}</AccountShell>;
@@ -33,7 +38,6 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
   const { accessToken, dashboard, deletionPending, loadDashboard, loadFailed, setDashboard } =
     useAccountData();
   const [displayName, setDisplayName] = useState("");
-  const [busy, setBusy] = useState<BusyAction>(null);
   const [status, setStatus] = useState("");
   const personalOrganizer = dashboard?.organizers.find(
     (organizer) => organizer.organizerType === "individual",
@@ -46,52 +50,56 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
     if (storedDisplayName !== null) setDisplayName(storedDisplayName);
   }, [storedDisplayName]);
 
-  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
-    setBusy("profile");
-    setStatus("");
-    try {
-      const profile = await api.updateProfile(token, { displayName, preferredLocale: locale });
+  const profileMutation = useMutation({
+    mutationFn: ({ api, token, name }: Client & { name: string }) =>
+      api.updateProfile(token, { displayName: name, preferredLocale: locale }),
+    onSuccess: (profile) => {
       setDashboard((current) => (current ? { ...current, profile } : current));
       setStatus(translate(locale, "dashboard.saved"));
-    } catch {
-      setStatus(translate(locale, "dashboard.error"));
-    } finally {
-      setBusy(null);
-    }
+    },
+    onError: () => setStatus(translate(locale, "dashboard.error")),
+  });
+
+  const organizerMutation = useMutation({
+    mutationFn: ({ api, token, form }: Client & { form: FormData; formElement: HTMLFormElement }) =>
+      api.createOrganizer(token, {
+        displayName: String(form.get("displayName") ?? ""),
+        locality: String(form.get("locality") ?? ""),
+        organizerType: String(form.get("organizerType") ?? "informal_group") as OrganizerType,
+        website: String(form.get("website") ?? ""),
+      }),
+    onSuccess: async (_organizer, { formElement }) => {
+      formElement.reset();
+      await loadDashboard();
+      setStatus(translate(locale, "dashboard.created"));
+    },
+    onError: () => setStatus(translate(locale, "dashboard.error")),
+  });
+
+  const busy = profileMutation.isPending || organizerMutation.isPending;
+
+  const call = async (): Promise<Client | null> => {
+    const api = getPromenadisApiClient();
+    const token = await accessToken();
+    return api && token ? { api, token } : null;
+  };
+
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const client = await call();
+    if (!client) return;
+    setStatus("");
+    profileMutation.mutate({ ...client, name: displayName });
   };
 
   const createOrganizer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formElement = event.currentTarget;
-    const api = getPromenadisApiClient();
-    const token = await accessToken();
-    if (!api || !token) return;
+    const client = await call();
+    if (!client) return;
     const form = new FormData(formElement);
-    setBusy("organizer");
     setStatus("");
-    try {
-      await api.createOrganizer(token, {
-        displayName: String(form.get("displayName") ?? ""),
-        locality: String(form.get("locality") ?? ""),
-        organizerType: String(form.get("organizerType") ?? "informal_group") as
-          | "individual"
-          | "informal_group"
-          | "association"
-          | "company",
-        website: String(form.get("website") ?? ""),
-      });
-      formElement.reset();
-      await loadDashboard();
-      setStatus(translate(locale, "dashboard.created"));
-    } catch {
-      setStatus(translate(locale, "dashboard.error"));
-    } finally {
-      setBusy(null);
-    }
+    organizerMutation.mutate({ ...client, form, formElement });
   };
 
   return (
@@ -136,7 +144,7 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
                     />
                   </Field>
                   <div>
-                    <Button disabled={busy !== null} type="submit">
+                    <Button disabled={busy} type="submit">
                       {translate(locale, "dashboard.saveProfile")}
                     </Button>
                   </div>
@@ -175,7 +183,7 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
                         />
                       </Field>
                       <div>
-                        <Button disabled={busy !== null} type="submit" variant="outline">
+                        <Button disabled={busy} type="submit" variant="outline">
                           {translate(locale, "settings.createPersonalOrganizer")}
                         </Button>
                       </div>
@@ -255,7 +263,7 @@ function SettingsContent({ locale }: { readonly locale: Locale }) {
                       />
                     </Field>
                     <div>
-                      <Button disabled={busy !== null} type="submit">
+                      <Button disabled={busy} type="submit">
                         {translate(locale, "dashboard.createOrganizer")}
                       </Button>
                     </div>

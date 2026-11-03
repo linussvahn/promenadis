@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "../test/render";
 import { EventTaxonomyEditor } from "./event-taxonomy-editor";
 
 const api = { getEventTaxonomy: vi.fn(), saveEventTaxonomy: vi.fn() };
@@ -49,7 +50,9 @@ describe("EventTaxonomyEditor", () => {
   it("reorders, disables a category and saves suggestions", async () => {
     api.getEventTaxonomy.mockResolvedValue(taxonomy);
     api.saveEventTaxonomy.mockResolvedValue({ ...taxonomy, version: 2 });
-    render(<EventTaxonomyEditor call={call} editable eventId={eventId} locale="en" />);
+    await renderWithRouter(
+      <EventTaxonomyEditor call={call} editable eventId={eventId} locale="en" />,
+    );
     fireEvent.click(await screen.findByText("Categories and suggested tags"));
     fireEvent.click(screen.getByRole("button", { name: "Move up: Books & media" }));
     fireEvent.click(screen.getByLabelText("Other"));
@@ -68,7 +71,9 @@ describe("EventTaxonomyEditor", () => {
 
   it("is read-only after publication", async () => {
     api.getEventTaxonomy.mockResolvedValue(taxonomy);
-    render(<EventTaxonomyEditor call={call} editable={false} eventId={eventId} locale="en" />);
+    await renderWithRouter(
+      <EventTaxonomyEditor call={call} editable={false} eventId={eventId} locale="en" />,
+    );
     fireEvent.click(await screen.findByText("Categories and suggested tags"));
     expect(screen.getByText(/locked since the event was published/u)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Save categories" })).not.toBeInTheDocument();
@@ -76,7 +81,7 @@ describe("EventTaxonomyEditor", () => {
 
   it("has no detectable automated accessibility violations", async () => {
     api.getEventTaxonomy.mockResolvedValue(taxonomy);
-    const { container } = render(
+    const { container } = await renderWithRouter(
       <EventTaxonomyEditor call={call} editable eventId={eventId} locale="en" />,
     );
     fireEvent.click(await screen.findByText("Categories and suggested tags"));
