@@ -591,7 +591,11 @@ function RouteSteps({
               className="quiet-button"
               onClick={() => {
                 clearRoute(route.eventKey);
-                onChange(emptyRoute(route.eventKey, route.expiresAt));
+                // Keeping the sync marker lets an account sync clear the route too.
+                onChange({
+                  ...emptyRoute(route.eventKey, route.expiresAt),
+                  ...(route.sync ? { sync: route.sync } : {}),
+                });
               }}
               type="button"
             >

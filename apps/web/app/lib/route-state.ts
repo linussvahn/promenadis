@@ -1,8 +1,10 @@
 import type { LngLat, Pace } from "@promenadis/routing";
 import type { ComputedPlan } from "./route-compute";
 
-// The visitor's route lives only on this device. Start points, positions and
-// progress are never uploaded, logged or synced, and expire with the event.
+// The visitor's route lives on this device. Start points and positions are
+// never uploaded, logged or synced; a signed-in visitor's chosen sellers and
+// progress also sync to their account (see route-sync.ts). Both expire with
+// the event.
 export interface RoutePreferences {
   readonly mode: "availability" | "shortest";
   readonly pace: Pace;
@@ -18,6 +20,13 @@ export interface RouteProgress {
   readonly skipped: readonly string[];
   readonly visitedSellers: readonly string[];
   readonly visitedStops: readonly string[];
+}
+
+/** The last state confirmed by a signed-in account sync. */
+export interface RouteSync {
+  readonly accountId: string;
+  readonly fingerprint: string;
+  readonly version: number;
 }
 
 export interface SavedRoute {
@@ -37,6 +46,8 @@ export interface SavedRoute {
   readonly preferences: RoutePreferences;
   readonly progress: RouteProgress;
   readonly selected: readonly string[];
+  /** Absent until a signed-in visitor's route is synced. */
+  readonly sync?: RouteSync;
   readonly version: 1;
 }
 

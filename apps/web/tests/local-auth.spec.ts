@@ -1850,6 +1850,97 @@ test("visitors search the public map, follow the safety feed and report a stop",
   }
 });
 
+test("signed-in visitors sync chosen sellers to their account and delete them everywhere", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  if (!admin) throw new Error("Local test configuration missing");
+  const marker = randomUUID().slice(0, 8);
+  const emails = ["owner", "books", "toys", "visitor"].map(
+    (role) => `sync-${role}-${marker}@example.invalid`,
+  );
+  const ids: string[] = [];
+  for (const email of emails) {
+    const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
+    if (error || !data.user) throw error ?? new Error("User missing");
+    ids.push(data.user.id);
+  }
+  const [owner, books, toys, visitor] = ids;
+  try {
+    const eventKey = localSql(`
+      select public.create_scheduled_draft_event_command('${owner}',null,'Sync owner ${marker}','Sync walk ${marker}','',
+        'Europe/Stockholm','public', now()+interval '3 hours', now()+interval '8 hours', gen_random_uuid());
+      select public.upsert_draft_event_boundary_command('${owner}',(select id from public.events where title='Sync walk ${marker}'),null,'Area',
+        '{"type":"Polygon","coordinates":[[[18.0600,59.3100],[18.0700,59.3100],[18.0700,59.3150],[18.0600,59.3150],[18.0600,59.3100]]]}'::jsonb,
+        gen_random_uuid());
+      update public.events set admission_mode='auto_inside' where title='Sync walk ${marker}';
+      select public.apply_to_event_command('${books}',(select id from public.events where title='Sync walk ${marker}'),'Bokbord','Testgatan 1','','',
+        18.062,59.312,'manual',null,true,gen_random_uuid());
+      select public.apply_to_event_command('${toys}',(select id from public.events where title='Sync walk ${marker}'),'Leksaksbord','Testgatan 2','','',
+        18.066,59.313,'manual',null,true,gen_random_uuid());
+      update public.events set state='published' where title='Sync walk ${marker}';
+      update public.events set state='active' where title='Sync walk ${marker}';
+      select app_private.refresh_public_snapshots_command();
+      select public_key from public.events where title='Sync walk ${marker}';`)
+      .split("\n")
+      .at(-1);
+    const stored = () =>
+      localSql(`select coalesce(cardinality(selected_participation_ids),-1)||':'||(deleted_at is not null)
+        from app_private.saved_routes where account_id='${visitor}';`);
+
+    // Anonymous visitors keep the walk on the device and are offered sign-in.
+    await page.goto(`/e/${eventKey}/map`);
+    await expect(
+      page.getByRole("link", { name: "Logga in för att ha promenaden på alla dina enheter" }),
+    ).toBeVisible();
+
+    await signIn(page, emails[3] ?? "");
+    await page.goto(`/e/${eventKey}/map`);
+    const addToWalk = page.getByLabel("Lägg till i promenaden");
+    await expect(addToWalk).toHaveCount(2);
+    await addToWalk.nth(0).check();
+    await addToWalk.nth(1).check();
+    await expect(page.getByText(/Promenaden sparas på ditt konto/u)).toBeVisible();
+    await expect.poll(stored, { timeout: 10_000 }).toBe("2:false");
+    expect(
+      localSql(`select count(*) from information_schema.columns where table_schema='app_private'
+        and table_name='saved_routes' and column_name ~ '(latitude|longitude|position|accuracy|start_point)';`),
+    ).toBe("0");
+
+    // A fresh device (no local copy) gets the walk back from the account.
+    await page.evaluate((key) => localStorage.removeItem(`promenadis-route:${key}`), eventKey);
+    await page.reload();
+    await expect(addToWalk.nth(0)).toBeChecked();
+    await expect(addToWalk.nth(1)).toBeChecked();
+
+    // Deleting removes it here and leaves only an empty tombstone on the server.
+    await page.getByRole("button", { name: "Radera promenaden på alla enheter" }).click();
+    await expect(addToWalk.nth(0)).not.toBeChecked();
+    await expect.poll(stored, { timeout: 10_000 }).toBe("0:true");
+    await page.evaluate((key) => localStorage.removeItem(`promenadis-route:${key}`), eventKey);
+    await page.reload();
+    await expect(addToWalk.nth(0)).toBeVisible();
+    await expect(addToWalk.nth(0)).not.toBeChecked();
+
+    // Another account on the same browser does not inherit it.
+    await addToWalk.nth(1).check();
+    await expect.poll(stored, { timeout: 10_000 }).toBe("1:false");
+    await page.goto("/dashboard");
+    await expect(page.getByLabel("Färgtema")).toBeEnabled();
+    await page.getByRole("button", { name: "Logga ut" }).click();
+    await expect(page).toHaveURL(/\/sign-in$/u);
+    await signIn(page, emails[1] ?? "");
+    await page.goto(`/e/${eventKey}/map`);
+    await expect(page.getByText(/Promenaden sparas på ditt konto/u)).toBeVisible();
+    await expect(addToWalk.nth(1)).not.toBeChecked();
+    expect(
+      localSql(`select count(*) from app_private.saved_routes where account_id='${books}';`),
+    ).toBe("0");
+  } finally {
+    for (const email of emails) await deleteSyntheticAccount(email);
+  }
+});
+
 test("hosts build, inspect, correct and approve the walking network", async ({
   context,
   page,

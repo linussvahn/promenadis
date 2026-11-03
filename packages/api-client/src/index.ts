@@ -1,5 +1,7 @@
 import {
   type AcceptEventTeamInviteRequest,
+  type SaveSyncedRouteRequest,
+  syncedRouteResponseSchema,
   type AccountRecoveryTokenRequest,
   type AdminEventInterventionRequest,
   type ApplyToEventRequest,
@@ -971,6 +973,25 @@ export function createPromenadisApiClient(config: ApiClientConfig) {
     },
     getDashboard(accessToken: string): Promise<IdentityDashboard> {
       return request("/dashboard", accessToken, identityDashboardSchema);
+    },
+    getSyncedRoute(accessToken: string, route: "public" | "unlisted", key: string) {
+      return request(`/account/routes/${route}/${key}`, accessToken, syncedRouteResponseSchema);
+    },
+    saveSyncedRoute(
+      accessToken: string,
+      route: "public" | "unlisted",
+      key: string,
+      input: SaveSyncedRouteRequest,
+    ) {
+      return request(`/account/routes/${route}/${key}`, accessToken, syncedRouteResponseSchema, {
+        body: input,
+        method: "PUT",
+      });
+    },
+    deleteSyncedRoute(accessToken: string, route: "public" | "unlisted", key: string) {
+      return request(`/account/routes/${route}/${key}`, accessToken, syncedRouteResponseSchema, {
+        method: "DELETE",
+      });
     },
     getEventTeam(accessToken: string, eventId: string) {
       return request(`/events/${eventId}/team`, accessToken, eventTeamSummarySchema);

@@ -1071,6 +1071,15 @@ const sv = {
   "route.startWalk": "Starta promenaden",
   "route.notSaved":
     "Promenaden kunde inte sparas på enheten. Den försvinner om du laddar om sidan.",
+  "route.sync.off": "",
+  "route.sync.saving": "Sparar promenaden på ditt konto …",
+  "route.sync.synced":
+    "Promenaden sparas på ditt konto: valda säljare och besök, aldrig din position.",
+  "route.sync.offline":
+    "Kunde inte spara på ditt konto just nu. Promenaden finns kvar på enheten och sparas när du är online igen.",
+  "route.sync.closed": "Evenemanget är slut. Den sparade promenaden raderas inom 24 timmar.",
+  "route.sync.remove": "Radera promenaden på alla enheter",
+  "route.sync.signIn": "Logga in för att ha promenaden på alla dina enheter",
   "route.manualAccess": "Nås manuellt enligt arrangören",
   "route.start.location": "Min position",
   "location.purpose":
@@ -2313,6 +2322,15 @@ const en = {
   "route.end": "End the walk",
   "route.startWalk": "Start the walk",
   "route.notSaved": "The walk could not be saved on this device. It will be lost if you reload.",
+  "route.sync.off": "",
+  "route.sync.saving": "Saving the walk to your account …",
+  "route.sync.synced":
+    "The walk is saved to your account: chosen sellers and visits, never your position.",
+  "route.sync.offline":
+    "Could not save to your account right now. The walk stays on this device and saves when you are back online.",
+  "route.sync.closed": "The event is over. The saved walk is deleted within 24 hours.",
+  "route.sync.remove": "Delete the walk on all devices",
+  "route.sync.signIn": "Sign in to keep the walk on all your devices",
   "route.manualAccess": "Reached manually, per the organizer",
   "route.start.location": "My location",
   "location.purpose":

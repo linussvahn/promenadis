@@ -1415,6 +1415,54 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_routes: {
+        Row: {
+          account_id: string
+          deleted_at: string | null
+          event_id: string
+          mode: string
+          must_see_participation_ids: string[]
+          pace: string
+          return_to_start: boolean
+          selected_participation_ids: string[]
+          skipped_location_ids: string[]
+          updated_at: string
+          version: number
+          visited_location_ids: string[]
+          visited_participation_ids: string[]
+        }
+        Insert: {
+          account_id: string
+          deleted_at?: string | null
+          event_id: string
+          mode?: string
+          must_see_participation_ids?: string[]
+          pace?: string
+          return_to_start?: boolean
+          selected_participation_ids?: string[]
+          skipped_location_ids?: string[]
+          updated_at?: string
+          version?: number
+          visited_location_ids?: string[]
+          visited_participation_ids?: string[]
+        }
+        Update: {
+          account_id?: string
+          deleted_at?: string | null
+          event_id?: string
+          mode?: string
+          must_see_participation_ids?: string[]
+          pace?: string
+          return_to_start?: boolean
+          selected_participation_ids?: string[]
+          skipped_location_ids?: string[]
+          updated_at?: string
+          version?: number
+          visited_location_ids?: string[]
+          visited_participation_ids?: string[]
+        }
+        Relationships: []
+      }
       support_requests: {
         Row: {
           body: string
@@ -1682,6 +1730,7 @@ export type Database = {
       purge_geocode_records_command: { Args: never; Returns: undefined }
       purge_moderation_records: { Args: { p_now: string }; Returns: number }
       purge_report_rate_buckets_command: { Args: never; Returns: undefined }
+      purge_saved_routes_command: { Args: never; Returns: number }
       queue_relay_message: {
         Args: {
           p_direction: string
@@ -1742,6 +1791,27 @@ export type Database = {
       }
       routing_locations: { Args: { p_event_id: string }; Returns: Json }
       routing_overrides_hash: { Args: { p_event_id: string }; Returns: string }
+      saved_route_json: {
+        Args: {
+          p_event: Database["public"]["Tables"]["events"]["Row"]
+          p_route: Database["app_private"]["Tables"]["saved_routes"]["Row"]
+        }
+        Returns: Json
+      }
+      saved_route_sellers: {
+        Args: {
+          p_event: Database["public"]["Tables"]["events"]["Row"]
+          p_ids: Json
+        }
+        Returns: string[]
+      }
+      saved_route_stops: {
+        Args: {
+          p_event: Database["public"]["Tables"]["events"]["Row"]
+          p_ids: Json
+        }
+        Returns: string[]
+      }
       seller_listing_summary: {
         Args: { p_participation_id: string }
         Returns: Json
@@ -3725,6 +3795,10 @@ export type Database = {
         }
         Returns: string
       }
+      delete_saved_route_command: {
+        Args: { p_actor_id: string; p_key: string; p_route: string }
+        Returns: Json
+      }
       download_event_export_command: {
         Args: { p_actor_id: string; p_export_id: string; p_token: string }
         Returns: string
@@ -3850,6 +3924,10 @@ export type Database = {
       }
       get_organizer_verification_command: {
         Args: { p_actor_id: string; p_organizer_profile_id: string }
+        Returns: Json
+      }
+      get_saved_route_command: {
+        Args: { p_actor_id: string; p_key: string; p_route: string }
         Returns: Json
       }
       get_seller_listing_command: {
@@ -4294,6 +4372,16 @@ export type Database = {
           p_event_id: string
           p_expected_version: number
           p_suggested_tags: string[]
+        }
+        Returns: Json
+      }
+      save_saved_route_command: {
+        Args: {
+          p_actor_id: string
+          p_body: Json
+          p_expected_version: number
+          p_key: string
+          p_route: string
         }
         Returns: Json
       }

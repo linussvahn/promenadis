@@ -28,6 +28,7 @@ import {
   setMustSee,
   setSelected,
 } from "../lib/route-state";
+import { hasContent, useRouteSync } from "../lib/route-sync";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { DEFAULT_CENTER, MAP_STYLE, MapErrorBoundary } from "./boundary-editor";
 import { RoutePlanner } from "./route-planner";
@@ -530,6 +531,12 @@ export function PublicEventMap({
     },
     [admit, walk.active],
   );
+  const sync = useRouteSync(
+    route,
+    walk,
+    changeWalk,
+    Boolean(expiresAt) && walk.expiresAt === expiresAt,
+  );
   // Starting (or resuming) a walk is the explicit action that keeps the
   // event's data on the device for offline use.
   useEffect(() => {
@@ -644,6 +651,24 @@ export function PublicEventMap({
             stops={allStops}
           />
           {storageFailed ? <p className="notice">{translate(locale, "route.notSaved")}</p> : null}
+          {sync.signedIn ? (
+            <div className="route-sync">
+              <p className="field-hint" role="status">
+                {translate(locale, `route.sync.${sync.state}`)}
+              </p>
+              {sync.state === "synced" && hasContent(walk) ? (
+                <button className="quiet-button" onClick={() => void sync.remove()} type="button">
+                  {translate(locale, "route.sync.remove")}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <p className="field-hint">
+              <a className="text-link" href="/sign-in">
+                {translate(locale, "route.sync.signIn")}
+              </a>
+            </p>
+          )}
           <section
             aria-label={translate(locale, "map.mapLabel")}
             className="boundary-map public-map"

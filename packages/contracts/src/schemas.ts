@@ -1839,7 +1839,42 @@ export const supportRequestsSchema = z.array(
 );
 export type SupportRequests = z.infer<typeof supportRequestsSchema>;
 
+// Signed-in route sync: chosen sellers, progress and route-wide preferences
+// only. Start points, positions and accuracy have no field here.
+const syncedRouteFields = {
+  mustSee: z.array(publicId).max(10),
+  preferences: z.strictObject({
+    mode: z.enum(["availability", "shortest"]),
+    pace: z.enum(["quick", "standard", "leisurely"]),
+    returnToStart: z.boolean(),
+  }),
+  selected: z.array(publicId).max(500),
+  skipped: z.array(publicId).max(500),
+  visitedSellers: z.array(publicId).max(500),
+  visitedStops: z.array(publicId).max(500),
+};
+export const saveSyncedRouteRequestSchema = z.strictObject({
+  ...syncedRouteFields,
+  expectedVersion: z.number().int().nonnegative(),
+});
+export type SaveSyncedRouteRequest = z.infer<typeof saveSyncedRouteRequestSchema>;
+export const syncedRouteSchema = z.strictObject({
+  ...syncedRouteFields,
+  deleted: z.boolean(),
+  version: z.number().int().positive(),
+});
+export type SyncedRoute = z.infer<typeof syncedRouteSchema>;
+// A version conflict is a normal answer (200): the client merges and retries.
+export const syncedRouteResponseSchema = z.strictObject({
+  conflict: z.boolean(),
+  route: syncedRouteSchema.nullable(),
+});
+export type SyncedRouteResponse = z.infer<typeof syncedRouteResponseSchema>;
+
 export const boundarySchemas = {
+  SaveSyncedRouteRequest: saveSyncedRouteRequestSchema,
+  SyncedRoute: syncedRouteSchema,
+  SyncedRouteResponse: syncedRouteResponseSchema,
   AdminOperations: adminOperationsSchema,
   EventFeedbackRequest: eventFeedbackRequestSchema,
   OperationsStatus: operationsStatusSchema,

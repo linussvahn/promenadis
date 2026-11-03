@@ -132,6 +132,8 @@ import {
   updateEventTeamMemberRoleRequestSchema,
   updateOrganizerProfileRequestSchema,
   updateProfileRequestSchema,
+  saveSyncedRouteRequestSchema,
+  syncedRouteResponseSchema,
 } from "../../../packages/contracts/src/schemas.ts";
 import { sessionFromVerifiedAccessToken } from "../../../packages/domain/src/auth-session.ts";
 import { normalizeOrganizationNumber } from "../../../packages/domain/src/organization-number.ts";
@@ -1430,6 +1432,59 @@ Deno.serve(async (request) => {
       });
       if (error) throw error;
       const parsed = accountProfileSchema.safeParse(data);
+      if (!parsed.success) throw new Error("invalid_internal_response");
+      status = "succeeded";
+      return json(parsed.data, 200, correlationId, origin);
+    }
+
+    // Signed-in route sync. Only chosen sellers, progress and route-wide
+    // preferences are accepted; start points and positions have no field.
+    const syncedRoute = route.match(/^\/account\/routes\/(public|unlisted)\/([0-9a-f]{32})$/u);
+    if (syncedRoute && ["DELETE", "GET", "PUT"].includes(request.method)) {
+      const [, visibility, key] = syncedRoute;
+      let result: { data: unknown; error: unknown };
+      if (request.method === "PUT") {
+        operation = "route.sync_save";
+        const input = saveSyncedRouteRequestSchema.safeParse(await requestBody(request));
+        if (!input.success) {
+          status = "denied";
+          return apiError("invalid_request", "Check the route.", 400, correlationId, origin);
+        }
+        const { expectedVersion, ...body } = input.data;
+        result = await admin.rpc("save_saved_route_command", {
+          p_actor_id: actorId,
+          p_body: body,
+          p_expected_version: expectedVersion,
+          p_key: key,
+          p_route: visibility,
+        });
+      } else {
+        operation = request.method === "GET" ? "route.sync_read" : "route.sync_delete";
+        result = await admin.rpc(
+          request.method === "GET" ? "get_saved_route_command" : "delete_saved_route_command",
+          { p_actor_id: actorId, p_key: key, p_route: visibility },
+        );
+      }
+      if (result.error) throw result.error;
+      const outcome = result.data as { status?: string; route?: unknown } | null;
+      if (outcome?.status === "not_found") {
+        status = "denied";
+        return apiError("not_found", "Event not found.", 404, correlationId, origin);
+      }
+      if (outcome?.status === "closed") {
+        status = "denied";
+        return apiError(
+          "route_closed",
+          "This event no longer saves routes.",
+          410,
+          correlationId,
+          origin,
+        );
+      }
+      const parsed = syncedRouteResponseSchema.safeParse({
+        conflict: outcome?.status === "conflict",
+        route: outcome?.route ?? null,
+      });
       if (!parsed.success) throw new Error("invalid_internal_response");
       status = "succeeded";
       return json(parsed.data, 200, correlationId, origin);

@@ -11,7 +11,7 @@ for (const file of readdirSync(directory)
   .sort()) {
   const source = readFileSync(new URL(file, directory), "utf8");
   if (
-    !/^begin;/u.test(source.trim()) ||
+    !/^(?:--[^\n]*\n\s*)*begin;/u.test(source.trim()) ||
     !/rollback;$/u.test(source.trim()) ||
     /\bcommit\s*;/iu.test(source)
   ) {
@@ -19,9 +19,12 @@ for (const file of readdirSync(directory)
   }
   const input = source.replace(
     "begin;",
+    // Seeded switch keys are cascaded away with their setters; keep the keys.
     `begin;
+    create temporary table seeded_switches on commit drop as select key from app_private.kill_switches;
     truncate auth.users, public.organizer_profiles, app_private.audit_events,
-      app_private.local_recovery_budget cascade;`,
+      app_private.local_recovery_budget, app_private.support_requests cascade;
+    insert into app_private.kill_switches (key) select key from seeded_switches;`,
   );
   const output = execFileSync(
     "docker",

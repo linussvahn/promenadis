@@ -1,6 +1,301 @@
 {
   "components": {
     "schemas": {
+      "SaveSyncedRouteRequest": {
+        "type": "object",
+        "properties": {
+          "mustSee": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "preferences": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "availability",
+                  "shortest"
+                ]
+              },
+              "pace": {
+                "type": "string",
+                "enum": [
+                  "quick",
+                  "standard",
+                  "leisurely"
+                ]
+              },
+              "returnToStart": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mode",
+              "pace",
+              "returnToStart"
+            ],
+            "additionalProperties": false
+          },
+          "selected": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "skipped": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "visitedSellers": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "visitedStops": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "mustSee",
+          "preferences",
+          "selected",
+          "skipped",
+          "visitedSellers",
+          "visitedStops",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "SyncedRoute": {
+        "type": "object",
+        "properties": {
+          "mustSee": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "preferences": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "availability",
+                  "shortest"
+                ]
+              },
+              "pace": {
+                "type": "string",
+                "enum": [
+                  "quick",
+                  "standard",
+                  "leisurely"
+                ]
+              },
+              "returnToStart": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mode",
+              "pace",
+              "returnToStart"
+            ],
+            "additionalProperties": false
+          },
+          "selected": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "skipped": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "visitedSellers": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "visitedStops": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "mustSee",
+          "preferences",
+          "selected",
+          "skipped",
+          "visitedSellers",
+          "visitedStops",
+          "deleted",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "SyncedRouteResponse": {
+        "type": "object",
+        "properties": {
+          "conflict": {
+            "type": "boolean"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mustSee": {
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{24}$"
+                    }
+                  },
+                  "preferences": {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "availability",
+                          "shortest"
+                        ]
+                      },
+                      "pace": {
+                        "type": "string",
+                        "enum": [
+                          "quick",
+                          "standard",
+                          "leisurely"
+                        ]
+                      },
+                      "returnToStart": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "mode",
+                      "pace",
+                      "returnToStart"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "selected": {
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{24}$"
+                    }
+                  },
+                  "skipped": {
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{24}$"
+                    }
+                  },
+                  "visitedSellers": {
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{24}$"
+                    }
+                  },
+                  "visitedStops": {
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{24}$"
+                    }
+                  },
+                  "deleted": {
+                    "type": "boolean"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "mustSee",
+                  "preferences",
+                  "selected",
+                  "skipped",
+                  "visitedSellers",
+                  "visitedStops",
+                  "deleted",
+                  "version"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "conflict",
+          "route"
+        ],
+        "additionalProperties": false
+      },
       "AdminOperations": {
         "type": "object",
         "properties": {

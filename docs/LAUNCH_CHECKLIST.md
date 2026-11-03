@@ -232,7 +232,8 @@ versioned shell/page/asset caches, no data caching, and user-accepted
 updates) is complete locally: offline-store and geolocation tests and the
 e2e walking test going offline and back. Milestone 4 is complete locally
 except real-device and installed-PWA testing (Milestone 6), the hosted graph
-source and compiler, and signed-in route sync. Offline reload of the page
+source and compiler. Signed-in route sync followed on 2026-11-03 (chosen
+sellers and progress only, deleted within 24 hours). Offline reload of the page
 itself is verified against the production build by `pnpm test:local-offline`
 (a walk started on the first visit survives an offline reload; service
 worker v3).

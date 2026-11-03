@@ -549,10 +549,12 @@ the hints never alter location identity, retention, capacity, or progress.
 ### Visitors
 
 - `event_attendance`: interested/going private-to-user state.
-- `saved_routes`: selected physical stops and route configuration.
-- Saved-route configuration includes visit-time preset/custom base and sparse
-  per-location overrides; anonymous equivalents remain in local browser state.
-- `route_stop_progress`: visited/skipped state; never a GPS trail.
+- `saved_routes` (`app_private`): chosen sellers, must-sees, route-wide
+  preferences (mode, pace preset, return to start) and visited/skipped
+  progress in one versioned row per account and event, by private ID; never a
+  GPS trail, start point or plan. Custom visit times and per-location
+  overrides will join it when the planner offers them; anonymous state
+  remains in local browser state.
 
 Identifiable attendance, saved routes, and route progress use event-relative
 expiry jobs and deletion tombstones. They are not copied into event-history

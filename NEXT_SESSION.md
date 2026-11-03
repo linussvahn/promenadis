@@ -456,6 +456,32 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Signed-in route sync (2026-11-03)
+
+Migration `20261108000100_saved_routes.sql`: `app_private.saved_routes`, one
+row per account and event, holding only the chosen sellers, must-sees,
+visited sellers and stops, skipped stops and the route-wide preferences
+(mode, pace, return to start). No start point, position, accuracy or plan is
+sent or stored. Rows hold private IDs, mapped to and from public IDs per
+request, so a replaced link keeps the route. Saves are versioned; a stale
+version gets the current route back (`conflict: true`, HTTP 200) for the
+browser to merge. Early deletion leaves an empty tombstone so other devices
+clear their copy. Saves stop once the event ends, is cancelled or passes its
+hard expiry; `purge_saved_routes_command` (every 15 minutes, heartbeat
+`saved_routes`) deletes rows 23 hours after the earlier of the last
+interval's end and an early end or cancellation. Account deletion cascades.
+
+BFF: `GET/PUT/DELETE /account/routes/{public|unlisted}/{key}`. Browser:
+`app/lib/route-sync.ts` (`reconcile`: adopt the account's route on a fresh
+device, merge as a union when both sides changed, never carry a route synced
+for another account into this one; `useRouteSync` reads on load, focus,
+session change and reconnect, and saves 0.8 s after a change). The map shows
+the sync state and "Delete the walk on all devices"; anonymous visitors see
+a sign-in link. Tests: `440_saved_routes.test.sql`, `route-sync.test.ts`
+and the local-auth e2e "signed-in visitors sync chosen sellers…".
+`pnpm db:test:preserve` now accepts fixtures that start with a comment and
+keeps seeded kill-switch keys; it passes all files again.
+
 ### Map and offline follow-up (2026-11-03)
 
 No migration. The map draws the location accuracy as a circle around the
@@ -467,8 +493,8 @@ assets and page that loaded before it took control, and keeps `theme.js`
 and `register-sw.js` for offline use. Before this, a walk started on the
 first visit fell back to the generic offline page on reload.
 `pnpm test:local-offline` proves the fix against the production build.
-Still open: real devices and installed PWAs, signed-in route sync
-(deferred).
+Still open: real devices and installed PWAs. Signed-in route sync followed
+below.
 
 ### Script nonce CSP (2026-11-03)
 

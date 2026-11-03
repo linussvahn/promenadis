@@ -14,7 +14,13 @@ const mocks = vi.hoisted(() => ({
   getPublicSafetyFeed: vi.fn(),
   getPublicSnapshot: vi.fn(),
 }));
-vi.mock("../lib/supabase", () => ({ getPromenadisApiClient: () => mocks }));
+vi.mock("../lib/supabase", () => ({
+  // An anonymous visitor: route sync stays off.
+  getBrowserAuthClient: () => ({
+    auth: { getSession: async () => ({ data: { session: null }, error: null }) },
+  }),
+  getPromenadisApiClient: () => mocks,
+}));
 
 const key = "c".repeat(32);
 const later = new Date(Date.now() + 3_600_000).toISOString();
