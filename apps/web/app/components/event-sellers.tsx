@@ -12,8 +12,22 @@ import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { EventCases } from "./event-cases";
-import { SellerInvites } from "./seller-invites";
 import { EventTaxonomyEditor } from "./event-taxonomy-editor";
+import { SellerInvites } from "./seller-invites";
+import { Alert } from "./ui/alert";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
+import { Checkbox, Radio } from "./ui/checkbox";
+import { ChoiceField, Field, FieldDescription, FieldLegend, FieldSet } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+
+const actions = "flex flex-wrap items-center gap-2";
+const details =
+  "rounded-xl border bg-card px-4 py-3 [&>summary]:flex [&>summary]:min-h-8 [&>summary]:cursor-pointer [&>summary]:items-center [&>summary]:text-sm [&>summary]:font-semibold";
+const subForm = "mt-3 grid gap-4";
 
 const errorKeys = {
   conflict_of_interest: "sellers.ownApplication",
@@ -147,19 +161,27 @@ export function EventSellers({
       : `${window.location.origin}/events/${event.id}/join`;
 
   return (
-    <div className="event-sellers">
-      <section aria-labelledby="places-heading" className="panel">
-        <h2 id="places-heading">{translate(locale, "sellers.places")}</h2>
-        <p className="capacity-summary">
-          {translate(locale, "sellers.capacity")
-            .replace("{used}", String(data.placesUsed))
-            .replace("{limit}", String(data.sellerLimit))
-            .replace("{locations}", String(data.locationCount))}
-        </p>
-        <label htmlFor="seller-join-link">{translate(locale, "sellers.joinLink")}</label>
-        <input id="seller-join-link" readOnly value={joinUrl} />
-        <p className="field-help">{translate(locale, "sellers.joinLinkHelp")}</p>
-      </section>
+    <div className="grid min-w-0 content-start gap-5">
+      <Card asChild>
+        <section aria-labelledby="places-heading">
+          <CardHeader>
+            <CardTitle id="places-heading">{translate(locale, "sellers.places")}</CardTitle>
+            <CardDescription className="text-base font-semibold text-foreground">
+              {translate(locale, "sellers.capacity")
+                .replace("{used}", String(data.placesUsed))
+                .replace("{limit}", String(data.sellerLimit))
+                .replace("{locations}", String(data.locationCount))}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Field>
+              <Label htmlFor="seller-join-link">{translate(locale, "sellers.joinLink")}</Label>
+              <Input className="bg-muted" id="seller-join-link" readOnly value={joinUrl} />
+              <FieldDescription>{translate(locale, "sellers.joinLinkHelp")}</FieldDescription>
+            </Field>
+          </CardContent>
+        </section>
+      </Card>
 
       {canManage ? (
         <SellerInvites call={call} eventId={event.id} locale={locale} timezone={event.timezone} />
@@ -181,169 +203,195 @@ export function EventSellers({
       />
 
       {canManage && (event.state === "draft" || event.state === "published") ? (
-        <form className="panel form-panel" key={data.eventVersion} onSubmit={saveAdmission}>
-          <h2>{translate(locale, "sellers.admission")}</h2>
-          <fieldset className="choice-group">
-            <legend>{translate(locale, "sellers.admissionMode")}</legend>
-            {(["auto_inside", "host_approval", "invite_only"] as const).map((mode) => (
-              <label className="checkbox-field" key={mode}>
-                <input
-                  defaultChecked={data.admissionMode === mode}
-                  name="admissionMode"
-                  type="radio"
-                  value={mode}
-                />
-                <span>{translate(locale, `admission.${mode}`)}</span>
-              </label>
-            ))}
-          </fieldset>
-          <label className="checkbox-field">
-            <input
-              defaultChecked={data.waitlistPromotionPaused}
-              name="promotionPaused"
-              type="checkbox"
-            />
-            <span>{translate(locale, "sellers.promotionPaused")}</span>
-          </label>
-          <button className="secondary-button" disabled={busy} type="submit">
-            {translate(locale, "sellers.saveAdmission")}
-          </button>
-        </form>
+        <Card asChild>
+          <form key={data.eventVersion} onSubmit={saveAdmission}>
+            <CardHeader>
+              <CardTitle>{translate(locale, "sellers.admission")}</CardTitle>
+            </CardHeader>
+            <CardContent className="gap-5">
+              <FieldSet>
+                <FieldLegend>{translate(locale, "sellers.admissionMode")}</FieldLegend>
+                {(["auto_inside", "host_approval", "invite_only"] as const).map((mode) => (
+                  <ChoiceField key={mode}>
+                    <Radio
+                      defaultChecked={data.admissionMode === mode}
+                      name="admissionMode"
+                      value={mode}
+                    />
+                    <span>{translate(locale, `admission.${mode}`)}</span>
+                  </ChoiceField>
+                ))}
+              </FieldSet>
+              <ChoiceField className="border-t pt-5">
+                <Checkbox defaultChecked={data.waitlistPromotionPaused} name="promotionPaused" />
+                <span>{translate(locale, "sellers.promotionPaused")}</span>
+              </ChoiceField>
+            </CardContent>
+            <CardFooter>
+              <Button disabled={busy} type="submit" variant="outline">
+                {translate(locale, "sellers.saveAdmission")}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
       ) : null}
       {canManage && (event.state === "draft" || event.state === "published") ? (
-        <form className="panel form-panel" key={`early-${data.eventVersion}`} onSubmit={saveEarly}>
-          <h2>{translate(locale, "sellers.earlyVisibility")}</h2>
-          <label className="checkbox-field">
-            <input
-              defaultChecked={data.earlyLocationVisibility}
-              name="earlyVisible"
-              type="checkbox"
-            />
-            <span>{translate(locale, "sellers.earlyVisibilityLabel")}</span>
-          </label>
-          <p className="field-hint">{translate(locale, "sellers.earlyVisibilityHint")}</p>
-          <button className="secondary-button" disabled={busy} type="submit">
-            {translate(locale, "sellers.saveEarlyVisibility")}
-          </button>
-        </form>
+        <Card asChild>
+          <form key={`early-${data.eventVersion}`} onSubmit={saveEarly}>
+            <CardHeader>
+              <CardTitle>{translate(locale, "sellers.earlyVisibility")}</CardTitle>
+            </CardHeader>
+            <CardContent className="gap-2">
+              <ChoiceField>
+                <Checkbox defaultChecked={data.earlyLocationVisibility} name="earlyVisible" />
+                <span>{translate(locale, "sellers.earlyVisibilityLabel")}</span>
+              </ChoiceField>
+              <FieldDescription className="pl-8">
+                {translate(locale, "sellers.earlyVisibilityHint")}
+              </FieldDescription>
+            </CardContent>
+            <CardFooter>
+              <Button disabled={busy} type="submit" variant="outline">
+                {translate(locale, "sellers.saveEarlyVisibility")}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
       ) : null}
 
-      <section aria-labelledby="applications-heading" className="panel">
-        <h2 id="applications-heading">{translate(locale, "sellers.applications")}</h2>
-        {sellers.length === 0 ? <p>{translate(locale, "sellers.empty")}</p> : null}
-        {sellers.map((seller) => {
-          const open = ["pending", "waitlisted"].includes(seller.state);
-          const holding = ["approved", "suspended", "pending_address_change"].includes(
-            seller.state,
-          );
-          return (
-            <article className="review-item" key={seller.id}>
-              <h3>{seller.displayName}</h3>
-              <p>
-                <span className="status-pill status-pill-muted">
-                  {translate(locale, `participation.${seller.state}`)}
-                </span>{" "}
-                {seller.geographicException ? translate(locale, "sellers.outside") : null}
-              </p>
-              {seller.location ? (
-                <p>
-                  {seller.location.addressLine}
-                  {seller.location.postalCode ? `, ${seller.location.postalCode}` : ""}
-                  {seller.location.locality ? ` ${seller.location.locality}` : ""}
-                </p>
-              ) : null}
-              {seller.location ? (
-                <LocationTools
-                  busy={busy}
-                  canReview={canManage}
-                  locale={locale}
-                  location={seller.location}
-                  otherLocations={data.sellers.flatMap((other) =>
-                    other.location &&
-                    other.location.id !== seller.location?.id &&
-                    other.location.addressLine.toLowerCase() ===
-                      seller.location?.addressLine.toLowerCase()
-                      ? [other.location]
-                      : [],
-                  )}
-                  onCorrect={(input) =>
-                    run(({ api, token }) =>
-                      api.correctLocationPin(token, seller.location?.id ?? "", input),
-                    )
-                  }
-                  onReview={(input) =>
-                    run(({ api, token }) => api.reviewEventLocation(token, event.id, input))
-                  }
-                  participationId={seller.id}
-                />
-              ) : null}
-              <p className="field-help">
-                {translate(locale, "sellers.appliedAt")}{" "}
-                {formatDateTime(locale, seller.appliedAt, event.timezone)}
-              </p>
-              <SellerListingView
-                call={call}
-                eventActive={event.state === "active"}
-                locale={locale}
-                onChanged={load}
-                participation={seller}
-              />
-              {open || holding ? (
-                <form className="details-form" onSubmit={(formEvent) => decide(seller, formEvent)}>
-                  <label htmlFor={`seller-reason-${seller.id}`}>
-                    {translate(locale, "sellers.reason")}
-                  </label>
-                  <textarea id={`seller-reason-${seller.id}`} maxLength={500} name="reason" />
-                  <div className="form-actions">
-                    {open || seller.state === "pending_address_change" ? (
-                      <button
-                        className="primary-button"
-                        disabled={busy}
-                        type="submit"
-                        value="approve"
-                      >
-                        {translate(locale, open ? "sellers.approve" : "sellers.approveAddress")}
-                      </button>
-                    ) : null}
-                    {open ? (
-                      <>
-                        {seller.state === "pending" ? (
-                          <button
-                            className="secondary-button"
+      <Card asChild>
+        <section aria-labelledby="applications-heading">
+          <CardHeader>
+            <CardTitle id="applications-heading">
+              {translate(locale, "sellers.applications")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="gap-0 divide-y">
+            {sellers.length === 0 ? (
+              <p className="text-muted-foreground">{translate(locale, "sellers.empty")}</p>
+            ) : null}
+            {sellers.map((seller) => {
+              const open = ["pending", "waitlisted"].includes(seller.state);
+              const holding = ["approved", "suspended", "pending_address_change"].includes(
+                seller.state,
+              );
+              return (
+                <article className="grid gap-3 py-5 first:pt-0 last:pb-0" key={seller.id}>
+                  <div className="grid gap-1.5">
+                    <h3 className="text-lg font-bold">{seller.displayName}</h3>
+                    <p className="flex flex-wrap items-center gap-2 text-sm">
+                      <Badge variant="secondary">
+                        {translate(locale, `participation.${seller.state}`)}
+                      </Badge>{" "}
+                      {seller.geographicException ? translate(locale, "sellers.outside") : null}
+                    </p>
+                  </div>
+                  {seller.location ? (
+                    <p>
+                      {seller.location.addressLine}
+                      {seller.location.postalCode ? `, ${seller.location.postalCode}` : ""}
+                      {seller.location.locality ? ` ${seller.location.locality}` : ""}
+                    </p>
+                  ) : null}
+                  {seller.location ? (
+                    <LocationTools
+                      busy={busy}
+                      canReview={canManage}
+                      locale={locale}
+                      location={seller.location}
+                      otherLocations={data.sellers.flatMap((other) =>
+                        other.location &&
+                        other.location.id !== seller.location?.id &&
+                        other.location.addressLine.toLowerCase() ===
+                          seller.location?.addressLine.toLowerCase()
+                          ? [other.location]
+                          : [],
+                      )}
+                      onCorrect={(input) =>
+                        run(({ api, token }) =>
+                          api.correctLocationPin(token, seller.location?.id ?? "", input),
+                        )
+                      }
+                      onReview={(input) =>
+                        run(({ api, token }) => api.reviewEventLocation(token, event.id, input))
+                      }
+                      participationId={seller.id}
+                    />
+                  ) : null}
+                  <p className="text-sm text-muted-foreground">
+                    {translate(locale, "sellers.appliedAt")}{" "}
+                    {formatDateTime(locale, seller.appliedAt, event.timezone)}
+                  </p>
+                  <SellerListingView
+                    call={call}
+                    eventActive={event.state === "active"}
+                    locale={locale}
+                    onChanged={load}
+                    participation={seller}
+                  />
+                  {open || holding ? (
+                    <form
+                      className="grid gap-3 rounded-xl bg-muted/50 p-4"
+                      onSubmit={(formEvent) => decide(seller, formEvent)}
+                    >
+                      <Field>
+                        <Label htmlFor={`seller-reason-${seller.id}`}>
+                          {translate(locale, "sellers.reason")}
+                        </Label>
+                        <Textarea
+                          className="min-h-20"
+                          id={`seller-reason-${seller.id}`}
+                          maxLength={500}
+                          name="reason"
+                        />
+                      </Field>
+                      <div className={actions}>
+                        {open || seller.state === "pending_address_change" ? (
+                          <Button disabled={busy} type="submit" value="approve">
+                            {translate(locale, open ? "sellers.approve" : "sellers.approveAddress")}
+                          </Button>
+                        ) : null}
+                        {open ? (
+                          <>
+                            {seller.state === "pending" ? (
+                              <Button
+                                disabled={busy}
+                                type="submit"
+                                value="waitlist"
+                                variant="outline"
+                              >
+                                {translate(locale, "sellers.waitlist")}
+                              </Button>
+                            ) : null}
+                            <Button
+                              disabled={busy}
+                              type="submit"
+                              value="reject"
+                              variant="destructive"
+                            >
+                              {translate(locale, "sellers.reject")}
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
                             disabled={busy}
                             type="submit"
-                            value="waitlist"
+                            value="revoke"
+                            variant="destructive"
                           >
-                            {translate(locale, "sellers.waitlist")}
-                          </button>
-                        ) : null}
-                        <button
-                          className="danger-button"
-                          disabled={busy}
-                          type="submit"
-                          value="reject"
-                        >
-                          {translate(locale, "sellers.reject")}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        className="danger-button"
-                        disabled={busy}
-                        type="submit"
-                        value="revoke"
-                      >
-                        {translate(locale, "sellers.revoke")}
-                      </button>
-                    )}
-                  </div>
-                </form>
-              ) : null}
-            </article>
-          );
-        })}
-      </section>
-      <p aria-live="polite" className="form-status">
+                            {translate(locale, "sellers.revoke")}
+                          </Button>
+                        )}
+                      </div>
+                    </form>
+                  ) : null}
+                </article>
+              );
+            })}
+          </CardContent>
+        </section>
+      </Card>
+      <p aria-live="polite" className="min-h-6 text-sm font-semibold">
         {status}
       </p>
     </div>
@@ -372,8 +420,8 @@ function LocationTools({
   const prefix = `location-${participationId}`;
   const targets = [...new Map(otherLocations.map((item) => [item.id, item])).values()];
   return (
-    <div className="location-tools">
-      <p className="field-help">
+    <div className="grid gap-3">
+      <p className="text-sm text-muted-foreground">
         {location.sellerCount > 1
           ? translate(locale, "sellers.sharedStop").replace("{count}", String(location.sellerCount))
           : translate(locale, "sellers.ownStop")}
@@ -381,21 +429,21 @@ function LocationTools({
         {translate(locale, `placement.${location.placement}`)}
       </p>
       {location.needsReview ? (
-        <p className="notice">{translate(locale, "sellers.needsReview")}</p>
+        <Alert variant="warning">{translate(locale, "sellers.needsReview")}</Alert>
       ) : null}
       {canReview && location.needsReview ? (
-        <div className="form-actions">
-          <button
-            className="secondary-button"
+        <div className={actions}>
+          <Button
             disabled={busy}
             onClick={() => void onReview({ action: "confirm_separate", locationId: location.id })}
+            size="sm"
             type="button"
+            variant="outline"
           >
             {translate(locale, "sellers.confirmSeparate")}
-          </button>
+          </Button>
           {targets.map((target) => (
-            <button
-              className="secondary-button"
+            <Button
               disabled={busy}
               key={target.id}
               onClick={() =>
@@ -405,29 +453,34 @@ function LocationTools({
                   targetLocationId: target.id,
                 })
               }
+              size="sm"
               type="button"
+              variant="outline"
             >
               {translate(locale, "sellers.mergeInto")}
-            </button>
+            </Button>
           ))}
         </div>
       ) : null}
       {canReview && location.sellerCount > 1 ? (
-        <button
-          className="secondary-button"
-          disabled={busy}
-          onClick={() =>
-            void onReview({ action: "split", locationId: location.id, participationId })
-          }
-          type="button"
-        >
-          {translate(locale, "sellers.split")}
-        </button>
+        <div>
+          <Button
+            disabled={busy}
+            onClick={() =>
+              void onReview({ action: "split", locationId: location.id, participationId })
+            }
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {translate(locale, "sellers.split")}
+          </Button>
+        </div>
       ) : null}
-      <details className="settings-details">
+      <details className={details}>
         <summary>{translate(locale, "sellers.correctPin")}</summary>
         <form
-          className="details-form"
+          className={subForm}
           onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
             formEvent.preventDefault();
             const form = new FormData(formEvent.currentTarget);
@@ -438,30 +491,49 @@ function LocationTools({
             });
           }}
         >
-          <p className="field-help">{translate(locale, "sellers.correctPinHelp")}</p>
-          <label htmlFor={`${prefix}-latitude`}>{translate(locale, "boundary.latitude")}</label>
-          <input
-            defaultValue={location.latitude}
-            id={`${prefix}-latitude`}
-            inputMode="decimal"
-            name="latitude"
-            required
-          />
-          <label htmlFor={`${prefix}-longitude`}>{translate(locale, "boundary.longitude")}</label>
-          <input
-            defaultValue={location.longitude}
-            id={`${prefix}-longitude`}
-            inputMode="decimal"
-            name="longitude"
-            required
-          />
-          <label htmlFor={`${prefix}-reason`}>
-            {translate(locale, "sellers.correctionReason")}
-          </label>
-          <textarea id={`${prefix}-reason`} maxLength={500} minLength={3} name="reason" required />
-          <button className="secondary-button" disabled={busy} type="submit">
-            {translate(locale, "sellers.saveCorrection")}
-          </button>
+          <FieldDescription>{translate(locale, "sellers.correctPinHelp")}</FieldDescription>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <Label htmlFor={`${prefix}-latitude`}>{translate(locale, "boundary.latitude")}</Label>
+              <Input
+                defaultValue={location.latitude}
+                id={`${prefix}-latitude`}
+                inputMode="decimal"
+                name="latitude"
+                required
+              />
+            </Field>
+            <Field>
+              <Label htmlFor={`${prefix}-longitude`}>
+                {translate(locale, "boundary.longitude")}
+              </Label>
+              <Input
+                defaultValue={location.longitude}
+                id={`${prefix}-longitude`}
+                inputMode="decimal"
+                name="longitude"
+                required
+              />
+            </Field>
+          </div>
+          <Field>
+            <Label htmlFor={`${prefix}-reason`}>
+              {translate(locale, "sellers.correctionReason")}
+            </Label>
+            <Textarea
+              className="min-h-20"
+              id={`${prefix}-reason`}
+              maxLength={500}
+              minLength={3}
+              name="reason"
+              required
+            />
+          </Field>
+          <div>
+            <Button disabled={busy} type="submit" variant="outline">
+              {translate(locale, "sellers.saveCorrection")}
+            </Button>
+          </div>
         </form>
       </details>
     </div>
@@ -561,26 +633,30 @@ function SellerListingView({
 
   return (
     <details
-      className="settings-details"
+      className={details}
       onToggle={(event) => {
         if (event.currentTarget.open) void load();
       }}
     >
       <summary>{translate(locale, "listing.view")}</summary>
       {listing ? (
-        <div>
-          {listing.version === 0 ? <p>{translate(locale, "listing.empty")}</p> : null}
+        <div className="mt-3 grid gap-3 text-sm">
+          {listing.version === 0 ? (
+            <p className="text-muted-foreground">{translate(locale, "listing.empty")}</p>
+          ) : null}
           {listing.title ? (
-            <p>
+            <p className="text-base">
               <strong>{listing.title}</strong>
             </p>
           ) : null}
-          {listing.description ? <p>{listing.description}</p> : null}
-          {listing.tags.length ? <p>{listing.tags.join(" · ")}</p> : null}
+          {listing.description ? <p className="leading-relaxed">{listing.description}</p> : null}
+          {listing.tags.length ? (
+            <p className="text-muted-foreground">{listing.tags.join(" · ")}</p>
+          ) : null}
           {listing.items.length ? (
-            <ul>
+            <ul className="m-0 grid list-none divide-y rounded-lg border p-0">
               {listing.items.map((item) => (
-                <li key={item.id}>
+                <li className="px-3 py-2" key={item.id}>
                   {item.name}
                   {item.priceMinor !== null ? ` · ${item.priceMinor / 100} ${item.currency}` : ""}
                   {item.status === "sold" ? ` · ${translate(locale, "listing.sold")}` : ""}
@@ -588,81 +664,93 @@ function SellerListingView({
               ))}
             </ul>
           ) : null}
-          <p className="field-help">
+          <p className="text-muted-foreground">
             {listing.liveStatus
               ? translate(locale, `live.${listing.liveStatus.status}`)
               : translate(locale, "live.scheduled")}
           </p>
           {listing.hidden ? (
-            <p className="notice">{translate(locale, "moderation.listingHidden")}</p>
+            <Alert variant="warning">{translate(locale, "moderation.listingHidden")}</Alert>
           ) : null}
-          <form className="details-form" onSubmit={moderate}>
-            <label htmlFor={`moderation-reason-${participation.id}`}>
-              {translate(locale, "moderation.reason")}
-            </label>
-            <textarea
-              id={`moderation-reason-${participation.id}`}
-              maxLength={500}
-              name="reason"
-              required
-            />
-            <div className="form-actions">
+          <form className="grid gap-3 border-t pt-4" onSubmit={moderate}>
+            <Field>
+              <Label htmlFor={`moderation-reason-${participation.id}`}>
+                {translate(locale, "moderation.reason")}
+              </Label>
+              <Textarea
+                className="min-h-20"
+                id={`moderation-reason-${participation.id}`}
+                maxLength={500}
+                name="reason"
+                required
+              />
+            </Field>
+            <div className={actions}>
               {listing.version > 0 ? (
-                <button
-                  className="secondary-button"
+                <Button
+                  size="sm"
                   type="submit"
                   value={listing.hidden ? "restore_listing" : "hide_listing"}
+                  variant="outline"
                 >
                   {translate(
                     locale,
                     listing.hidden ? "moderation.restoreListing" : "moderation.hideListing",
                   )}
-                </button>
+                </Button>
               ) : null}
               {listing.items.map((item) => (
-                <button
-                  className="secondary-button"
+                <Button
                   key={item.id}
+                  size="sm"
                   type="submit"
                   value={`${item.hidden ? "restore_item" : "hide_item"}:${item.id}`}
+                  variant="outline"
                 >
                   {translate(
                     locale,
                     item.hidden ? "moderation.restoreItem" : "moderation.hideItem",
                   )}
                   : {item.name}
-                </button>
+                </Button>
               ))}
               {participation.state === "approved" ? (
-                <button className="danger-button" type="submit" value="suspend">
+                <Button size="sm" type="submit" value="suspend" variant="destructive">
                   {translate(locale, "moderation.suspend")}
-                </button>
+                </Button>
               ) : null}
               {participation.state === "suspended" ? (
-                <button className="secondary-button" type="submit" value="reinstate">
+                <Button size="sm" type="submit" value="reinstate" variant="outline">
                   {translate(locale, "moderation.reinstate")}
-                </button>
+                </Button>
               ) : null}
             </div>
           </form>
           {eventActive && participation.state === "approved" ? (
-            <form className="details-form" onSubmit={onBehalf}>
-              <label htmlFor={`live-reason-${participation.id}`}>
-                {translate(locale, "live.onBehalfReason")}
-              </label>
-              <textarea id={`live-reason-${participation.id}`} maxLength={500} name="reason" />
-              <div className="form-actions">
+            <form className="grid gap-3 border-t pt-4" onSubmit={onBehalf}>
+              <Field>
+                <Label htmlFor={`live-reason-${participation.id}`}>
+                  {translate(locale, "live.onBehalfReason")}
+                </Label>
+                <Textarea
+                  className="min-h-20"
+                  id={`live-reason-${participation.id}`}
+                  maxLength={500}
+                  name="reason"
+                />
+              </Field>
+              <div className={actions}>
                 {(["open", "away", "closed_early"] as const).map((next) => (
-                  <button className="secondary-button" key={next} type="submit" value={next}>
+                  <Button key={next} size="sm" type="submit" value={next} variant="outline">
                     {translate(locale, `live.set.${next}`)}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </form>
           ) : null}
         </div>
       ) : null}
-      <p aria-live="polite" className="form-status">
+      <p aria-live="polite" className="min-h-6 text-sm font-semibold">
         {status}
       </p>
     </details>

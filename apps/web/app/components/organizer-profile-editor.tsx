@@ -1,8 +1,13 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { OrganizerProfileSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { ChevronRightIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { Button } from "./ui/button";
+import { Field, FieldDescription } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 // Organizer type is fixed after creation; a rename of a verified organization
 // sends its badge back for review.
@@ -56,40 +61,54 @@ export function OrganizerProfileEditor({
   };
 
   return (
-    <details className="settings-details">
-      <summary>{translate(locale, "organizerEdit.title")}</summary>
-      <form className="form-panel details-form" key={organizer.version} onSubmit={save}>
-        <p className="field-help">{translate(locale, "organizerEdit.help")}</p>
-        <label htmlFor={`${idPrefix}-name`}>{translate(locale, "dashboard.organizerName")}</label>
-        <input
-          defaultValue={organizer.displayName}
-          id={`${idPrefix}-name`}
-          maxLength={100}
-          name="displayName"
-          required
+    <details className="group rounded-xl border bg-muted/40 px-4 py-1">
+      <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 font-semibold text-link [&::-webkit-details-marker]:hidden">
+        <ChevronRightIcon
+          aria-hidden="true"
+          className="size-4 transition-transform group-open:rotate-90"
         />
-        <label htmlFor={`${idPrefix}-locality`}>{translate(locale, "dashboard.locality")}</label>
-        <input
-          defaultValue={organizer.locality ?? ""}
-          id={`${idPrefix}-locality`}
-          maxLength={100}
-          name="locality"
-        />
-        <label htmlFor={`${idPrefix}-website`}>{translate(locale, "dashboard.website")}</label>
-        <input
-          defaultValue={organizer.website ?? ""}
-          id={`${idPrefix}-website`}
-          maxLength={500}
-          name="website"
-          placeholder="https://"
-          type="url"
-        />
-        <button className="secondary-button" disabled={busy} type="submit">
-          {busy ? translate(locale, "common.saving") : translate(locale, "organizerEdit.save")}
-        </button>
-        <p aria-live="polite" className="form-status">
-          {status}
-        </p>
+        {translate(locale, "organizerEdit.title")}
+      </summary>
+      <form className="grid max-w-xl gap-4 pt-2 pb-4" key={organizer.version} onSubmit={save}>
+        <FieldDescription>{translate(locale, "organizerEdit.help")}</FieldDescription>
+        <Field>
+          <Label htmlFor={`${idPrefix}-name`}>{translate(locale, "dashboard.organizerName")}</Label>
+          <Input
+            defaultValue={organizer.displayName}
+            id={`${idPrefix}-name`}
+            maxLength={100}
+            name="displayName"
+            required
+          />
+        </Field>
+        <Field>
+          <Label htmlFor={`${idPrefix}-locality`}>{translate(locale, "dashboard.locality")}</Label>
+          <Input
+            defaultValue={organizer.locality ?? ""}
+            id={`${idPrefix}-locality`}
+            maxLength={100}
+            name="locality"
+          />
+        </Field>
+        <Field>
+          <Label htmlFor={`${idPrefix}-website`}>{translate(locale, "dashboard.website")}</Label>
+          <Input
+            defaultValue={organizer.website ?? ""}
+            id={`${idPrefix}-website`}
+            maxLength={500}
+            name="website"
+            placeholder="https://"
+            type="url"
+          />
+        </Field>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button disabled={busy} type="submit" variant="outline">
+            {busy ? translate(locale, "common.saving") : translate(locale, "organizerEdit.save")}
+          </Button>
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
+          </p>
+        </div>
       </form>
     </details>
   );

@@ -29,9 +29,26 @@ import {
   setSelected,
 } from "../lib/route-state";
 import { hasContent, useRouteSync } from "../lib/route-sync";
+import { cn } from "../lib/utils";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { DEFAULT_CENTER, MAP_STYLE, MapErrorBoundary } from "./boundary-editor";
 import { RoutePlanner } from "./route-planner";
+import { Alert } from "./ui/alert";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent } from "./ui/card";
+import { Checkbox } from "./ui/checkbox";
+import { Field } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { NativeSelect } from "./ui/native-select";
+
+const stopMarker =
+  "grid min-h-9 min-w-9 cursor-pointer place-items-center rounded-full border-[3px] border-[#fffdf8] bg-primary px-2 font-display text-[0.95rem] font-extrabold text-primary-foreground shadow-[0_0.2rem_0.6rem_rgb(70_45_20/30%)] transition-transform hover:scale-110";
+
+/** A toggle pill around a native checkbox; fills when checked. */
+const togglePill =
+  "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-input bg-card py-2 pr-4 pl-3 text-sm font-semibold transition-colors hover:border-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring [&_input]:accent-current";
 
 type Route = "public" | "unlisted";
 type LoadState =
@@ -226,27 +243,29 @@ function SellerDetails({
       : null,
   ].filter(Boolean);
   return (
-    <article className="public-seller">
-      <h4>
+    <article className="grid gap-1.5 border-dashed [article+&]:mt-5 [article+&]:border-t [article+&]:pt-5">
+      <h4 className="flex flex-wrap items-center gap-2 text-xl font-extrabold">
         {seller.title ?? seller.displayName}
         {seller.status === "away" ? (
-          <span className="status-pill status-pill-muted">{translate(locale, "map.away")}</span>
+          <Badge variant="secondary">{translate(locale, "map.away")}</Badge>
         ) : null}
       </h4>
-      {seller.title ? <p className="field-hint">{seller.displayName}</p> : null}
+      {seller.title ? <p className="text-sm text-muted-foreground">{seller.displayName}</p> : null}
       {seller.description ? <p>{seller.description}</p> : null}
-      <p className="public-seller-categories">
+      <p className="text-sm font-semibold text-primary">
         {seller.categoryIds.map((id) => categoryLabel(snapshot, locale, id)).join(" · ")}
       </p>
       {seller.tags.length > 0 ? (
-        <ul className="tag-list">
+        <ul className="m-0 my-1 flex list-none flex-wrap gap-1.5 p-0">
           {seller.tags.map((tag) => (
-            <li key={tag}>{tag}</li>
+            <li key={tag}>
+              <Badge variant="secondary">{tag}</Badge>
+            </li>
           ))}
         </ul>
       ) : null}
       {seller.items.length > 0 ? (
-        <ul className="public-items">
+        <ul className="m-0 my-2 grid list-none gap-1 rounded-lg bg-muted px-4 py-3">
           {seller.items.map((item) => (
             <li key={`${item.name}|${item.categoryId}|${item.priceMinor}|${item.status}`}>
               {item.name}
@@ -258,9 +277,11 @@ function SellerDetails({
           ))}
         </ul>
       ) : null}
-      {facts.length > 0 ? <p className="field-hint">{facts.join(" · ")}</p> : null}
+      {facts.length > 0 ? (
+        <p className="text-sm text-muted-foreground">{facts.join(" · ")}</p>
+      ) : null}
       {seller.availability.length > 0 ? (
-        <p className="field-hint">
+        <p className="text-sm text-muted-foreground">
           {translate(locale, "map.hours")}:{" "}
           {seller.availability
             .map(
@@ -270,32 +291,40 @@ function SellerDetails({
             .join(", ")}
         </p>
       ) : null}
-      <div className="seller-actions">
-        <label className="walk-toggle">
-          <input
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label
+          className={cn(
+            togglePill,
+            "has-checked:border-primary has-checked:bg-primary has-checked:text-primary-foreground",
+          )}
+        >
+          <Checkbox
             checked={chosen}
             onChange={(event) =>
               onWalkChange(setSelected(walk, seller.id, event.currentTarget.checked))
             }
-            type="checkbox"
           />
           <span>{translate(locale, "route.add")}</span>
         </label>
         {chosen ? (
-          <label className="walk-toggle walk-toggle-star">
-            <input
+          <label
+            className={cn(
+              togglePill,
+              "has-checked:border-sun has-checked:bg-sun has-checked:text-sun-foreground",
+            )}
+          >
+            <Checkbox
               checked={walk.mustSee.includes(seller.id)}
               disabled={!walk.mustSee.includes(seller.id) && walk.mustSee.length >= 10}
               onChange={(event) =>
                 onWalkChange(setMustSee(walk, seller.id, event.currentTarget.checked))
               }
-              type="checkbox"
             />
             <span>{translate(locale, "route.mustSee")}</span>
           </label>
         ) : null}
         <a
-          className="report-link"
+          className="ms-auto p-2 text-sm text-muted-foreground"
           href={`/report?key=${snapshot.eventKey}&route=${route}&type=participation&subject=${seller.id}`}
           rel="nofollow"
         >
@@ -399,7 +428,7 @@ function StopsMap({
         <Marker latitude={shownStart[1]} longitude={shownStart[0]}>
           <span
             aria-label={translate(locale, "route.start")}
-            className="map-start-marker"
+            className="block size-5 rounded-full border-[3px] border-[#fffdf8] bg-[#2e6b4f] shadow-[0_0.2rem_0.6rem_rgb(70_45_20/30%)]"
             role="img"
           />
         </Marker>
@@ -433,7 +462,7 @@ function StopsMap({
         <Marker latitude={position.point[1]} longitude={position.point[0]}>
           <span
             aria-label={`${translate(locale, "location.you")} ± ${position.accuracy} m`}
-            className="map-position-puck"
+            className="block size-[1.1rem] rounded-full border-[3px] border-white bg-[#2f6fd6] shadow-[0_0_0_0.5rem_rgb(47_111_214/25%)]"
             role="img"
           />
         </Marker>
@@ -460,7 +489,7 @@ function StopsMap({
           <Marker key={cluster.key} latitude={cluster.latitude} longitude={cluster.longitude}>
             <button
               aria-label={`${translate(locale, "map.stop")} ${cluster.stops[0].number}`}
-              className="map-stop-marker"
+              className={stopMarker}
               onClick={() => onSelect(cluster.stops[0]?.id ?? "")}
               type="button"
             >
@@ -471,7 +500,7 @@ function StopsMap({
           <Marker key={cluster.key} latitude={cluster.latitude} longitude={cluster.longitude}>
             <button
               aria-label={`${cluster.stops.length} ${translate(locale, "map.stops")}. ${translate(locale, "map.zoomIn")}`}
-              className="map-stop-marker map-cluster-marker"
+              className={cn(stopMarker, "min-h-11 min-w-11 bg-success")}
               onClick={() =>
                 mapRef.current?.flyTo({
                   center: [cluster.longitude, cluster.latitude],
@@ -551,10 +580,10 @@ export function PublicEventMap({
   };
 
   if (state.kind !== "ready") {
-    return (
-      <p className={state.kind === "loading" ? "" : "notice"} role="status">
-        {translate(locale, `map.${state.kind}`)}
-      </p>
+    return state.kind === "loading" ? (
+      <p role="status">{translate(locale, `map.${state.kind}`)}</p>
+    ) : (
+      <Alert role="status">{translate(locale, `map.${state.kind}`)}</Alert>
     );
   }
   const snapshot = state.snapshot;
@@ -566,8 +595,8 @@ export function PublicEventMap({
     : 0;
 
   return (
-    <div className="public-map-page">
-      <p className="field-hint" role="status">
+    <div className="grid gap-4">
+      <p className="text-sm text-muted-foreground" role="status">
         {allStops.length} {translate(locale, "map.stops")} · {sellerCount}{" "}
         {translate(locale, "map.sellers")} · {openCount} {translate(locale, "map.openNowCount")} ·{" "}
         {translate(locale, "map.updated")}{" "}
@@ -577,23 +606,25 @@ export function PublicEventMap({
         })}
       </p>
       {state.offline ? (
-        <p className="notice" role="alert">
+        <Alert role="alert" variant="warning">
           {translate(locale, "offline.banner")}
-        </p>
+        </Alert>
       ) : null}
-      {storageRefused ? <p className="notice">{translate(locale, "offline.refused")}</p> : null}
+      {storageRefused ? <Alert>{translate(locale, "offline.refused")}</Alert> : null}
       {!snapshot || allStops.length === 0 ? (
-        <p className="notice">{translate(locale, "map.noStopsYet")}</p>
+        <Alert>{translate(locale, "map.noStopsYet")}</Alert>
       ) : (
-        <div className="map-layout">
+        <div className="grid gap-5 lg:grid-cols-[minmax(22rem,0.85fr)_minmax(0,1.15fr)] lg:items-start">
           <section
             aria-label={translate(locale, "map.mapLabel")}
-            className="boundary-map public-map map-stage"
+            className="h-[min(62vh,30rem)] min-h-72 overflow-hidden rounded-2xl bg-[#e7eadc] shadow-xl shadow-amber-950/10 lg:sticky lg:top-4 lg:order-2 lg:h-[calc(100vh-2rem)] lg:max-h-[52rem]"
           >
             {mounted ? (
               <MapErrorBoundary
                 fallback={
-                  <p className="map-fallback">{translate(locale, "boundary.mapUnavailable")}</p>
+                  <p className="m-8 max-w-prose rounded-lg bg-card p-4">
+                    {translate(locale, "boundary.mapUnavailable")}
+                  </p>
                 }
               >
                 <StopsMap
@@ -617,59 +648,71 @@ export function PublicEventMap({
               </MapErrorBoundary>
             ) : null}
           </section>
-          <div className="map-sidebar">
+          <div className="grid min-w-0 content-start gap-5">
             <search>
-              <form
-                className="panel form-panel discovery-search map-filters"
-                onSubmit={(event) => event.preventDefault()}
-              >
-                <label htmlFor="stop-search">{translate(locale, "map.search")}</label>
-                <input
-                  id="stop-search"
-                  maxLength={100}
-                  onChange={(event) => setFilters({ ...filters, query: event.currentTarget.value })}
-                  type="search"
-                  value={filters.query}
-                />
-                <label htmlFor="stop-category">{translate(locale, "map.category")}</label>
-                <select
-                  id="stop-category"
-                  onChange={(event) =>
-                    setFilters({ ...filters, categoryId: event.currentTarget.value || null })
-                  }
-                  value={filters.categoryId ?? ""}
-                >
-                  <option value="">{translate(locale, "map.allCategories")}</option>
-                  {snapshot.categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.labels[locale]}
-                      {snapshot.counts.byCategory[category.id]
-                        ? ` (${snapshot.counts.byCategory[category.id]})`
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-                <div className="filter-chips">
-                  {(
-                    [
-                      ["openNow", "map.filterOpen"],
-                      ["stepFree", "map.filterStepFree"],
-                      ["stroller", "map.filterStroller"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <label className="filter-chip" key={key}>
-                      <input
-                        checked={filters[key]}
+              <Card asChild className="gap-4">
+                <form onSubmit={(event) => event.preventDefault()}>
+                  <CardContent className="gap-4">
+                    <Field>
+                      <Label htmlFor="stop-search">{translate(locale, "map.search")}</Label>
+                      <Input
+                        id="stop-search"
+                        maxLength={100}
                         onChange={(event) =>
-                          setFilters({ ...filters, [key]: event.currentTarget.checked })
+                          setFilters({ ...filters, query: event.currentTarget.value })
                         }
-                        type="checkbox"
+                        type="search"
+                        value={filters.query}
                       />
-                      <span>{translate(locale, label)}</span>
-                    </label>
-                  ))}
-                </div>
-              </form>
+                    </Field>
+                    <Field>
+                      <Label htmlFor="stop-category">{translate(locale, "map.category")}</Label>
+                      <NativeSelect
+                        id="stop-category"
+                        onChange={(event) =>
+                          setFilters({ ...filters, categoryId: event.currentTarget.value || null })
+                        }
+                        value={filters.categoryId ?? ""}
+                      >
+                        <option value="">{translate(locale, "map.allCategories")}</option>
+                        {snapshot.categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.labels[locale]}
+                            {snapshot.counts.byCategory[category.id]
+                              ? ` (${snapshot.counts.byCategory[category.id]})`
+                              : ""}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          ["openNow", "map.filterOpen"],
+                          ["stepFree", "map.filterStepFree"],
+                          ["stroller", "map.filterStroller"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <label
+                          className={cn(
+                            togglePill,
+                            "has-checked:border-success has-checked:bg-success has-checked:text-primary-foreground",
+                          )}
+                          key={key}
+                        >
+                          <Checkbox
+                            checked={filters[key]}
+                            onChange={(event) =>
+                              setFilters({ ...filters, [key]: event.currentTarget.checked })
+                            }
+                          />
+                          <span>{translate(locale, label)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </CardContent>
+                </form>
+              </Card>
             </search>
             <RoutePlanner
               blockedEdgeIds={state.feed.blockedEdgeIds}
@@ -686,60 +729,68 @@ export function PublicEventMap({
               snapshot={snapshot}
               stops={allStops}
             />
-            {storageFailed ? <p className="notice">{translate(locale, "route.notSaved")}</p> : null}
+            {storageFailed ? <Alert>{translate(locale, "route.notSaved")}</Alert> : null}
             {sync.signedIn ? (
-              <div className="route-sync">
-                <p className="field-hint" role="status">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground" role="status">
                   {translate(locale, `route.sync.${sync.state}`)}
                 </p>
                 {sync.state === "synced" && hasContent(walk) ? (
-                  <button className="quiet-button" onClick={() => void sync.remove()} type="button">
+                  <Button onClick={() => void sync.remove()} type="button" variant="link">
                     {translate(locale, "route.sync.remove")}
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             ) : (
-              <p className="field-hint">
-                <a className="text-link" href="/sign-in">
+              <p className="text-sm">
+                <a className="font-semibold" href="/sign-in">
                   {translate(locale, "route.sync.signIn")}
                 </a>
               </p>
             )}
-            <section aria-labelledby="stop-list-heading" className="public-stop-list">
-              <h2 id="stop-list-heading">{translate(locale, "map.listLabel")}</h2>
-              <p className="field-hint">{translate(locale, "map.listIntro")}</p>
+            <section aria-labelledby="stop-list-heading" className="grid gap-3">
+              <h2 className="text-2xl font-extrabold" id="stop-list-heading">
+                {translate(locale, "map.listLabel")}
+              </h2>
+              <p className="text-sm text-muted-foreground">{translate(locale, "map.listIntro")}</p>
               {stops.length === 0 ? (
                 <p role="status">{translate(locale, "map.noMatches")}</p>
               ) : (
-                <ol className="stop-list">
+                <ol className="m-0 grid list-none gap-4 p-0">
                   {stops.map((stop) => (
-                    <li
-                      className="panel stop-card"
-                      id={`stop-${stop.id}`}
-                      key={stop.id}
-                      tabIndex={-1}
-                    >
-                      <h3 className="stop-card-heading">
-                        <span aria-hidden="true" className="stop-badge">
-                          {stop.number}
-                        </span>
-                        {translate(locale, "map.stop")} {stop.number}
-                      </h3>
-                      {stop.manualAccess ? (
-                        <p className="field-hint">{translate(locale, "route.manualAccess")}</p>
-                      ) : null}
-                      {stop.sellers.map((seller) => (
-                        <SellerDetails
-                          key={seller.id}
-                          locale={locale}
-                          onWalkChange={changeWalk}
-                          route={route}
-                          seller={seller}
-                          snapshot={snapshot}
-                          walk={walk}
-                        />
-                      ))}
-                    </li>
+                    <Card asChild key={stop.id}>
+                      <li
+                        className="scroll-mt-4 gap-0 px-6 focus:border-primary"
+                        id={`stop-${stop.id}`}
+                        tabIndex={-1}
+                      >
+                        <h3 className="mb-4 flex items-center gap-2.5 font-sans text-sm font-extrabold tracking-[0.06em] text-muted-foreground uppercase">
+                          <span
+                            aria-hidden="true"
+                            className="grid size-8 place-items-center rounded-full bg-primary font-display text-[0.95rem] tracking-normal text-primary-foreground"
+                          >
+                            {stop.number}
+                          </span>
+                          {translate(locale, "map.stop")} {stop.number}
+                        </h3>
+                        {stop.manualAccess ? (
+                          <p className="mb-3 text-sm text-muted-foreground">
+                            {translate(locale, "route.manualAccess")}
+                          </p>
+                        ) : null}
+                        {stop.sellers.map((seller) => (
+                          <SellerDetails
+                            key={seller.id}
+                            locale={locale}
+                            onWalkChange={changeWalk}
+                            route={route}
+                            seller={seller}
+                            snapshot={snapshot}
+                            walk={walk}
+                          />
+                        ))}
+                      </li>
+                    </Card>
                   ))}
                 </ol>
               )}
@@ -747,10 +798,9 @@ export function PublicEventMap({
           </div>
         </div>
       )}
-      <p className="field-hint">{translate(locale, "map.offlineNote")}</p>
+      <p className="text-sm text-muted-foreground">{translate(locale, "map.offlineNote")}</p>
       <p>
-        <button
-          className="quiet-button"
+        <Button
           onClick={() =>
             void resetOfflineData().then(() => {
               setWalk(emptyRoute(eventKey, walk.expiresAt));
@@ -758,9 +808,10 @@ export function PublicEventMap({
             })
           }
           type="button"
+          variant="link"
         >
           {translate(locale, "offline.reset")}
-        </button>
+        </Button>
       </p>
     </div>
   );

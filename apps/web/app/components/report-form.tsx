@@ -5,7 +5,17 @@ import { type FormEvent, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { PageHeading, PageMain, siteShell, skipLink } from "./page";
 import { PageHeader } from "./page-header";
+import { Alert } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent } from "./ui/card";
+import { Checkbox } from "./ui/checkbox";
+import { ChoiceField, Field, FieldDescription, FieldGroup } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
+import { Textarea } from "./ui/textarea";
 
 const reasons = [
   "unauthorized_address",
@@ -21,8 +31,8 @@ const reasons = [
 export function ReportPage() {
   const { locale, setLocale } = useStoredLocale();
   return (
-    <div className="site-shell">
-      <a className="skip-link" href="#main">
+    <div className={siteShell}>
+      <a className={skipLink} href="#main">
         {translate(locale, "home.skip")}
       </a>
       <PageHeader locale={locale} onLocaleChange={setLocale} />
@@ -99,72 +109,94 @@ export function ReportForm({ locale }: { readonly locale: Locale }) {
     )
   ) {
     return (
-      <main className="account-page" id="main">
-        <p className="notice notice-error">{translate(locale, "report.badLink")}</p>
-      </main>
+      <PageMain width="flow">
+        <Alert variant="destructive">{translate(locale, "report.badLink")}</Alert>
+      </PageMain>
     );
   }
 
   return (
-    <main className="account-page flow-page" id="main" tabIndex={-1}>
-      <header className="app-heading flow-heading">
-        <p className="eyebrow">Promenadis</p>
-        <h1>{translate(locale, "report.title")}</h1>
-        <p className="lede">{translate(locale, "report.intro")}</p>
-      </header>
+    <PageMain width="flow">
+      <PageHeading
+        description={translate(locale, "report.intro")}
+        eyebrow="Promenadis"
+        title={translate(locale, "report.title")}
+      />
       {sent ? (
-        <p className="notice" role="status">
+        <Alert role="status" variant="success">
           {translate(locale, "report.received")}
-        </p>
+        </Alert>
       ) : (
-        <form className="panel form-panel" onSubmit={submit}>
-          <label htmlFor="report-reason">{translate(locale, "report.reason")}</label>
-          <select
-            id="report-reason"
-            onChange={(event) => setReason(event.currentTarget.value as (typeof reasons)[number])}
-            value={reason}
-          >
-            {reasons.map((value) => (
-              <option key={value} value={value}>
-                {translate(locale, `report.reason.${value}`)}
-              </option>
-            ))}
-          </select>
-          {reason === "unauthorized_address" ? (
-            <>
-              <label htmlFor="report-relationship">
-                {translate(locale, "report.relationship")}
-              </label>
-              <select defaultValue="resident" id="report-relationship" name="relationship">
-                {(["resident", "owner", "manager", "other"] as const).map((value) => (
-                  <option key={value} value={value}>
-                    {translate(locale, `report.relationship.${value}`)}
-                  </option>
-                ))}
-              </select>
-              <label className="checkbox-field">
-                <input name="confirmsNoConsent" type="checkbox" />
-                <span>{translate(locale, "report.confirmsNoConsent")}</span>
-              </label>
-            </>
-          ) : null}
-          <label htmlFor="report-details">{translate(locale, "report.details")}</label>
-          <textarea id="report-details" maxLength={1000} name="details" required rows={5} />
-          <label htmlFor="report-contact">{translate(locale, "report.contact")}</label>
-          <input autoComplete="email" id="report-contact" maxLength={200} name="contact" />
-          <p className="field-help">{translate(locale, "report.contactHelp")}</p>
-          <div aria-hidden="true" className="visually-hidden">
-            <label htmlFor="report-website">Website</label>
-            <input autoComplete="off" id="report-website" name="website" tabIndex={-1} />
-          </div>
-          <button className="primary-button" disabled={busy} type="submit">
-            {translate(locale, "report.submit")}
-          </button>
-          <p aria-live="polite" className="form-status">
-            {status}
-          </p>
-        </form>
+        <Card asChild className="max-w-2xl">
+          <form onSubmit={submit}>
+            <CardContent>
+              <FieldGroup>
+                <Field>
+                  <Label htmlFor="report-reason">{translate(locale, "report.reason")}</Label>
+                  <NativeSelect
+                    id="report-reason"
+                    onChange={(event) =>
+                      setReason(event.currentTarget.value as (typeof reasons)[number])
+                    }
+                    value={reason}
+                  >
+                    {reasons.map((value) => (
+                      <NativeSelectOption key={value} value={value}>
+                        {translate(locale, `report.reason.${value}`)}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </Field>
+                {reason === "unauthorized_address" ? (
+                  <>
+                    <Field>
+                      <Label htmlFor="report-relationship">
+                        {translate(locale, "report.relationship")}
+                      </Label>
+                      <NativeSelect
+                        defaultValue="resident"
+                        id="report-relationship"
+                        name="relationship"
+                      >
+                        {(["resident", "owner", "manager", "other"] as const).map((value) => (
+                          <NativeSelectOption key={value} value={value}>
+                            {translate(locale, `report.relationship.${value}`)}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    </Field>
+                    <ChoiceField>
+                      <Checkbox name="confirmsNoConsent" />
+                      <span>{translate(locale, "report.confirmsNoConsent")}</span>
+                    </ChoiceField>
+                  </>
+                ) : null}
+                <Field>
+                  <Label htmlFor="report-details">{translate(locale, "report.details")}</Label>
+                  <Textarea id="report-details" maxLength={1000} name="details" required rows={5} />
+                </Field>
+                <Field>
+                  <Label htmlFor="report-contact">{translate(locale, "report.contact")}</Label>
+                  <Input autoComplete="email" id="report-contact" maxLength={200} name="contact" />
+                  <FieldDescription>{translate(locale, "report.contactHelp")}</FieldDescription>
+                </Field>
+                <div aria-hidden="true" className="sr-only">
+                  <label htmlFor="report-website">Website</label>
+                  <input autoComplete="off" id="report-website" name="website" tabIndex={-1} />
+                </div>
+              </FieldGroup>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button disabled={busy} type="submit">
+                  {translate(locale, "report.submit")}
+                </Button>
+              </div>
+              <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+                {status}
+              </p>
+            </CardContent>
+          </form>
+        </Card>
       )}
-    </main>
+    </PageMain>
   );
 }

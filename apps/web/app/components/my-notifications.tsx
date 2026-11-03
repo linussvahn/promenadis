@@ -2,6 +2,9 @@ import type { AccountNotifications } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 // In-app copies of the account's notices for 30 days.
 export function MyNotifications({
@@ -44,31 +47,44 @@ export function MyNotifications({
   if (items.length === 0) return null;
   const unread = items.filter((item) => !item.read).length;
   return (
-    <section aria-labelledby="notifications-heading" className="panel">
-      <h2 id="notifications-heading">
-        {translate(locale, "notifications.title")}
-        {unread > 0 ? ` (${unread})` : ""}
-      </h2>
-      <ul className="stop-list">
-        {items.map((item) => (
-          <li key={item.id}>
-            <strong>{translate(locale, `notifications.${item.template}`)}</strong>
-            {item.eventTitle ? ` · ${item.eventTitle}` : ""}
-            <br />
-            <small>{formatDateTime(locale, item.createdAt, "Europe/Stockholm")}</small>
-            {item.read ? null : (
-              <span className="status-pill status-pill-muted">
-                {translate(locale, "notifications.new")}
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-      {unread > 0 ? (
-        <button className="quiet-button" onClick={() => void markAll()} type="button">
-          {translate(locale, "notifications.markRead")}
-        </button>
-      ) : null}
-    </section>
+    <Card asChild>
+      <section aria-labelledby="notifications-heading">
+        <CardHeader>
+          <CardTitle id="notifications-heading">
+            {translate(locale, "notifications.title")}
+            {unread > 0 ? ` (${unread})` : ""}
+          </CardTitle>
+          {unread > 0 ? (
+            <CardAction>
+              <Button onClick={() => void markAll()} size="sm" type="button" variant="ghost">
+                {translate(locale, "notifications.markRead")}
+              </Button>
+            </CardAction>
+          ) : null}
+        </CardHeader>
+        <CardContent>
+          <ul className="m-0 grid list-none divide-y p-0">
+            {items.map((item) => (
+              <li
+                className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                key={item.id}
+              >
+                <div className="min-w-0">
+                  <strong>{translate(locale, `notifications.${item.template}`)}</strong>
+                  {item.eventTitle ? ` · ${item.eventTitle}` : ""}
+                  <br />
+                  <small className="text-sm text-muted-foreground">
+                    {formatDateTime(locale, item.createdAt, "Europe/Stockholm")}
+                  </small>
+                </div>
+                {item.read ? null : (
+                  <Badge variant="secondary">{translate(locale, "notifications.new")}</Badge>
+                )}
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

@@ -1,10 +1,15 @@
-import { useExpectedAccountId } from "../lib/account-session";
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary, EventPublicationReadiness } from "@promenadis/contracts";
 import { type Locale, type MessageKey, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { getPromenadisApiClient, getBrowserAuthClient } from "../lib/supabase";
+import { useExpectedAccountId } from "../lib/account-session";
+import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { Alert } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Checkbox } from "./ui/checkbox";
+import { ChoiceField, FieldDescription } from "./ui/field";
 
 const blockerKeys = {
   boundary_missing: "publication.blocker.boundary_missing",
@@ -187,103 +192,107 @@ export function PublicationReadiness({
   const canAttest = event.role === "owner" && event.boundary && event.registration;
 
   return (
-    <section aria-labelledby="publication-heading" className="panel publication-panel">
-      <header>
-        <h2 id="publication-heading">{translate(locale, "publication.title")}</h2>
-        <p>{translate(locale, "publication.intro")}</p>
-      </header>
-      {!readiness ? (
-        <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
-      ) : (
-        <>
-          <h3>{translate(locale, "publication.blockers")}</h3>
-          <ul className="readiness-list">
-            {readiness.blockers.map((blocker) => (
-              <li key={blocker}>{translate(locale, blockerKeys[blocker])}</li>
-            ))}
-          </ul>
-          {rejectionReason ? (
-            <p className="notice">
-              {translate(locale, "publication.reviewReason")} {rejectionReason}
-            </p>
-          ) : null}
-          {readiness.readyToPublish && event.role === "owner" ? (
-            <button
-              className="primary-button"
-              disabled={busy}
-              onClick={() => void publish()}
-              type="button"
-            >
-              {translate(locale, "publication.publish")}
-            </button>
-          ) : null}
-          {reviewable ? (
-            <button
-              className="primary-button"
-              disabled={busy}
-              onClick={() => void requestReview()}
-              type="button"
-            >
-              {translate(locale, "publication.requestReview")}
-            </button>
-          ) : null}
-          {readiness.blockers.includes("recovery_code_missing") ? (
-            <Link className="secondary-button button-link" to="/settings">
-              {translate(locale, "publication.openSecurity")}
-            </Link>
-          ) : null}
-          {readiness.recommendations.length > 0 ? (
+    <Card asChild>
+      <section aria-labelledby="publication-heading">
+        <CardHeader>
+          <CardTitle id="publication-heading">{translate(locale, "publication.title")}</CardTitle>
+          <CardDescription className="text-base leading-relaxed">
+            {translate(locale, "publication.intro")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!readiness ? (
+            <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
+          ) : (
             <>
-              <h3>{translate(locale, "publication.recommendations")}</h3>
-              <ul className="readiness-list readiness-list-secondary">
-                {readiness.recommendations.map((recommendation) => (
-                  <li key={recommendation}>
-                    {translate(locale, recommendationKeys[recommendation])}
-                  </li>
+              <h3 className={subheading}>{translate(locale, "publication.blockers")}</h3>
+              <ul className="m-0 grid list-disc gap-2 pl-6 marker:text-primary">
+                {readiness.blockers.map((blocker) => (
+                  <li key={blocker}>{translate(locale, blockerKeys[blocker])}</li>
                 ))}
               </ul>
+              {rejectionReason ? (
+                <Alert>
+                  {translate(locale, "publication.reviewReason")} {rejectionReason}
+                </Alert>
+              ) : null}
+              {(readiness.readyToPublish && event.role === "owner") ||
+              reviewable ||
+              readiness.blockers.includes("recovery_code_missing") ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  {readiness.readyToPublish && event.role === "owner" ? (
+                    <Button disabled={busy} onClick={() => void publish()} type="button">
+                      {translate(locale, "publication.publish")}
+                    </Button>
+                  ) : null}
+                  {reviewable ? (
+                    <Button disabled={busy} onClick={() => void requestReview()} type="button">
+                      {translate(locale, "publication.requestReview")}
+                    </Button>
+                  ) : null}
+                  {readiness.blockers.includes("recovery_code_missing") ? (
+                    <Button asChild variant="outline">
+                      <Link to="/settings">{translate(locale, "publication.openSecurity")}</Link>
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              {readiness.recommendations.length > 0 ? (
+                <>
+                  <h3 className={subheading}>{translate(locale, "publication.recommendations")}</h3>
+                  <ul className="m-0 grid list-disc gap-2 pl-6 text-muted-foreground">
+                    {readiness.recommendations.map((recommendation) => (
+                      <li key={recommendation}>
+                        {translate(locale, recommendationKeys[recommendation])}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+
+              {attestationMissing && canAttest ? (
+                <form className="grid gap-4 rounded-xl bg-muted p-4 sm:p-5" onSubmit={attest}>
+                  <h3 className={subheading}>{translate(locale, "publication.attestTitle")}</h3>
+                  <ChoiceField>
+                    <Checkbox name="locationAuthority" required />
+                    <span>{translate(locale, "publication.locationAuthorityConfirmed")}</span>
+                  </ChoiceField>
+                  <ChoiceField>
+                    <Checkbox name="visibilityUnderstood" required />
+                    <span>
+                      {translate(
+                        locale,
+                        event.visibility === "unlisted"
+                          ? "publication.unlistedWarning"
+                          : "publication.publicWarning",
+                      )}
+                    </span>
+                  </ChoiceField>
+                  <Button className="justify-self-start" disabled={busy} type="submit">
+                    {busy
+                      ? translate(locale, "common.saving")
+                      : translate(locale, "publication.attest")}
+                  </Button>
+                </form>
+              ) : null}
+
+              {!attestationMissing ? (
+                <Alert variant="success">
+                  {translate(locale, "publication.attestationCurrent")}
+                </Alert>
+              ) : null}
+              <FieldDescription>{translate(locale, "publication.closedAlpha")}</FieldDescription>
             </>
-          ) : null}
-
-          {attestationMissing && canAttest ? (
-            <form className="attestation-form" onSubmit={attest}>
-              <h3>{translate(locale, "publication.attestTitle")}</h3>
-              <label className="checkbox-field">
-                <input name="locationAuthority" required type="checkbox" />
-                <span>{translate(locale, "publication.locationAuthorityConfirmed")}</span>
-              </label>
-              <label className="checkbox-field">
-                <input name="visibilityUnderstood" required type="checkbox" />
-                <span>
-                  {translate(
-                    locale,
-                    event.visibility === "unlisted"
-                      ? "publication.unlistedWarning"
-                      : "publication.publicWarning",
-                  )}
-                </span>
-              </label>
-              <button className="primary-button" disabled={busy} type="submit">
-                {busy
-                  ? translate(locale, "common.saving")
-                  : translate(locale, "publication.attest")}
-              </button>
-            </form>
-          ) : null}
-
-          {!attestationMissing ? (
-            <p className="notice notice-success">
-              {translate(locale, "publication.attestationCurrent")}
+          )}
+          {readiness ? (
+            <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+              {status}
             </p>
           ) : null}
-          <p className="field-help">{translate(locale, "publication.closedAlpha")}</p>
-        </>
-      )}
-      {readiness ? (
-        <p aria-live="polite" className="form-status">
-          {status}
-        </p>
-      ) : null}
-    </section>
+        </CardContent>
+      </section>
+    </Card>
   );
 }
+
+const subheading = "font-display text-lg leading-tight font-extrabold";

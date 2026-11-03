@@ -1,9 +1,24 @@
-import { useExpectedAccountId } from "../lib/account-session";
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { EventTeamSummary, InvitedEventTeamRole } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
+import { ChevronRightIcon } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { getPromenadisApiClient, getBrowserAuthClient } from "../lib/supabase";
+import { useExpectedAccountId } from "../lib/account-session";
+import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
+
+const rowList = "m-0 grid list-none divide-y border-y p-0";
+const row = "flex flex-wrap items-start justify-between gap-3 py-3";
+const subPanel = "grid gap-3 rounded-xl bg-muted/60 p-4 sm:p-5";
+const subheading = "text-base font-bold";
+const hint = "text-sm text-muted-foreground";
+const summaryClass =
+  "flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 text-sm font-semibold text-link [&::-webkit-details-marker]:hidden";
+const chevronClass = "size-4 transition-transform group-open:rotate-90";
 
 export function EventTeam({
   actorRole,
@@ -327,405 +342,428 @@ export function EventTeam({
     : false;
 
   return (
-    <section aria-labelledby="event-team-heading" className="event-team panel">
-      <header>
-        <h2 id="event-team-heading">{translate(locale, "team.title")}</h2>
-        <p className="field-help">{translate(locale, "team.intro")}</p>
-      </header>
-
-      {!team ? (
-        <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
-      ) : (
-        <>
-          <ul aria-label={translate(locale, "team.members")} className="team-list">
-            {team.members.map((member) => (
-              <li key={member.id}>
-                <div className="team-member-copy">
-                  <strong>{member.displayName}</strong>
-                  <span>{translate(locale, `team.role.${member.role}`)}</span>
-                </div>
-                {effectiveActorRole === "owner" &&
-                member.role !== "owner" &&
-                pendingEmergencyClaim?.successorMembershipId !== member.id ? (
-                  <details className="team-member-controls">
-                    <summary>{translate(locale, "team.manageMember")}</summary>
-                    <form
-                      onSubmit={(formEvent) => {
-                        formEvent.preventDefault();
-                        const nextRole = new FormData(formEvent.currentTarget).get("role");
-                        void updateMember(
-                          member.id,
-                          String(nextRole) as InvitedEventTeamRole,
-                          false,
-                        );
-                      }}
-                    >
-                      <label className="team-control-label" htmlFor={`member-role-${member.id}`}>
-                        {translate(locale, "team.roleLabel")}
-                      </label>
-                      <select
-                        defaultValue={member.role}
-                        disabled={busy !== null}
-                        id={`member-role-${member.id}`}
-                        name="role"
-                      >
-                        <option value="co_host">{translate(locale, "team.role.co_host")}</option>
-                        <option value="moderator">
-                          {translate(locale, "team.role.moderator")}
-                        </option>
-                      </select>
-                      <button className="secondary-button" disabled={busy !== null} type="submit">
-                        {translate(locale, "team.saveRole")}
-                      </button>
-                      {confirmingRemoval === member.id ? (
-                        <div className="remove-confirmation">
-                          <strong>{translate(locale, "team.confirmRemoval")}</strong>
-                          <div className="inline-control">
-                            <button
-                              className="danger-button"
-                              disabled={busy !== null}
-                              onClick={() => void updateMember(member.id, "moderator", true)}
-                              type="button"
-                            >
-                              {translate(locale, "team.confirmRemoveMember")}
-                            </button>
-                            <button
-                              className="quiet-button"
-                              disabled={busy !== null}
-                              onClick={() => setConfirmingRemoval(null)}
-                              type="button"
-                            >
-                              {translate(locale, "common.cancel")}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          className="danger-button"
-                          disabled={busy !== null}
-                          onClick={() => setConfirmingRemoval(member.id)}
-                          type="button"
+    <Card asChild>
+      <section aria-labelledby="event-team-heading">
+        <CardHeader>
+          <CardTitle id="event-team-heading">{translate(locale, "team.title")}</CardTitle>
+          <CardDescription>{translate(locale, "team.intro")}</CardDescription>
+        </CardHeader>
+        <CardContent className="gap-6">
+          {!team ? (
+            <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
+          ) : (
+            <>
+              <ul aria-label={translate(locale, "team.members")} className={rowList}>
+                {team.members.map((member) => (
+                  <li className={row} key={member.id}>
+                    <div className="grid min-w-0 gap-0.5">
+                      <strong>{member.displayName}</strong>
+                      <span>{translate(locale, `team.role.${member.role}`)}</span>
+                    </div>
+                    {effectiveActorRole === "owner" &&
+                    member.role !== "owner" &&
+                    pendingEmergencyClaim?.successorMembershipId !== member.id ? (
+                      <details className="group w-full sm:w-auto sm:min-w-64">
+                        <summary className={summaryClass}>
+                          <ChevronRightIcon aria-hidden="true" className={chevronClass} />
+                          {translate(locale, "team.manageMember")}
+                        </summary>
+                        <form
+                          className="mt-2 grid gap-3 rounded-xl bg-muted/60 p-4"
+                          onSubmit={(formEvent) => {
+                            formEvent.preventDefault();
+                            const nextRole = new FormData(formEvent.currentTarget).get("role");
+                            void updateMember(
+                              member.id,
+                              String(nextRole) as InvitedEventTeamRole,
+                              false,
+                            );
+                          }}
                         >
-                          {translate(locale, "team.removeMember")}
-                        </button>
-                      )}
-                    </form>
-                  </details>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+                          <Label htmlFor={`member-role-${member.id}`}>
+                            {translate(locale, "team.roleLabel")}
+                          </Label>
+                          <NativeSelect
+                            defaultValue={member.role}
+                            disabled={busy !== null}
+                            id={`member-role-${member.id}`}
+                            name="role"
+                          >
+                            <NativeSelectOption value="co_host">
+                              {translate(locale, "team.role.co_host")}
+                            </NativeSelectOption>
+                            <NativeSelectOption value="moderator">
+                              {translate(locale, "team.role.moderator")}
+                            </NativeSelectOption>
+                          </NativeSelect>
+                          <Button variant="outline" disabled={busy !== null} type="submit">
+                            {translate(locale, "team.saveRole")}
+                          </Button>
+                          {confirmingRemoval === member.id ? (
+                            <div className="grid gap-2 rounded-lg bg-destructive-soft p-3 text-destructive-foreground">
+                              <strong>{translate(locale, "team.confirmRemoval")}</strong>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                  variant="destructive"
+                                  disabled={busy !== null}
+                                  onClick={() => void updateMember(member.id, "moderator", true)}
+                                  type="button"
+                                >
+                                  {translate(locale, "team.confirmRemoveMember")}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  disabled={busy !== null}
+                                  onClick={() => setConfirmingRemoval(null)}
+                                  type="button"
+                                >
+                                  {translate(locale, "common.cancel")}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              className="text-destructive-foreground hover:bg-destructive-soft"
+                              variant="ghost"
+                              disabled={busy !== null}
+                              onClick={() => setConfirmingRemoval(member.id)}
+                              type="button"
+                            >
+                              {translate(locale, "team.removeMember")}
+                            </Button>
+                          )}
+                        </form>
+                      </details>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
 
-          {team.emergencySuccessor ? (
-            <section aria-labelledby="emergency-successor-heading" className="team-transfer">
-              <h3 id="emergency-successor-heading">{translate(locale, "team.successorTitle")}</h3>
-              <p>
-                {translate(locale, "team.successorCurrent")
-                  .replace("{name}", team.emergencySuccessor.recipientDisplayName)
-                  .replace("{organizer}", team.emergencySuccessor.organizerDisplayName)}
-              </p>
-              <p className="field-help">{translate(locale, "team.successorDelay")}</p>
-              {effectiveActorRole === "owner" && !pendingEmergencyClaim ? (
-                <button
-                  className="secondary-button"
-                  disabled={busy !== null}
-                  onClick={() => void clearSuccessor()}
-                  type="button"
-                >
-                  {translate(locale, "team.successorClear")}
-                </button>
-              ) : null}
-            </section>
-          ) : null}
-
-          {pendingEmergencyClaim ? (
-            <section aria-labelledby="emergency-claim-heading" className="team-transfer">
-              <h3 id="emergency-claim-heading">{translate(locale, "team.claimPendingTitle")}</h3>
-              <p>
-                {translate(locale, "team.claimPending")
-                  .replace("{name}", pendingEmergencyClaim.successorDisplayName)
-                  .replace("{organizer}", pendingEmergencyClaim.targetOrganizerDisplayName)}
-              </p>
-              <p className="field-help">
-                {translate(locale, "team.claimReadyAt")}{" "}
-                {formatDateTime(locale, pendingEmergencyClaim.readyAt, "Europe/Stockholm")}
-              </p>
-              <p className="field-help">
-                {translate(locale, "team.expires")}{" "}
-                {formatDateTime(locale, pendingEmergencyClaim.expiresAt, "Europe/Stockholm")}
-              </p>
-              <p className="field-help">{translate(locale, "team.claimNotificationLocal")}</p>
-              <div className="inline-control">
-                {isClaimant ? (
-                  <button
-                    className="primary-button"
-                    disabled={busy !== null || !claimIsReady}
-                    onClick={() => void resolveEmergencyClaim(true)}
-                    type="button"
-                  >
-                    {claimIsReady
-                      ? translate(locale, "team.claimComplete")
-                      : translate(locale, "team.claimWaiting")}
-                  </button>
-                ) : null}
-                {effectiveActorRole === "owner" || isClaimant ? (
-                  <button
-                    className="secondary-button"
-                    disabled={busy !== null}
-                    onClick={() => void resolveEmergencyClaim(false)}
-                    type="button"
-                  >
-                    {translate(locale, "team.claimCancel")}
-                  </button>
-                ) : null}
-              </div>
-            </section>
-          ) : isDesignatedSuccessor ? (
-            <section aria-labelledby="emergency-claim-start-heading" className="team-transfer">
-              <h3 id="emergency-claim-start-heading">{translate(locale, "team.claimTitle")}</h3>
-              <p>{translate(locale, "team.claimHelp")}</p>
-              {confirmingEmergencyClaim ? (
-                <p className="remove-confirmation">
-                  <strong>{translate(locale, "team.claimConfirm")}</strong>
-                </p>
-              ) : null}
-              <button
-                className="secondary-button"
-                disabled={busy !== null}
-                onClick={() =>
-                  confirmingEmergencyClaim
-                    ? void initiateEmergencyClaim()
-                    : setConfirmingEmergencyClaim(true)
-                }
-                type="button"
-              >
-                {confirmingEmergencyClaim
-                  ? translate(locale, "team.claimStart")
-                  : translate(locale, "team.claimReview")}
-              </button>
-            </section>
-          ) : null}
-
-          {effectiveActorRole === "owner" ? (
-            <div className="team-owner-controls">
-              {!team.emergencySuccessor ? (
-                <section aria-labelledby="successor-settings-heading" className="team-transfer">
-                  <h3 id="successor-settings-heading">
+              {team.emergencySuccessor ? (
+                <section aria-labelledby="emergency-successor-heading" className={subPanel}>
+                  <h3 className={subheading} id="emergency-successor-heading">
                     {translate(locale, "team.successorTitle")}
                   </h3>
-                  <p className="field-help">{translate(locale, "team.successorHelp")}</p>
-                  {successorOptions.length > 0 ? (
-                    <form
-                      onSubmit={(formEvent) => {
-                        formEvent.preventDefault();
-                        void setSuccessor(
-                          String(
-                            new FormData(formEvent.currentTarget).get("successorOption") ?? "",
-                          ),
-                        );
-                      }}
-                    >
-                      <label className="team-control-label" htmlFor="emergency-successor-option">
-                        {translate(locale, "team.successorPerson")}
-                      </label>
-                      <select
-                        disabled={busy !== null}
-                        id="emergency-successor-option"
-                        name="successorOption"
-                      >
-                        {successorOptions.map((option) => (
-                          <option
-                            key={`${option.successorMembershipId}:${option.organizerProfileId}`}
-                            value={`${option.successorMembershipId}:${option.organizerProfileId}`}
-                          >
-                            {option.recipientDisplayName} · {option.organizerDisplayName}
-                          </option>
-                        ))}
-                      </select>
-                      <button className="secondary-button" disabled={busy !== null} type="submit">
-                        {translate(locale, "team.successorSet")}
-                      </button>
-                    </form>
-                  ) : (
-                    <p>{translate(locale, "team.successorNoEligible")}</p>
-                  )}
-                </section>
-              ) : null}
-              <section aria-labelledby="ownership-transfer-heading" className="team-transfer">
-                <h3 id="ownership-transfer-heading">{translate(locale, "team.transferTitle")}</h3>
-                {pendingEmergencyClaim ? (
-                  <p className="field-help">{translate(locale, "team.claimBlocksTransfer")}</p>
-                ) : team.pendingTransfer ? (
-                  <div className="team-transfer-pending">
-                    <p>
-                      {translate(locale, "team.transferPending").replace(
-                        "{name}",
-                        team.pendingTransfer.toDisplayName,
-                      )}
-                    </p>
-                    {team.pendingTransfer.targetOrganizerDisplayName ? (
-                      <p className="field-help">
-                        {translate(locale, "team.transferOrganizer").replace(
-                          "{organizer}",
-                          team.pendingTransfer.targetOrganizerDisplayName,
-                        )}
-                      </p>
-                    ) : null}
-                    <p className="field-help">
-                      {translate(locale, "team.expires")}{" "}
-                      {formatDateTime(locale, team.pendingTransfer.expiresAt, "Europe/Stockholm")}
-                    </p>
-                    <button
-                      className="secondary-button"
+                  <p>
+                    {translate(locale, "team.successorCurrent")
+                      .replace("{name}", team.emergencySuccessor.recipientDisplayName)
+                      .replace("{organizer}", team.emergencySuccessor.organizerDisplayName)}
+                  </p>
+                  <p className={hint}>{translate(locale, "team.successorDelay")}</p>
+                  {effectiveActorRole === "owner" && !pendingEmergencyClaim ? (
+                    <Button
+                      variant="outline"
                       disabled={busy !== null}
-                      onClick={() => void resolveTransfer(false)}
+                      onClick={() => void clearSuccessor()}
                       type="button"
                     >
-                      {translate(locale, "team.transferCancel")}
-                    </button>
-                  </div>
-                ) : transferOptions.length === 0 ? (
-                  <p className="field-help">{translate(locale, "team.transferNoEligible")}</p>
-                ) : (
-                  <form
-                    onSubmit={(formEvent) => {
-                      formEvent.preventDefault();
-                      const optionValue = String(
-                        new FormData(formEvent.currentTarget).get("transferOption") ?? "",
-                      );
-                      if (confirmingTransfer === optionValue) void initiateTransfer(optionValue);
-                      else setConfirmingTransfer(optionValue);
-                    }}
-                  >
-                    <p className="field-help">{translate(locale, "team.transferHelp")}</p>
-                    <label className="team-control-label" htmlFor="ownership-transfer-recipient">
-                      {translate(locale, "team.transferRecipient")}
-                    </label>
-                    <select
-                      disabled={busy !== null}
-                      id="ownership-transfer-recipient"
-                      name="transferOption"
-                      onChange={() => setConfirmingTransfer(null)}
-                    >
-                      {transferOptions.map((option) => (
-                        <option
-                          key={`${option.toMembershipId}:${option.organizerProfileId}`}
-                          value={`${option.toMembershipId}:${option.organizerProfileId}`}
-                        >
-                          {option.recipientDisplayName} · {option.organizerDisplayName}
-                        </option>
-                      ))}
-                    </select>
-                    {confirmingTransfer ? (
-                      <p className="remove-confirmation">
-                        <strong>{translate(locale, "team.transferConfirm")}</strong>
-                      </p>
+                      {translate(locale, "team.successorClear")}
+                    </Button>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {pendingEmergencyClaim ? (
+                <section aria-labelledby="emergency-claim-heading" className={subPanel}>
+                  <h3 className={subheading} id="emergency-claim-heading">
+                    {translate(locale, "team.claimPendingTitle")}
+                  </h3>
+                  <p>
+                    {translate(locale, "team.claimPending")
+                      .replace("{name}", pendingEmergencyClaim.successorDisplayName)
+                      .replace("{organizer}", pendingEmergencyClaim.targetOrganizerDisplayName)}
+                  </p>
+                  <p className={hint}>
+                    {translate(locale, "team.claimReadyAt")}{" "}
+                    {formatDateTime(locale, pendingEmergencyClaim.readyAt, "Europe/Stockholm")}
+                  </p>
+                  <p className={hint}>
+                    {translate(locale, "team.expires")}{" "}
+                    {formatDateTime(locale, pendingEmergencyClaim.expiresAt, "Europe/Stockholm")}
+                  </p>
+                  <p className={hint}>{translate(locale, "team.claimNotificationLocal")}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isClaimant ? (
+                      <Button
+                        disabled={busy !== null || !claimIsReady}
+                        onClick={() => void resolveEmergencyClaim(true)}
+                        type="button"
+                      >
+                        {claimIsReady
+                          ? translate(locale, "team.claimComplete")
+                          : translate(locale, "team.claimWaiting")}
+                      </Button>
                     ) : null}
-                    <button className="secondary-button" disabled={busy !== null} type="submit">
-                      {confirmingTransfer
-                        ? translate(locale, "team.transferConfirmButton")
-                        : translate(locale, "team.transferStart")}
-                    </button>
-                  </form>
-                )}
-              </section>
+                    {effectiveActorRole === "owner" || isClaimant ? (
+                      <Button
+                        variant="outline"
+                        disabled={busy !== null}
+                        onClick={() => void resolveEmergencyClaim(false)}
+                        type="button"
+                      >
+                        {translate(locale, "team.claimCancel")}
+                      </Button>
+                    ) : null}
+                  </div>
+                </section>
+              ) : isDesignatedSuccessor ? (
+                <section aria-labelledby="emergency-claim-start-heading" className={subPanel}>
+                  <h3 className={subheading} id="emergency-claim-start-heading">
+                    {translate(locale, "team.claimTitle")}
+                  </h3>
+                  <p>{translate(locale, "team.claimHelp")}</p>
+                  {confirmingEmergencyClaim ? (
+                    <p className="rounded-lg bg-destructive-soft p-3 text-destructive-foreground">
+                      <strong>{translate(locale, "team.claimConfirm")}</strong>
+                    </p>
+                  ) : null}
+                  <Button
+                    variant="outline"
+                    disabled={busy !== null}
+                    onClick={() =>
+                      confirmingEmergencyClaim
+                        ? void initiateEmergencyClaim()
+                        : setConfirmingEmergencyClaim(true)
+                    }
+                    type="button"
+                  >
+                    {confirmingEmergencyClaim
+                      ? translate(locale, "team.claimStart")
+                      : translate(locale, "team.claimReview")}
+                  </Button>
+                </section>
+              ) : null}
 
-              <form className="team-invite-form" onSubmit={invite}>
-                <h3>{translate(locale, "team.inviteTitle")}</h3>
-                <p className="field-help">{translate(locale, "team.inviteHelp")}</p>
-                <label className="team-control-label" htmlFor="team-invite-email">
-                  {translate(locale, "auth.email")}
-                </label>
-                <input
-                  autoComplete="email"
-                  disabled={busy !== null}
-                  id="team-invite-email"
-                  name="email"
-                  required
-                  type="email"
-                />
-                <label className="team-control-label" htmlFor="team-invite-role">
-                  {translate(locale, "team.roleLabel")}
-                </label>
-                <select
-                  defaultValue="co_host"
-                  disabled={busy !== null}
-                  id="team-invite-role"
-                  name="role"
-                >
-                  <option value="co_host">{translate(locale, "team.role.co_host")}</option>
-                  <option value="moderator">{translate(locale, "team.role.moderator")}</option>
-                </select>
-                <button className="secondary-button" disabled={busy !== null} type="submit">
-                  {busy === "invite"
-                    ? translate(locale, "team.inviting")
-                    : translate(locale, "team.sendInvite")}
-                </button>
-              </form>
-
-              {team.pendingInvites.length > 0 ? (
-                <div>
-                  <h3>{translate(locale, "team.pending")}</h3>
-                  <ul className="team-list pending-invite-list">
-                    {team.pendingInvites.map((inviteItem) => (
-                      <li key={inviteItem.id}>
-                        <div className="team-member-copy">
-                          <strong>{inviteItem.email}</strong>
-                          <span>
-                            {translate(locale, `team.role.${inviteItem.role}`)} ·{" "}
-                            {translate(locale, "team.expires")}{" "}
-                            {formatDateTime(locale, inviteItem.expiresAt, "Europe/Stockholm")}
-                          </span>
-                        </div>
-                        <button
-                          className="secondary-button"
+              {effectiveActorRole === "owner" ? (
+                <div className="grid gap-6 border-t pt-6">
+                  {!team.emergencySuccessor ? (
+                    <section aria-labelledby="successor-settings-heading" className={subPanel}>
+                      <h3 className={subheading} id="successor-settings-heading">
+                        {translate(locale, "team.successorTitle")}
+                      </h3>
+                      <p className={hint}>{translate(locale, "team.successorHelp")}</p>
+                      {successorOptions.length > 0 ? (
+                        <form
+                          onSubmit={(formEvent) => {
+                            formEvent.preventDefault();
+                            void setSuccessor(
+                              String(
+                                new FormData(formEvent.currentTarget).get("successorOption") ?? "",
+                              ),
+                            );
+                          }}
+                        >
+                          <Label htmlFor="emergency-successor-option">
+                            {translate(locale, "team.successorPerson")}
+                          </Label>
+                          <NativeSelect
+                            disabled={busy !== null}
+                            id="emergency-successor-option"
+                            name="successorOption"
+                          >
+                            {successorOptions.map((option) => (
+                              <NativeSelectOption
+                                key={`${option.successorMembershipId}:${option.organizerProfileId}`}
+                                value={`${option.successorMembershipId}:${option.organizerProfileId}`}
+                              >
+                                {option.recipientDisplayName} · {option.organizerDisplayName}
+                              </NativeSelectOption>
+                            ))}
+                          </NativeSelect>
+                          <Button variant="outline" disabled={busy !== null} type="submit">
+                            {translate(locale, "team.successorSet")}
+                          </Button>
+                        </form>
+                      ) : (
+                        <p>{translate(locale, "team.successorNoEligible")}</p>
+                      )}
+                    </section>
+                  ) : null}
+                  <section aria-labelledby="ownership-transfer-heading" className={subPanel}>
+                    <h3 className={subheading} id="ownership-transfer-heading">
+                      {translate(locale, "team.transferTitle")}
+                    </h3>
+                    {pendingEmergencyClaim ? (
+                      <p className={hint}>{translate(locale, "team.claimBlocksTransfer")}</p>
+                    ) : team.pendingTransfer ? (
+                      <div className="grid gap-2">
+                        <p>
+                          {translate(locale, "team.transferPending").replace(
+                            "{name}",
+                            team.pendingTransfer.toDisplayName,
+                          )}
+                        </p>
+                        {team.pendingTransfer.targetOrganizerDisplayName ? (
+                          <p className={hint}>
+                            {translate(locale, "team.transferOrganizer").replace(
+                              "{organizer}",
+                              team.pendingTransfer.targetOrganizerDisplayName,
+                            )}
+                          </p>
+                        ) : null}
+                        <p className={hint}>
+                          {translate(locale, "team.expires")}{" "}
+                          {formatDateTime(
+                            locale,
+                            team.pendingTransfer.expiresAt,
+                            "Europe/Stockholm",
+                          )}
+                        </p>
+                        <Button
+                          variant="outline"
                           disabled={busy !== null}
-                          onClick={() => void cancelInvite(inviteItem.id)}
+                          onClick={() => void resolveTransfer(false)}
                           type="button"
                         >
-                          {translate(locale, "team.cancelInvite")}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                          {translate(locale, "team.transferCancel")}
+                        </Button>
+                      </div>
+                    ) : transferOptions.length === 0 ? (
+                      <p className={hint}>{translate(locale, "team.transferNoEligible")}</p>
+                    ) : (
+                      <form
+                        onSubmit={(formEvent) => {
+                          formEvent.preventDefault();
+                          const optionValue = String(
+                            new FormData(formEvent.currentTarget).get("transferOption") ?? "",
+                          );
+                          if (confirmingTransfer === optionValue)
+                            void initiateTransfer(optionValue);
+                          else setConfirmingTransfer(optionValue);
+                        }}
+                      >
+                        <p className={hint}>{translate(locale, "team.transferHelp")}</p>
+                        <Label htmlFor="ownership-transfer-recipient">
+                          {translate(locale, "team.transferRecipient")}
+                        </Label>
+                        <NativeSelect
+                          disabled={busy !== null}
+                          id="ownership-transfer-recipient"
+                          name="transferOption"
+                          onChange={() => setConfirmingTransfer(null)}
+                        >
+                          {transferOptions.map((option) => (
+                            <NativeSelectOption
+                              key={`${option.toMembershipId}:${option.organizerProfileId}`}
+                              value={`${option.toMembershipId}:${option.organizerProfileId}`}
+                            >
+                              {option.recipientDisplayName} · {option.organizerDisplayName}
+                            </NativeSelectOption>
+                          ))}
+                        </NativeSelect>
+                        {confirmingTransfer ? (
+                          <p className="rounded-lg bg-destructive-soft p-3 text-destructive-foreground">
+                            <strong>{translate(locale, "team.transferConfirm")}</strong>
+                          </p>
+                        ) : null}
+                        <Button variant="outline" disabled={busy !== null} type="submit">
+                          {confirmingTransfer
+                            ? translate(locale, "team.transferConfirmButton")
+                            : translate(locale, "team.transferStart")}
+                        </Button>
+                      </form>
+                    )}
+                  </section>
+
+                  <form className="grid max-w-md gap-3" onSubmit={invite}>
+                    <h3 className={subheading}>{translate(locale, "team.inviteTitle")}</h3>
+                    <p className={hint}>{translate(locale, "team.inviteHelp")}</p>
+                    <Label htmlFor="team-invite-email">{translate(locale, "auth.email")}</Label>
+                    <Input
+                      autoComplete="email"
+                      disabled={busy !== null}
+                      id="team-invite-email"
+                      name="email"
+                      required
+                      type="email"
+                    />
+                    <Label htmlFor="team-invite-role">{translate(locale, "team.roleLabel")}</Label>
+                    <NativeSelect
+                      defaultValue="co_host"
+                      disabled={busy !== null}
+                      id="team-invite-role"
+                      name="role"
+                    >
+                      <NativeSelectOption value="co_host">
+                        {translate(locale, "team.role.co_host")}
+                      </NativeSelectOption>
+                      <NativeSelectOption value="moderator">
+                        {translate(locale, "team.role.moderator")}
+                      </NativeSelectOption>
+                    </NativeSelect>
+                    <Button variant="outline" disabled={busy !== null} type="submit">
+                      {busy === "invite"
+                        ? translate(locale, "team.inviting")
+                        : translate(locale, "team.sendInvite")}
+                    </Button>
+                  </form>
+
+                  {team.pendingInvites.length > 0 ? (
+                    <div>
+                      <h3 className={subheading}>{translate(locale, "team.pending")}</h3>
+                      <ul className={rowList}>
+                        {team.pendingInvites.map((inviteItem) => (
+                          <li className={row} key={inviteItem.id}>
+                            <div className="grid min-w-0 gap-0.5">
+                              <strong>{inviteItem.email}</strong>
+                              <span>
+                                {translate(locale, `team.role.${inviteItem.role}`)} ·{" "}
+                                {translate(locale, "team.expires")}{" "}
+                                {formatDateTime(locale, inviteItem.expiresAt, "Europe/Stockholm")}
+                              </span>
+                            </div>
+                            <Button
+                              variant="outline"
+                              disabled={busy !== null}
+                              onClick={() => void cancelInvite(inviteItem.id)}
+                              type="button"
+                            >
+                              {translate(locale, "team.cancelInvite")}
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
-            </div>
-          ) : null}
 
-          {team.pendingTransfer &&
-          team.currentMembershipId === team.pendingTransfer.toMembershipId ? (
-            <section aria-labelledby="ownership-accept-heading" className="team-transfer">
-              <h3 id="ownership-accept-heading">{translate(locale, "team.transferAcceptTitle")}</h3>
-              <p>{translate(locale, "team.transferAcceptHelp")}</p>
-              {team.pendingTransfer.targetOrganizerDisplayName ? (
-                <p className="field-help">
-                  {translate(locale, "team.transferOrganizer").replace(
-                    "{organizer}",
-                    team.pendingTransfer.targetOrganizerDisplayName,
-                  )}
-                </p>
+              {team.pendingTransfer &&
+              team.currentMembershipId === team.pendingTransfer.toMembershipId ? (
+                <section aria-labelledby="ownership-accept-heading" className={subPanel}>
+                  <h3 className={subheading} id="ownership-accept-heading">
+                    {translate(locale, "team.transferAcceptTitle")}
+                  </h3>
+                  <p>{translate(locale, "team.transferAcceptHelp")}</p>
+                  {team.pendingTransfer.targetOrganizerDisplayName ? (
+                    <p className={hint}>
+                      {translate(locale, "team.transferOrganizer").replace(
+                        "{organizer}",
+                        team.pendingTransfer.targetOrganizerDisplayName,
+                      )}
+                    </p>
+                  ) : null}
+                  <Button
+                    disabled={busy !== null}
+                    onClick={() => void resolveTransfer(true)}
+                    type="button"
+                  >
+                    {busy === "transfer"
+                      ? translate(locale, "common.saving")
+                      : translate(locale, "team.transferAccept")}
+                  </Button>
+                </section>
               ) : null}
-              <button
-                className="primary-button"
-                disabled={busy !== null}
-                onClick={() => void resolveTransfer(true)}
-                type="button"
-              >
-                {busy === "transfer"
-                  ? translate(locale, "common.saving")
-                  : translate(locale, "team.transferAccept")}
-              </button>
-            </section>
-          ) : null}
-        </>
-      )}
+            </>
+          )}
 
-      {team ? (
-        <p aria-live="polite" className="form-status">
-          {status}
-        </p>
-      ) : null}
-    </section>
+          {team ? (
+            <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+              {status}
+            </p>
+          ) : null}
+        </CardContent>
+      </section>
+    </Card>
   );
 }

@@ -2,6 +2,10 @@ import { type createPromenadisApiClient, PromenadisApiError } from "@promenadis/
 import type { SellerInvite } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useEffect, useState } from "react";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
 
@@ -66,42 +70,59 @@ export function SellerInvites({
 
   if (!invites) return null;
   return (
-    <section aria-labelledby="seller-invite-heading" className="panel">
-      <h2 id="seller-invite-heading">{translate(locale, "sellerInvite.title")}</h2>
-      <p className="field-help">{translate(locale, "sellerInvite.help")}</p>
-      <form className="inline-control" onSubmit={invite}>
-        <label className="visually-hidden" htmlFor="seller-invite-email">
-          {translate(locale, "sellerInvite.email")}
-        </label>
-        <input
-          autoComplete="off"
-          id="seller-invite-email"
-          name="email"
-          placeholder={translate(locale, "sellerInvite.email")}
-          required
-          type="email"
-        />
-        <button className="secondary-button" type="submit">
-          {translate(locale, "sellerInvite.send")}
-        </button>
-      </form>
-      <ul className="resource-list">
-        {invites.map((item) => (
-          <li key={item.id}>
-            <span>{item.email}</span>
-            <span className="field-help">
-              {translate(locale, "sellerInvite.expires")}{" "}
-              {formatDateTime(locale, item.expiresAt, timezone)}
-            </span>
-            <button className="text-button" onClick={() => void cancel(item.id)} type="button">
-              {translate(locale, "sellerInvite.cancel")}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </section>
+    <Card asChild>
+      <section aria-labelledby="seller-invite-heading">
+        <CardHeader>
+          <CardTitle id="seller-invite-heading">
+            {translate(locale, "sellerInvite.title")}
+          </CardTitle>
+          <CardDescription>{translate(locale, "sellerInvite.help")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-wrap items-center gap-3" onSubmit={invite}>
+            <Label className="sr-only" htmlFor="seller-invite-email">
+              {translate(locale, "sellerInvite.email")}
+            </Label>
+            <Input
+              autoComplete="off"
+              className="flex-1 basis-60"
+              id="seller-invite-email"
+              name="email"
+              placeholder={translate(locale, "sellerInvite.email")}
+              required
+              type="email"
+            />
+            <Button type="submit" variant="outline">
+              {translate(locale, "sellerInvite.send")}
+            </Button>
+          </form>
+          <ul className="m-0 grid list-none divide-y p-0">
+            {invites.map((item) => (
+              <li
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 last:pb-0"
+                key={item.id}
+              >
+                <span className="min-w-0 font-semibold break-all">{item.email}</span>
+                <span className="text-sm text-muted-foreground">
+                  {translate(locale, "sellerInvite.expires")}{" "}
+                  {formatDateTime(locale, item.expiresAt, timezone)}
+                </span>
+                <Button
+                  className="ml-auto"
+                  onClick={() => void cancel(item.id)}
+                  type="button"
+                  variant="link"
+                >
+                  {translate(locale, "sellerInvite.cancel")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
+          </p>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

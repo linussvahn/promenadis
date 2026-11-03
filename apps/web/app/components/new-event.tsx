@@ -5,6 +5,15 @@ import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
 import { CreationProgress } from "./creation-progress";
+import { backLink, PageHeading, PageMain } from "./page";
+import { Alert } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent } from "./ui/card";
+import { Field, FieldDescription, FieldGroup } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
+import { Textarea } from "./ui/textarea";
 
 function defaultTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Stockholm";
@@ -75,126 +84,152 @@ function NewEventContent({ locale }: { readonly locale: "sv" | "en" }) {
   };
 
   return (
-    <main className="account-page flow-page" id="main" tabIndex={-1}>
-      <Link className="back-link" to="/dashboard">
+    <PageMain width="flow">
+      <Link className={backLink} to="/dashboard">
         ← {translate(locale, "event.backToEvents")}
       </Link>
       <CreationProgress currentStep={1} locale={locale} />
-      <header className="app-heading flow-heading">
-        <p className="eyebrow">{translate(locale, "creation.stepBasics")}</p>
-        <h1>{translate(locale, "creation.basicsTitle")}</h1>
-        <p className="lede">{translate(locale, "creation.basicsIntro")}</p>
-      </header>
+      <PageHeading
+        description={translate(locale, "creation.basicsIntro")}
+        eyebrow={translate(locale, "creation.stepBasics")}
+        title={translate(locale, "creation.basicsTitle")}
+      />
 
       {loadFailed ? (
-        <p className="notice notice-error" role="alert">
+        <Alert role="alert" variant="destructive">
           {translate(locale, "dashboard.sessionExpired")}
-        </p>
+        </Alert>
       ) : !dashboard || !scheduleDefaults ? (
         <p aria-live="polite">{translate(locale, "common.loading")}</p>
       ) : (
-        <form className="panel form-panel creation-form" onSubmit={createEvent}>
-          {dashboard.organizers.length === 0 ? (
-            <div className="form-section">
-              <p className="form-section-title">{translate(locale, "dashboard.organizedByYou")}</p>
-              <label htmlFor="public-organizer-name">
-                {translate(locale, "dashboard.publicOrganizerName")}
-              </label>
-              <input
-                aria-describedby="public-organizer-help"
-                defaultValue={dashboard.profile.displayName ?? ""}
-                id="public-organizer-name"
-                maxLength={100}
-                name="publicOrganizerName"
-                required
-              />
-              <p className="field-help" id="public-organizer-help">
-                {translate(locale, "dashboard.publicOrganizerHelp")}
-              </p>
-            </div>
-          ) : dashboard.organizers.length === 1 ? (
-            <p className="organizer-context">
-              <span className="organizer-context-label">
-                {translate(locale, "dashboard.organizingAs")}
-              </span>
-              <strong>{dashboard.organizers[0]?.displayName}</strong>
-            </p>
-          ) : (
-            <div className="form-section">
-              <label htmlFor="event-organizer">{translate(locale, "dashboard.organizingAs")}</label>
-              <select id="event-organizer" name="organizerProfileId" required>
-                {dashboard.organizers.map((organizer) => (
-                  <option key={organizer.id} value={organizer.id}>
-                    {organizer.displayName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        <Card asChild className="gap-0 py-2">
+          <form onSubmit={createEvent}>
+            <CardContent className="gap-0 divide-y sm:px-8">
+              {dashboard.organizers.length === 0 ? (
+                <Field className={section}>
+                  <p className="font-display text-lg font-extrabold">
+                    {translate(locale, "dashboard.organizedByYou")}
+                  </p>
+                  <Label htmlFor="public-organizer-name">
+                    {translate(locale, "dashboard.publicOrganizerName")}
+                  </Label>
+                  <Input
+                    aria-describedby="public-organizer-help"
+                    defaultValue={dashboard.profile.displayName ?? ""}
+                    id="public-organizer-name"
+                    maxLength={100}
+                    name="publicOrganizerName"
+                    required
+                  />
+                  <FieldDescription id="public-organizer-help">
+                    {translate(locale, "dashboard.publicOrganizerHelp")}
+                  </FieldDescription>
+                </Field>
+              ) : dashboard.organizers.length === 1 ? (
+                <div className={section}>
+                  <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-xl bg-muted px-4 py-3">
+                    <span className="text-sm text-muted-foreground">
+                      {translate(locale, "dashboard.organizingAs")}
+                    </span>
+                    <strong>{dashboard.organizers[0]?.displayName}</strong>
+                  </p>
+                </div>
+              ) : (
+                <Field className={section}>
+                  <Label htmlFor="event-organizer">
+                    {translate(locale, "dashboard.organizingAs")}
+                  </Label>
+                  <NativeSelect id="event-organizer" name="organizerProfileId" required>
+                    {dashboard.organizers.map((organizer) => (
+                      <NativeSelectOption key={organizer.id} value={organizer.id}>
+                        {organizer.displayName}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </Field>
+              )}
 
-          <div className="form-section">
-            <label htmlFor="event-title">{translate(locale, "dashboard.eventTitle")}</label>
-            <input id="event-title" maxLength={120} name="title" required />
-            <label htmlFor="event-description">
-              {translate(locale, "dashboard.eventDescription")}
-            </label>
-            <textarea id="event-description" maxLength={2000} name="description" rows={4} />
-          </div>
+              <FieldGroup className={section}>
+                <Field>
+                  <Label htmlFor="event-title">{translate(locale, "dashboard.eventTitle")}</Label>
+                  <Input id="event-title" maxLength={120} name="title" required />
+                </Field>
+                <Field>
+                  <Label htmlFor="event-description">
+                    {translate(locale, "dashboard.eventDescription")}
+                  </Label>
+                  <Textarea id="event-description" maxLength={2000} name="description" rows={4} />
+                </Field>
+              </FieldGroup>
 
-          <div className="form-section">
-            <h2>{translate(locale, "creation.whenTitle")}</h2>
-            <div className="schedule-fields">
-              <div>
-                <label htmlFor="event-start">{translate(locale, "dashboard.startsAt")}</label>
-                <input
-                  defaultValue={scheduleDefaults.startsAt}
-                  id="event-start"
-                  name="startsAt"
-                  required
-                  type="datetime-local"
-                />
+              <div className={section}>
+                <h2 className="font-display text-xl font-extrabold">
+                  {translate(locale, "creation.whenTitle")}
+                </h2>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field>
+                    <Label htmlFor="event-start">{translate(locale, "dashboard.startsAt")}</Label>
+                    <Input
+                      defaultValue={scheduleDefaults.startsAt}
+                      id="event-start"
+                      name="startsAt"
+                      required
+                      type="datetime-local"
+                    />
+                  </Field>
+                  <Field>
+                    <Label htmlFor="event-end">{translate(locale, "dashboard.endsAt")}</Label>
+                    <Input
+                      defaultValue={scheduleDefaults.endsAt}
+                      id="event-end"
+                      name="endsAt"
+                      required
+                      type="datetime-local"
+                    />
+                  </Field>
+                </div>
+                <FieldDescription>
+                  {translate(locale, "dashboard.timezone")}: {defaultTimeZone()}.{" "}
+                  {translate(locale, "dashboard.timezoneHelp")}
+                </FieldDescription>
               </div>
-              <div>
-                <label htmlFor="event-end">{translate(locale, "dashboard.endsAt")}</label>
-                <input
-                  defaultValue={scheduleDefaults.endsAt}
-                  id="event-end"
-                  name="endsAt"
-                  required
-                  type="datetime-local"
-                />
+
+              <Field className={section}>
+                <Label htmlFor="event-visibility">
+                  {translate(locale, "dashboard.visibility")}
+                </Label>
+                <NativeSelect defaultValue="public" id="event-visibility" name="visibility">
+                  <NativeSelectOption value="public">
+                    {translate(locale, "visibility.public")}
+                  </NativeSelectOption>
+                  <NativeSelectOption value="unlisted">
+                    {translate(locale, "visibility.unlisted")}
+                  </NativeSelectOption>
+                </NativeSelect>
+                <FieldDescription>{translate(locale, "creation.visibilityHelp")}</FieldDescription>
+              </Field>
+
+              <div className="grid gap-3 py-6">
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <Button asChild variant="outline">
+                    <Link to="/dashboard">{translate(locale, "common.cancel")}</Link>
+                  </Button>
+                  <Button disabled={busy} type="submit">
+                    {busy
+                      ? translate(locale, "common.saving")
+                      : translate(locale, "creation.continueToArea")}
+                  </Button>
+                </div>
+                <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+                  {status}
+                </p>
               </div>
-            </div>
-            <p className="field-help">
-              {translate(locale, "dashboard.timezone")}: {defaultTimeZone()}.{" "}
-              {translate(locale, "dashboard.timezoneHelp")}
-            </p>
-          </div>
-
-          <div className="form-section">
-            <label htmlFor="event-visibility">{translate(locale, "dashboard.visibility")}</label>
-            <select defaultValue="public" id="event-visibility" name="visibility">
-              <option value="public">{translate(locale, "visibility.public")}</option>
-              <option value="unlisted">{translate(locale, "visibility.unlisted")}</option>
-            </select>
-            <p className="field-help">{translate(locale, "creation.visibilityHelp")}</p>
-          </div>
-
-          <div className="form-actions">
-            <Link className="secondary-button button-link" to="/dashboard">
-              {translate(locale, "common.cancel")}
-            </Link>
-            <button className="primary-button" disabled={busy} type="submit">
-              {busy
-                ? translate(locale, "common.saving")
-                : translate(locale, "creation.continueToArea")}
-            </button>
-          </div>
-          <p aria-live="polite" className="form-status">
-            {status}
-          </p>
-        </form>
+            </CardContent>
+          </form>
+        </Card>
       )}
-    </main>
+    </PageMain>
   );
 }
+
+const section = "grid gap-3 py-6";

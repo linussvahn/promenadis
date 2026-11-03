@@ -2,6 +2,12 @@ import { type createPromenadisApiClient, PromenadisApiError } from "@promenadis/
 import type { EventTaxonomy } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
+import { Checkbox } from "./ui/checkbox";
+import { ChoiceField, Field, FieldDescription } from "./ui/field";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
 
@@ -91,78 +97,89 @@ export function EventTaxonomyEditor({
   const byId = new Map(taxonomy.categories.map((category) => [category.id, category]));
 
   return (
-    <details className="panel settings-details">
-      <summary>{translate(locale, "taxonomy.title")}</summary>
-      <form className="form-panel" key={taxonomy.version} onSubmit={save}>
-        <p className="field-help">
-          {translate(locale, editable ? "taxonomy.help" : "taxonomy.pinned")}
-        </p>
-        <ol className="category-order">
-          {order.map((id, index) => {
-            const category = byId.get(id);
-            if (!category) return null;
-            return (
-              <li key={id}>
-                <label className="checkbox-field">
-                  <input
-                    checked={enabled.has(id)}
-                    disabled={!editable}
-                    onChange={(event) => {
-                      const checked = event.currentTarget.checked;
-                      setEnabled((current) => {
-                        const next = new Set(current);
-                        if (checked) next.add(id);
-                        else next.delete(id);
-                        return next;
-                      });
-                    }}
-                    type="checkbox"
-                  />
-                  <span>{category.label[locale]}</span>
-                </label>
-                {editable ? (
-                  <>
-                    <button
-                      aria-label={`${translate(locale, "boundary.moveUp")}: ${category.label[locale]}`}
-                      className="text-button"
-                      disabled={index === 0}
-                      onClick={() => move(index, -1)}
-                      type="button"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      aria-label={`${translate(locale, "boundary.moveDown")}: ${category.label[locale]}`}
-                      className="text-button"
-                      disabled={index === order.length - 1}
-                      onClick={() => move(index, 1)}
-                      type="button"
-                    >
-                      ↓
-                    </button>
-                  </>
-                ) : null}
-              </li>
-            );
-          })}
-        </ol>
-        <label htmlFor="suggested-tags">{translate(locale, "taxonomy.suggestedTags")}</label>
-        <textarea
-          defaultValue={taxonomy.suggestedTags.join("\n")}
-          disabled={!editable}
-          id="suggested-tags"
-          name="suggestedTags"
-          rows={4}
-        />
-        {editable ? (
-          <button className="secondary-button" disabled={busy} type="submit">
-            {translate(locale, "taxonomy.save")}
-          </button>
-        ) : null}
-        <p aria-live="polite" className="form-status">
-          {status}
-        </p>
-      </form>
-    </details>
+    <Card
+      asChild
+      className="gap-0 py-0 [&>summary]:flex [&>summary]:min-h-16 [&>summary]:cursor-pointer [&>summary]:items-center [&>summary]:px-6 [&>summary]:py-4 [&>summary]:font-display [&>summary]:text-lg [&>summary]:font-extrabold"
+    >
+      <details>
+        <summary>{translate(locale, "taxonomy.title")}</summary>
+        <form className="grid gap-5 border-t px-6 pt-5 pb-6" key={taxonomy.version} onSubmit={save}>
+          <FieldDescription>
+            {translate(locale, editable ? "taxonomy.help" : "taxonomy.pinned")}
+          </FieldDescription>
+          <ol className="m-0 grid list-none divide-y rounded-xl border p-0">
+            {order.map((id, index) => {
+              const category = byId.get(id);
+              if (!category) return null;
+              return (
+                <li className="flex min-h-12 items-center gap-2 py-1 pr-1 pl-4" key={id}>
+                  <ChoiceField className="flex-1 items-center py-2">
+                    <Checkbox
+                      checked={enabled.has(id)}
+                      className="mt-0"
+                      disabled={!editable}
+                      onChange={(event) => {
+                        const checked = event.currentTarget.checked;
+                        setEnabled((current) => {
+                          const next = new Set(current);
+                          if (checked) next.add(id);
+                          else next.delete(id);
+                          return next;
+                        });
+                      }}
+                    />
+                    <span>{category.label[locale]}</span>
+                  </ChoiceField>
+                  {editable ? (
+                    <>
+                      <Button
+                        aria-label={`${translate(locale, "boundary.moveUp")}: ${category.label[locale]}`}
+                        disabled={index === 0}
+                        onClick={() => move(index, -1)}
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                      >
+                        ↑
+                      </Button>
+                      <Button
+                        aria-label={`${translate(locale, "boundary.moveDown")}: ${category.label[locale]}`}
+                        disabled={index === order.length - 1}
+                        onClick={() => move(index, 1)}
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                      >
+                        ↓
+                      </Button>
+                    </>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+          <Field>
+            <Label htmlFor="suggested-tags">{translate(locale, "taxonomy.suggestedTags")}</Label>
+            <Textarea
+              defaultValue={taxonomy.suggestedTags.join("\n")}
+              disabled={!editable}
+              id="suggested-tags"
+              name="suggestedTags"
+              rows={4}
+            />
+          </Field>
+          {editable ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button disabled={busy} type="submit" variant="outline">
+                {translate(locale, "taxonomy.save")}
+              </Button>
+            </div>
+          ) : null}
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
+          </p>
+        </form>
+      </details>
+    </Card>
   );
 }

@@ -4,6 +4,12 @@ import { type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { toDateTimeLocal, wallTimeToIso } from "../lib/wall-time";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
+import { Field, FieldDescription } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 
 // Title, description and schedule of a draft. Times are wall times in the
 // event's own time zone, like the registration editor.
@@ -65,60 +71,70 @@ export function EventDetailsEditor({
   };
 
   return (
-    <details className="panel settings-details">
-      <summary>{translate(locale, "details.title")}</summary>
-      <form className="form-panel details-form" key={event.version} onSubmit={save}>
-        <p className="field-help">{translate(locale, "details.help")}</p>
-        <label htmlFor="details-title">{translate(locale, "dashboard.eventTitle")}</label>
-        <input
-          defaultValue={event.title}
-          id="details-title"
-          maxLength={120}
-          name="title"
-          required
-        />
-        <label htmlFor="details-description">
-          {translate(locale, "dashboard.eventDescription")}
-        </label>
-        <textarea
-          defaultValue={event.description}
-          id="details-description"
-          maxLength={2000}
-          name="description"
-          rows={4}
-        />
-        <div className="schedule-fields">
-          <div>
-            <label htmlFor="details-start">{translate(locale, "dashboard.startsAt")}</label>
-            <input
-              defaultValue={toDateTimeLocal(interval.startsAt, event.timezone)}
-              id="details-start"
-              name="startsAt"
+    <Card asChild className="py-0">
+      <details className="[&>summary]:cursor-pointer">
+        <summary className="flex min-h-11 items-center px-6 py-5 font-display text-lg font-extrabold">
+          {translate(locale, "details.title")}
+        </summary>
+        <form className="grid gap-5 border-t px-6 pt-5 pb-6" key={event.version} onSubmit={save}>
+          <FieldDescription>{translate(locale, "details.help")}</FieldDescription>
+          <Field>
+            <Label htmlFor="details-title">{translate(locale, "dashboard.eventTitle")}</Label>
+            <Input
+              defaultValue={event.title}
+              id="details-title"
+              maxLength={120}
+              name="title"
               required
-              type="datetime-local"
             />
-          </div>
-          <div>
-            <label htmlFor="details-end">{translate(locale, "dashboard.endsAt")}</label>
-            <input
-              defaultValue={toDateTimeLocal(interval.endsAt, event.timezone)}
-              id="details-end"
-              name="endsAt"
-              required
-              type="datetime-local"
+          </Field>
+          <Field>
+            <Label htmlFor="details-description">
+              {translate(locale, "dashboard.eventDescription")}
+            </Label>
+            <Textarea
+              defaultValue={event.description}
+              id="details-description"
+              maxLength={2000}
+              name="description"
+              rows={4}
             />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <Label htmlFor="details-start">{translate(locale, "dashboard.startsAt")}</Label>
+              <Input
+                defaultValue={toDateTimeLocal(interval.startsAt, event.timezone)}
+                id="details-start"
+                name="startsAt"
+                required
+                type="datetime-local"
+              />
+            </Field>
+            <Field>
+              <Label htmlFor="details-end">{translate(locale, "dashboard.endsAt")}</Label>
+              <Input
+                defaultValue={toDateTimeLocal(interval.endsAt, event.timezone)}
+                id="details-end"
+                name="endsAt"
+                required
+                type="datetime-local"
+              />
+            </Field>
           </div>
-        </div>
-        <p className="field-help">
-          {translate(locale, "dashboard.timezone")}: {event.timezone}
-        </p>
-        <button className="primary-button" disabled={busy} type="submit">
-          {busy ? translate(locale, "common.saving") : translate(locale, "details.save")}
-        </button>
-        <p aria-live="polite" className="form-status">
-          {status}
-        </p>
-      </form>
-    </details>
+          <FieldDescription>
+            {translate(locale, "dashboard.timezone")}: {event.timezone}
+          </FieldDescription>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button disabled={busy} type="submit">
+              {busy ? translate(locale, "common.saving") : translate(locale, "details.save")}
+            </Button>
+            <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+              {status}
+            </p>
+          </div>
+        </form>
+      </details>
+    </Card>
   );
 }

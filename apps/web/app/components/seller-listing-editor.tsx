@@ -8,6 +8,16 @@ import type {
 import { type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { toDateTimeLocal, wallTimeToIso } from "../lib/wall-time";
+import { Alert } from "./ui/alert";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
+import { Checkbox } from "./ui/checkbox";
+import { ChoiceField, Field, FieldDescription, FieldLegend, FieldSet } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
+import { Textarea } from "./ui/textarea";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
 type Call = () => Promise<{ api: ApiClient; token: string } | null>;
@@ -179,308 +189,397 @@ export function SellerListingEditor({
   const defaultCategory = enabled[0]?.id ?? "";
   const toDefaultSlot = (value: string | null) => (value ? toDateTimeLocal(value, timezone) : "");
 
+  const section = "grid gap-4 border-t pt-5";
+
   return (
-    <div className="seller-listing">
+    <div className="grid gap-6">
       {eventActive && participation.state === "approved" ? (
-        <section aria-labelledby="live-heading" className="panel">
-          <h2 id="live-heading">{translate(locale, "live.title")}</h2>
-          <p>
-            {listing.liveStatus
-              ? translate(locale, `live.${listing.liveStatus.status}`)
-              : translate(locale, "live.scheduled")}
-          </p>
-          <div className="form-actions">
-            {(["open", "away", "closed_early"] as const).map((next) => (
-              <button
-                className={next === "closed_early" ? "danger-button" : "secondary-button"}
-                disabled={busy || listing.liveStatus?.status === "closed_early"}
-                key={next}
-                onClick={() => void setLive(next)}
-                type="button"
-              >
-                {translate(locale, `live.set.${next}`)}
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
-      <form className="panel form-panel" key={listing.version} onSubmit={save}>
-        <h2>{translate(locale, "listing.title")}</h2>
-        {listing.hidden ? (
-          <p className="notice notice-error">
-            {translate(locale, "seller.listingHidden")} {listing.hiddenReason}
-          </p>
-        ) : null}
-        <p className="field-help">{translate(locale, "listing.help")}</p>
-        <label htmlFor="listing-title">{translate(locale, "listing.stopTitle")}</label>
-        <input defaultValue={listing.title ?? ""} id="listing-title" maxLength={80} name="title" />
-        <label htmlFor="listing-description">{translate(locale, "listing.description")}</label>
-        <textarea
-          defaultValue={listing.description}
-          id="listing-description"
-          maxLength={1000}
-          name="description"
-          rows={4}
-        />
-        <fieldset className="choice-group">
-          <legend>{translate(locale, "listing.categories")}</legend>
-          {enabled.map((category) => (
-            <label className="checkbox-field" key={category.id}>
-              <input
-                defaultChecked={listing.categoryIds.includes(category.id)}
-                name="categoryIds"
-                type="checkbox"
-                value={category.id}
-              />
-              <span>{category.label[locale]}</span>
-            </label>
-          ))}
-        </fieldset>
-        <label htmlFor="listing-tags">{translate(locale, "listing.tags")}</label>
-        <input
-          aria-describedby="listing-tags-help"
-          id="listing-tags"
-          onChange={(event) => setTags(event.currentTarget.value)}
-          value={tags}
-        />
-        <p className="field-help" id="listing-tags-help">
-          {translate(locale, "listing.tagsHelp")}
-        </p>
-        {taxonomy.suggestedTags.length ? (
-          <div className="form-actions">
-            {taxonomy.suggestedTags.map((tag) => (
-              <button
-                className="secondary-button"
-                key={tag}
-                onClick={() => setTags((current) => (current ? `${current}, ${tag}` : tag))}
-                type="button"
-              >
-                + {tag}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        <fieldset className="choice-group">
-          <legend>{translate(locale, "listing.accessibility")}</legend>
-          {(
-            [
-              ["stepFree", listing.accessibility.stepFree],
-              ["stairs", listing.accessibility.stairs],
-              ["elevator", listing.accessibility.elevator],
-              ["strollerFriendly", listing.accessibility.strollerFriendly],
-            ] as const
-          ).map(([name, value]) => (
-            <div key={name}>
-              <label htmlFor={`listing-${name}`}>{translate(locale, `listing.fact.${name}`)}</label>
-              <select defaultValue={triStateValue(value)} id={`listing-${name}`} name={name}>
-                <option value="">{translate(locale, "listing.unknown")}</option>
-                <option value="yes">{translate(locale, "listing.yes")}</option>
-                <option value="no">{translate(locale, "listing.no")}</option>
-              </select>
-            </div>
-          ))}
-          <label htmlFor="listing-setting">{translate(locale, "listing.setting")}</label>
-          <select
-            defaultValue={listing.accessibility.setting ?? ""}
-            id="listing-setting"
-            name="setting"
-          >
-            <option value="">{translate(locale, "listing.unknown")}</option>
-            <option value="indoor">{translate(locale, "listing.indoor")}</option>
-            <option value="outdoor">{translate(locale, "listing.outdoor")}</option>
-            <option value="both">{translate(locale, "listing.both")}</option>
-          </select>
-        </fieldset>
-
-        <fieldset className="choice-group">
-          <legend>{translate(locale, "listing.items")}</legend>
-          <p className="field-help">{translate(locale, "listing.itemsHelp")}</p>
-          {items.map((item, index) => (
-            <div className="item-row" key={item.key}>
-              <label htmlFor={`item-name-${item.key}`}>
-                {translate(locale, "listing.itemName")} {index + 1}
-              </label>
-              <input
-                id={`item-name-${item.key}`}
-                maxLength={80}
-                onChange={(event) => {
-                  const name = event.currentTarget.value;
-                  setItems((current) =>
-                    current.map((row) => (row.key === item.key ? { ...row, name } : row)),
-                  );
-                }}
-                required
-                value={item.name}
-              />
-              <label htmlFor={`item-category-${item.key}`}>
-                {translate(locale, "listing.itemCategory")}
-              </label>
-              <select
-                id={`item-category-${item.key}`}
-                onChange={(event) => {
-                  const categoryId = event.currentTarget.value;
-                  setItems((current) =>
-                    current.map((row) => (row.key === item.key ? { ...row, categoryId } : row)),
-                  );
-                }}
-                value={item.categoryId}
-              >
-                {enabled.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.label[locale]}
-                  </option>
+        <Card asChild>
+          <section aria-labelledby="live-heading">
+            <CardHeader>
+              <CardTitle id="live-heading">{translate(locale, "live.title")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>
+                <Badge variant={listing.liveStatus?.status === "open" ? "success" : "secondary"}>
+                  {listing.liveStatus
+                    ? translate(locale, `live.${listing.liveStatus.status}`)
+                    : translate(locale, "live.scheduled")}
+                </Badge>
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                {(["open", "away", "closed_early"] as const).map((next) => (
+                  <Button
+                    disabled={busy || listing.liveStatus?.status === "closed_early"}
+                    key={next}
+                    onClick={() => void setLive(next)}
+                    type="button"
+                    variant={next === "closed_early" ? "destructive" : "outline"}
+                  >
+                    {translate(locale, `live.set.${next}`)}
+                  </Button>
                 ))}
-              </select>
-              <label htmlFor={`item-price-${item.key}`}>
-                {translate(locale, "listing.itemPrice")}
-              </label>
-              <input
-                id={`item-price-${item.key}`}
-                inputMode="numeric"
-                onChange={(event) => {
-                  const text = event.currentTarget.value.trim();
-                  const kronor = Number(text.replace(",", "."));
-                  const priceMinor =
-                    text && Number.isFinite(kronor) ? Math.round(kronor * 100) : null;
-                  setItems((current) =>
-                    current.map((row) => (row.key === item.key ? { ...row, priceMinor } : row)),
-                  );
-                }}
-                defaultValue={item.priceMinor === null ? "" : String(item.priceMinor / 100)}
+              </div>
+            </CardContent>
+          </section>
+        </Card>
+      ) : null}
+      <Card asChild>
+        <form key={listing.version} onSubmit={save}>
+          <CardHeader>
+            <CardTitle>{translate(locale, "listing.title")}</CardTitle>
+            <CardDescription>{translate(locale, "listing.help")}</CardDescription>
+          </CardHeader>
+          <CardContent className="gap-5">
+            {listing.hidden ? (
+              <Alert variant="destructive">
+                {translate(locale, "seller.listingHidden")} {listing.hiddenReason}
+              </Alert>
+            ) : null}
+            <Field>
+              <Label htmlFor="listing-title">{translate(locale, "listing.stopTitle")}</Label>
+              <Input
+                defaultValue={listing.title ?? ""}
+                id="listing-title"
+                maxLength={80}
+                name="title"
               />
-              <label className="checkbox-field">
-                <input
-                  checked={item.status === "sold"}
-                  onChange={(event) => {
-                    const sold = event.currentTarget.checked;
-                    setItems((current) =>
-                      current.map((row) =>
-                        row.key === item.key
-                          ? { ...row, status: sold ? "sold" : "available" }
-                          : row,
-                      ),
-                    );
-                  }}
-                  type="checkbox"
-                />
-                <span>{translate(locale, "listing.sold")}</span>
-              </label>
-              <button
-                className="text-button"
-                onClick={() => setItems((current) => current.filter((row) => row.key !== item.key))}
-                type="button"
-              >
-                {translate(locale, "listing.remove")}
-              </button>
-            </div>
-          ))}
-          {items.length < 20 && defaultCategory ? (
-            <button
-              className="secondary-button"
-              onClick={() =>
-                setItems((current) => [
-                  ...current,
-                  {
-                    categoryId: defaultCategory,
-                    key: crypto.randomUUID(),
-                    name: "",
-                    priceMinor: null,
-                    status: "available",
-                  },
-                ])
-              }
-              type="button"
-            >
-              {translate(locale, "listing.addItem")}
-            </button>
-          ) : null}
-          <p className="field-help">{translate(locale, "listing.priceNotice")}</p>
-        </fieldset>
+            </Field>
+            <Field>
+              <Label htmlFor="listing-description">
+                {translate(locale, "listing.description")}
+              </Label>
+              <Textarea
+                defaultValue={listing.description}
+                id="listing-description"
+                maxLength={1000}
+                name="description"
+                rows={4}
+              />
+            </Field>
 
-        <fieldset className="choice-group">
-          <legend>{translate(locale, "listing.availability")}</legend>
-          <p className="field-help">{translate(locale, "listing.availabilityHelp")}</p>
-          {slots.map((slot, index) => (
-            <div className="schedule-fields" key={slot.key}>
-              <div>
-                <label htmlFor={`slot-start-${slot.key}`}>
-                  {translate(locale, "dashboard.startsAt")} {index + 1}
-                </label>
-                <input
-                  id={`slot-start-${slot.key}`}
-                  onChange={(event) => {
-                    const startsAt = event.currentTarget.value;
-                    setSlots((current) =>
-                      current.map((row) => (row.key === slot.key ? { ...row, startsAt } : row)),
-                    );
-                  }}
-                  required
-                  type="datetime-local"
-                  value={slot.startsAt}
-                />
+            <FieldSet className={section}>
+              <FieldLegend className="float-left mb-3 w-full">
+                {translate(locale, "listing.categories")}
+              </FieldLegend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {enabled.map((category) => (
+                  <ChoiceField key={category.id}>
+                    <Checkbox
+                      defaultChecked={listing.categoryIds.includes(category.id)}
+                      name="categoryIds"
+                      value={category.id}
+                    />
+                    <span>{category.label[locale]}</span>
+                  </ChoiceField>
+                ))}
               </div>
-              <div>
-                <label htmlFor={`slot-end-${slot.key}`}>
-                  {translate(locale, "dashboard.endsAt")} {index + 1}
-                </label>
-                <input
-                  id={`slot-end-${slot.key}`}
-                  onChange={(event) => {
-                    const endsAt = event.currentTarget.value;
-                    setSlots((current) =>
-                      current.map((row) => (row.key === slot.key ? { ...row, endsAt } : row)),
-                    );
-                  }}
-                  required
-                  type="datetime-local"
-                  value={slot.endsAt}
-                />
-              </div>
-              <button
-                className="text-button"
-                onClick={() => setSlots((current) => current.filter((row) => row.key !== slot.key))}
-                type="button"
-              >
-                {translate(locale, "listing.remove")}
-              </button>
-            </div>
-          ))}
-          {slots.length < 10 ? (
-            <button
-              className="secondary-button"
-              onClick={() =>
-                setSlots((current) => [
-                  ...current,
-                  {
-                    endsAt: toDefaultSlot(eventEndsAt),
-                    key: crypto.randomUUID(),
-                    startsAt: toDefaultSlot(eventStartsAt),
-                  },
-                ])
-              }
-              type="button"
-            >
-              {translate(locale, "listing.addAvailability")}
-            </button>
-          ) : null}
-        </fieldset>
+            </FieldSet>
+            <Field>
+              <Label htmlFor="listing-tags">{translate(locale, "listing.tags")}</Label>
+              <Input
+                aria-describedby="listing-tags-help"
+                id="listing-tags"
+                onChange={(event) => setTags(event.currentTarget.value)}
+                value={tags}
+              />
+              <FieldDescription id="listing-tags-help">
+                {translate(locale, "listing.tagsHelp")}
+              </FieldDescription>
+              {taxonomy.suggestedTags.length ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {taxonomy.suggestedTags.map((tag) => (
+                    <Button
+                      key={tag}
+                      onClick={() => setTags((current) => (current ? `${current}, ${tag}` : tag))}
+                      size="sm"
+                      type="button"
+                      variant="secondary"
+                    >
+                      + {tag}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+            </Field>
 
-        <label className="checkbox-field">
-          <input
-            defaultChecked={listing.earlyVisibilityOptOut}
-            name="earlyOptOut"
-            type="checkbox"
-          />
-          <span>{translate(locale, "listing.earlyOptOut")}</span>
-        </label>
-        <button className="primary-button" disabled={busy} type="submit">
-          {busy ? translate(locale, "common.saving") : translate(locale, "listing.save")}
-        </button>
-        <p aria-live="polite" className="form-status">
-          {status}
-        </p>
-      </form>
+            <FieldSet className={section}>
+              <FieldLegend className="float-left mb-3 w-full">
+                {translate(locale, "listing.accessibility")}
+              </FieldLegend>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {(
+                  [
+                    ["stepFree", listing.accessibility.stepFree],
+                    ["stairs", listing.accessibility.stairs],
+                    ["elevator", listing.accessibility.elevator],
+                    ["strollerFriendly", listing.accessibility.strollerFriendly],
+                  ] as const
+                ).map(([name, value]) => (
+                  <Field key={name}>
+                    <Label htmlFor={`listing-${name}`}>
+                      {translate(locale, `listing.fact.${name}`)}
+                    </Label>
+                    <NativeSelect
+                      defaultValue={triStateValue(value)}
+                      id={`listing-${name}`}
+                      name={name}
+                    >
+                      <NativeSelectOption value="">
+                        {translate(locale, "listing.unknown")}
+                      </NativeSelectOption>
+                      <NativeSelectOption value="yes">
+                        {translate(locale, "listing.yes")}
+                      </NativeSelectOption>
+                      <NativeSelectOption value="no">
+                        {translate(locale, "listing.no")}
+                      </NativeSelectOption>
+                    </NativeSelect>
+                  </Field>
+                ))}
+                <Field>
+                  <Label htmlFor="listing-setting">{translate(locale, "listing.setting")}</Label>
+                  <NativeSelect
+                    defaultValue={listing.accessibility.setting ?? ""}
+                    id="listing-setting"
+                    name="setting"
+                  >
+                    <NativeSelectOption value="">
+                      {translate(locale, "listing.unknown")}
+                    </NativeSelectOption>
+                    <NativeSelectOption value="indoor">
+                      {translate(locale, "listing.indoor")}
+                    </NativeSelectOption>
+                    <NativeSelectOption value="outdoor">
+                      {translate(locale, "listing.outdoor")}
+                    </NativeSelectOption>
+                    <NativeSelectOption value="both">
+                      {translate(locale, "listing.both")}
+                    </NativeSelectOption>
+                  </NativeSelect>
+                </Field>
+              </div>
+            </FieldSet>
+
+            <FieldSet className={section}>
+              <FieldLegend className="float-left mb-1 w-full">
+                {translate(locale, "listing.items")}
+              </FieldLegend>
+              <FieldDescription>{translate(locale, "listing.itemsHelp")}</FieldDescription>
+              {items.map((item, index) => (
+                <div
+                  className="grid gap-4 rounded-xl border bg-muted/40 p-4 sm:grid-cols-2"
+                  key={item.key}
+                >
+                  <Field className="sm:col-span-2">
+                    <Label htmlFor={`item-name-${item.key}`}>
+                      {translate(locale, "listing.itemName")} {index + 1}
+                    </Label>
+                    <Input
+                      id={`item-name-${item.key}`}
+                      maxLength={80}
+                      onChange={(event) => {
+                        const name = event.currentTarget.value;
+                        setItems((current) =>
+                          current.map((row) => (row.key === item.key ? { ...row, name } : row)),
+                        );
+                      }}
+                      required
+                      value={item.name}
+                    />
+                  </Field>
+                  <Field>
+                    <Label htmlFor={`item-category-${item.key}`}>
+                      {translate(locale, "listing.itemCategory")}
+                    </Label>
+                    <NativeSelect
+                      id={`item-category-${item.key}`}
+                      onChange={(event) => {
+                        const categoryId = event.currentTarget.value;
+                        setItems((current) =>
+                          current.map((row) =>
+                            row.key === item.key ? { ...row, categoryId } : row,
+                          ),
+                        );
+                      }}
+                      value={item.categoryId}
+                    >
+                      {enabled.map((category) => (
+                        <NativeSelectOption key={category.id} value={category.id}>
+                          {category.label[locale]}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                  <Field>
+                    <Label htmlFor={`item-price-${item.key}`}>
+                      {translate(locale, "listing.itemPrice")}
+                    </Label>
+                    <Input
+                      id={`item-price-${item.key}`}
+                      inputMode="numeric"
+                      onChange={(event) => {
+                        const text = event.currentTarget.value.trim();
+                        const kronor = Number(text.replace(",", "."));
+                        const priceMinor =
+                          text && Number.isFinite(kronor) ? Math.round(kronor * 100) : null;
+                        setItems((current) =>
+                          current.map((row) =>
+                            row.key === item.key ? { ...row, priceMinor } : row,
+                          ),
+                        );
+                      }}
+                      defaultValue={item.priceMinor === null ? "" : String(item.priceMinor / 100)}
+                    />
+                  </Field>
+                  <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
+                    <ChoiceField className="items-center">
+                      <Checkbox
+                        checked={item.status === "sold"}
+                        className="mt-0"
+                        onChange={(event) => {
+                          const sold = event.currentTarget.checked;
+                          setItems((current) =>
+                            current.map((row) =>
+                              row.key === item.key
+                                ? { ...row, status: sold ? "sold" : "available" }
+                                : row,
+                            ),
+                          );
+                        }}
+                      />
+                      <span>{translate(locale, "listing.sold")}</span>
+                    </ChoiceField>
+                    <Button
+                      onClick={() =>
+                        setItems((current) => current.filter((row) => row.key !== item.key))
+                      }
+                      type="button"
+                      variant="link"
+                    >
+                      {translate(locale, "listing.remove")}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {items.length < 20 && defaultCategory ? (
+                <div>
+                  <Button
+                    onClick={() =>
+                      setItems((current) => [
+                        ...current,
+                        {
+                          categoryId: defaultCategory,
+                          key: crypto.randomUUID(),
+                          name: "",
+                          priceMinor: null,
+                          status: "available",
+                        },
+                      ])
+                    }
+                    type="button"
+                    variant="outline"
+                  >
+                    {translate(locale, "listing.addItem")}
+                  </Button>
+                </div>
+              ) : null}
+              <FieldDescription>{translate(locale, "listing.priceNotice")}</FieldDescription>
+            </FieldSet>
+
+            <FieldSet className={section}>
+              <FieldLegend className="float-left mb-1 w-full">
+                {translate(locale, "listing.availability")}
+              </FieldLegend>
+              <FieldDescription>{translate(locale, "listing.availabilityHelp")}</FieldDescription>
+              {slots.map((slot, index) => (
+                <div
+                  className="grid items-end gap-4 rounded-xl border bg-muted/40 p-4 sm:grid-cols-[1fr_1fr_auto]"
+                  key={slot.key}
+                >
+                  <Field>
+                    <Label htmlFor={`slot-start-${slot.key}`}>
+                      {translate(locale, "dashboard.startsAt")} {index + 1}
+                    </Label>
+                    <Input
+                      id={`slot-start-${slot.key}`}
+                      onChange={(event) => {
+                        const startsAt = event.currentTarget.value;
+                        setSlots((current) =>
+                          current.map((row) => (row.key === slot.key ? { ...row, startsAt } : row)),
+                        );
+                      }}
+                      required
+                      type="datetime-local"
+                      value={slot.startsAt}
+                    />
+                  </Field>
+                  <Field>
+                    <Label htmlFor={`slot-end-${slot.key}`}>
+                      {translate(locale, "dashboard.endsAt")} {index + 1}
+                    </Label>
+                    <Input
+                      id={`slot-end-${slot.key}`}
+                      onChange={(event) => {
+                        const endsAt = event.currentTarget.value;
+                        setSlots((current) =>
+                          current.map((row) => (row.key === slot.key ? { ...row, endsAt } : row)),
+                        );
+                      }}
+                      required
+                      type="datetime-local"
+                      value={slot.endsAt}
+                    />
+                  </Field>
+                  <Button
+                    className="justify-self-start"
+                    onClick={() =>
+                      setSlots((current) => current.filter((row) => row.key !== slot.key))
+                    }
+                    type="button"
+                    variant="link"
+                  >
+                    {translate(locale, "listing.remove")}
+                  </Button>
+                </div>
+              ))}
+              {slots.length < 10 ? (
+                <div>
+                  <Button
+                    onClick={() =>
+                      setSlots((current) => [
+                        ...current,
+                        {
+                          endsAt: toDefaultSlot(eventEndsAt),
+                          key: crypto.randomUUID(),
+                          startsAt: toDefaultSlot(eventStartsAt),
+                        },
+                      ])
+                    }
+                    type="button"
+                    variant="outline"
+                  >
+                    {translate(locale, "listing.addAvailability")}
+                  </Button>
+                </div>
+              ) : null}
+            </FieldSet>
+
+            <ChoiceField className="border-t pt-5">
+              <Checkbox defaultChecked={listing.earlyVisibilityOptOut} name="earlyOptOut" />
+              <span>{translate(locale, "listing.earlyOptOut")}</span>
+            </ChoiceField>
+          </CardContent>
+          <CardFooter className="border-t">
+            <Button disabled={busy} type="submit">
+              {busy ? translate(locale, "common.saving") : translate(locale, "listing.save")}
+            </Button>
+            <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+              {status}
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   );
 }

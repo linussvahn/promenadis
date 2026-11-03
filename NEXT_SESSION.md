@@ -456,6 +456,18 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### shadcn/ui migration (2026-11-03)
+
+No migration. The web UI now uses shadcn/ui (MIT) on Tailwind CSS v4
+(`@tailwindcss/vite`), with Radix (MIT), class-variance-authority
+(Apache-2.0), clsx and tailwind-merge (MIT) and lucide-react (ISC). The
+primitives live in `apps/web/app/components/ui/`, page layout in
+`components/page.tsx`, and `docs/UI.md` records the rules and the old-class
+mapping. The warm palette from the visual refresh is now the shadcn token set
+in `app/styles/app.css` (still `light-dark()` pairs; a `dark:` variant follows
+the theme switcher). Selects, checkboxes and radios stay native for form
+posts and tests. `biome.json` parses Tailwind directives.
+
 ### Visual refresh (2026-11-03)
 
 No migration. `app/styles/app.css` now starts with design tokens (warm

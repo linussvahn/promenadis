@@ -4,7 +4,9 @@ import { AccountSessionContext, subscribeSessionChanges } from "../lib/account-s
 import { Link, useNavigate } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getBrowserAuthClient, hasLocalBackendConfiguration } from "../lib/supabase";
-import { PageHeader } from "./page-header";
+import { PageMain, siteShell, skipLink } from "./page";
+import { headerNavItem, PageHeader } from "./page-header";
+import { Alert } from "./ui/alert";
 
 export function AccountShell({
   children,
@@ -54,37 +56,46 @@ export function AccountShell({
   };
 
   const accountNavigation = (
-    <nav aria-label={translate(locale, "account.navigation")} className="account-navigation">
-      <Link to="/dashboard">{translate(locale, "nav.dashboard")}</Link>
-      <Link to="/settings">{translate(locale, "nav.settings")}</Link>
-      <button disabled={signingOut} onClick={signOut} type="button">
+    <nav aria-label={translate(locale, "account.navigation")}>
+      <Link className={headerNavItem} to="/dashboard">
+        {translate(locale, "nav.dashboard")}
+      </Link>
+      <Link className={headerNavItem} to="/settings">
+        {translate(locale, "nav.settings")}
+      </Link>
+      <button
+        className={headerNavItem}
+        disabled={signingOut || !accountId}
+        onClick={signOut}
+        type="button"
+      >
         {translate(locale, "dashboard.signOut")}
       </button>
     </nav>
   );
 
   return (
-    <div className="site-shell">
-      <a className="skip-link" href="#main">
+    <div className={siteShell}>
+      <a className={skipLink} href="#main">
         {translate(locale, "home.skip")}
       </a>
       <PageHeader action={accountNavigation} locale={locale} onLocaleChange={setLocale} />
       {!hasLocalBackendConfiguration() ? (
-        <main className="account-page" id="main">
-          <p className="notice notice-error" role="alert">
+        <PageMain>
+          <Alert role="alert" variant="destructive">
             {translate(locale, "auth.configMissing")}
-          </p>
-        </main>
+          </Alert>
+        </PageMain>
       ) : accountId ? (
         <AccountSessionContext.Provider key={accountId} value={accountId}>
           {children({ locale })}
         </AccountSessionContext.Provider>
       ) : (
-        <main className="account-page" id="main">
+        <PageMain>
           <p role={failed ? "alert" : "status"}>
             {translate(locale, failed ? "auth.error" : "common.loading")}
           </p>
-        </main>
+        </PageMain>
       )}
     </div>
   );

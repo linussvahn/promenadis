@@ -4,6 +4,16 @@ import { type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useState } from "react";
 import { useSearchParams } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { PageHeading } from "./page";
+import { Alert } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Radio } from "./ui/checkbox";
+import { ChoiceField, Field, FieldGroup, FieldLegend, FieldSet } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
+import { Textarea } from "./ui/textarea";
 
 const topics = ["support", "accessibility", "privacy", "safety", "legal"] as const;
 
@@ -37,44 +47,65 @@ export function SupportForm({ locale }: { readonly locale: Locale }) {
     }
   };
   return (
-    <section aria-labelledby="support-title" className="public-event">
-      <h1 id="support-title">{translate(locale, "support.title")}</h1>
-      <p className="lede">{translate(locale, "support.intro")}</p>
+    <section aria-labelledby="support-title" className="grid max-w-3xl gap-6">
+      <PageHeading
+        description={translate(locale, "support.intro")}
+        title={translate(locale, "support.title")}
+        titleId="support-title"
+      />
       {sent ? (
-        <p className="notice" role="status">
+        <Alert role="status" variant="success">
           {translate(locale, "support.received")}
-        </p>
+        </Alert>
       ) : (
-        <form className="panel form-panel" onSubmit={(formEvent) => void submit(formEvent)}>
-          <label htmlFor="support-topic">{translate(locale, "support.topic")}</label>
-          <select defaultValue={initial} id="support-topic" name="topic">
-            {topics.map((topic) => (
-              <option key={topic} value={topic}>
-                {translate(locale, `support.topic.${topic}`)}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="support-message">{translate(locale, "support.message")}</label>
-          <textarea id="support-message" maxLength={2000} minLength={10} name="message" required />
-          <label htmlFor="support-contact">{translate(locale, "support.contact")}</label>
-          <input
-            autoComplete="email"
-            id="support-contact"
-            maxLength={320}
-            name="contact"
-            type="email"
-          />
-          <div aria-hidden="true" className="visually-hidden">
-            <label htmlFor="support-website">Website</label>
-            <input autoComplete="off" id="support-website" name="website" tabIndex={-1} />
-          </div>
-          <button className="primary-button" type="submit">
-            {translate(locale, "contact.send")}
-          </button>
-          <p aria-live="polite" role="status">
-            {status}
-          </p>
-        </form>
+        <Card asChild className="max-w-2xl">
+          <form onSubmit={(formEvent) => void submit(formEvent)}>
+            <CardContent>
+              <FieldGroup>
+                <Field>
+                  <Label htmlFor="support-topic">{translate(locale, "support.topic")}</Label>
+                  <NativeSelect defaultValue={initial} id="support-topic" name="topic">
+                    {topics.map((topic) => (
+                      <NativeSelectOption key={topic} value={topic}>
+                        {translate(locale, `support.topic.${topic}`)}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </Field>
+                <Field>
+                  <Label htmlFor="support-message">{translate(locale, "support.message")}</Label>
+                  <Textarea
+                    id="support-message"
+                    maxLength={2000}
+                    minLength={10}
+                    name="message"
+                    required
+                  />
+                </Field>
+                <Field>
+                  <Label htmlFor="support-contact">{translate(locale, "support.contact")}</Label>
+                  <Input
+                    autoComplete="email"
+                    id="support-contact"
+                    maxLength={320}
+                    name="contact"
+                    type="email"
+                  />
+                </Field>
+                <div aria-hidden="true" className="sr-only">
+                  <label htmlFor="support-website">Website</label>
+                  <input autoComplete="off" id="support-website" name="website" tabIndex={-1} />
+                </div>
+              </FieldGroup>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="submit">{translate(locale, "contact.send")}</Button>
+              </div>
+              <p aria-live="polite" className="min-h-6 text-sm font-semibold" role="status">
+                {status}
+              </p>
+            </CardContent>
+          </form>
+        </Card>
       )}
     </section>
   );
@@ -111,40 +142,54 @@ export function EventFeedback({
   };
   if (sent) {
     return (
-      <p className="notice" role="status">
+      <Alert role="status" variant="success">
         {translate(locale, "feedback.thanks")}
-      </p>
+      </Alert>
     );
   }
   return (
-    <form className="panel form-panel" onSubmit={(formEvent) => void submit(formEvent)}>
-      <h2>{translate(locale, "feedback.title")}</h2>
-      <p className="field-hint">{translate(locale, "feedback.intro")}</p>
-      <fieldset className="choice-group">
-        <legend>{translate(locale, "feedback.rating")}</legend>
-        {[1, 2, 3, 4, 5].map((rating) => (
-          <label className="checkbox-field" key={rating}>
-            <input name="rating" required type="radio" value={rating} />
-            <span>{rating}</span>
-          </label>
-        ))}
-      </fieldset>
-      <label htmlFor="feedback-comment">{translate(locale, "feedback.comment")}</label>
-      <textarea id="feedback-comment" maxLength={1000} name="comment" />
-      <label htmlFor="feedback-followup">{translate(locale, "feedback.followup")}</label>
-      <input
-        autoComplete="email"
-        id="feedback-followup"
-        maxLength={320}
-        name="followup"
-        type="email"
-      />
-      <button className="primary-button" type="submit">
-        {translate(locale, "contact.send")}
-      </button>
-      <p aria-live="polite" role="status">
-        {status}
-      </p>
-    </form>
+    <Card asChild className="max-w-2xl">
+      <form onSubmit={(formEvent) => void submit(formEvent)}>
+        <CardHeader>
+          <CardTitle>{translate(locale, "feedback.title")}</CardTitle>
+          <CardDescription>{translate(locale, "feedback.intro")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup>
+            <FieldSet>
+              <FieldLegend>{translate(locale, "feedback.rating")}</FieldLegend>
+              <div className="flex flex-wrap gap-x-5 gap-y-3">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <ChoiceField className="items-center" key={rating}>
+                    <Radio className="mt-0" name="rating" required value={rating} />
+                    <span>{rating}</span>
+                  </ChoiceField>
+                ))}
+              </div>
+            </FieldSet>
+            <Field>
+              <Label htmlFor="feedback-comment">{translate(locale, "feedback.comment")}</Label>
+              <Textarea id="feedback-comment" maxLength={1000} name="comment" />
+            </Field>
+            <Field>
+              <Label htmlFor="feedback-followup">{translate(locale, "feedback.followup")}</Label>
+              <Input
+                autoComplete="email"
+                id="feedback-followup"
+                maxLength={320}
+                name="followup"
+                type="email"
+              />
+            </Field>
+          </FieldGroup>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit">{translate(locale, "contact.send")}</Button>
+          </div>
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold" role="status">
+            {status}
+          </p>
+        </CardContent>
+      </form>
+    </Card>
   );
 }

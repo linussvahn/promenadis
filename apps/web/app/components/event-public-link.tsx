@@ -4,6 +4,11 @@ import { type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Field, FieldDescription } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 // The visitor link of an event. Owners can replace a leaked unlisted link;
 // the old one then answers 410 Gone without redirecting.
@@ -98,40 +103,62 @@ export function EventPublicLink({
   };
 
   return (
-    <section aria-labelledby="public-link-heading" className="panel">
-      <h3 id="public-link-heading">{translate(locale, "publicLink.title")}</h3>
-      {link.live ? null : <p className="field-hint">{translate(locale, "publicLink.draft")}</p>}
-      <p>
-        <code className="public-link-url">{url}</code>
-      </p>
-      <button className="secondary-button" onClick={() => void copy()} type="button">
-        {translate(locale, "publicLink.copy")}
-      </button>
-      {link.visibility === "unlisted" ? (
-        <p className="field-hint">
-          {translate(locale, "public.unlistedNotice")}{" "}
-          {translate(locale, "publicLink.previewWarning")}
-        </p>
-      ) : null}
-      {canRotate ? (
-        <form className="form-panel" onSubmit={(formEvent) => void rotate(formEvent)}>
-          <p className="field-hint">{translate(locale, "publicLink.rotateIntro")}</p>
-          {link.state === "active" ? (
-            <>
-              <label htmlFor="rotate-safety-reason">
-                {translate(locale, "publicLink.safetyReason")}
-              </label>
-              <input id="rotate-safety-reason" maxLength={500} name="safetyReason" required />
-            </>
+    <Card asChild>
+      <section aria-labelledby="public-link-heading">
+        <CardHeader>
+          <CardTitle asChild>
+            <h3 id="public-link-heading">{translate(locale, "publicLink.title")}</h3>
+          </CardTitle>
+          {link.live ? null : (
+            <CardDescription>{translate(locale, "publicLink.draft")}</CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="min-w-0 flex-1 basis-64">
+              <code className="block rounded-lg bg-muted px-3 py-2.5 font-mono text-sm break-all">
+                {url}
+              </code>
+            </p>
+            <Button onClick={() => void copy()} type="button" variant="outline">
+              {translate(locale, "publicLink.copy")}
+            </Button>
+          </div>
+          {link.visibility === "unlisted" ? (
+            <FieldDescription>
+              {translate(locale, "public.unlistedNotice")}{" "}
+              {translate(locale, "publicLink.previewWarning")}
+            </FieldDescription>
           ) : null}
-          <button className="secondary-button" disabled={busy} type="submit">
-            {translate(locale, "publicLink.rotate")}
-          </button>
-        </form>
-      ) : null}
-      <p aria-live="polite" role="status">
-        {status}
-      </p>
-    </section>
+          {canRotate ? (
+            <form
+              className="grid gap-3 rounded-xl border bg-muted/40 p-4"
+              onSubmit={(formEvent) => void rotate(formEvent)}
+            >
+              <FieldDescription>{translate(locale, "publicLink.rotateIntro")}</FieldDescription>
+              {link.state === "active" ? (
+                <Field>
+                  <Label htmlFor="rotate-safety-reason">
+                    {translate(locale, "publicLink.safetyReason")}
+                  </Label>
+                  <Input id="rotate-safety-reason" maxLength={500} name="safetyReason" required />
+                </Field>
+              ) : null}
+              <Button
+                className="justify-self-start"
+                disabled={busy}
+                type="submit"
+                variant="outline"
+              >
+                {translate(locale, "publicLink.rotate")}
+              </Button>
+            </form>
+          ) : null}
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold" role="status">
+            {status}
+          </p>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

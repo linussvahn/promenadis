@@ -4,6 +4,12 @@ import { type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { toDateTimeLocal, wallTimeToIso } from "../lib/wall-time";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
+import { Field, FieldDescription } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 
 // Copies description, area and visibility into a new owner-only draft with new
 // dates. Team, sellers and history are never copied.
@@ -60,69 +66,77 @@ export function EventDuplicate({
   };
 
   return (
-    <details className="panel settings-details">
-      <summary>{translate(locale, "duplicate.title")}</summary>
-      {defaultOrganizer ? (
-        <form className="form-panel details-form" onSubmit={duplicate}>
-          <p className="field-help">{translate(locale, "duplicate.help")}</p>
-          {organizers.length > 1 ? (
-            <>
-              <label htmlFor="duplicate-organizer">
-                {translate(locale, "dashboard.organizingAs")}
-              </label>
-              <select
-                defaultValue={defaultOrganizer.id}
-                id="duplicate-organizer"
-                name="organizerProfileId"
-              >
-                {organizers.map((organizer) => (
-                  <option key={organizer.id} value={organizer.id}>
-                    {organizer.displayName}
-                  </option>
-                ))}
-              </select>
-            </>
-          ) : null}
-          <label htmlFor="duplicate-title">{translate(locale, "dashboard.eventTitle")}</label>
-          <input
-            defaultValue={event.title}
-            id="duplicate-title"
-            maxLength={120}
-            name="title"
-            required
-          />
-          <div className="schedule-fields">
-            <div>
-              <label htmlFor="duplicate-start">{translate(locale, "dashboard.startsAt")}</label>
-              <input
-                defaultValue={nextYear(interval?.startsAt)}
-                id="duplicate-start"
-                name="startsAt"
-                required
-                type="datetime-local"
-              />
-            </div>
-            <div>
-              <label htmlFor="duplicate-end">{translate(locale, "dashboard.endsAt")}</label>
-              <input
-                defaultValue={nextYear(interval?.endsAt)}
-                id="duplicate-end"
-                name="endsAt"
-                required
-                type="datetime-local"
-              />
-            </div>
-          </div>
-          <button className="primary-button" disabled={busy} type="submit">
-            {busy ? translate(locale, "common.saving") : translate(locale, "duplicate.create")}
-          </button>
-        </form>
-      ) : (
-        <p className="field-help">{translate(locale, "duplicate.noOrganizer")}</p>
-      )}
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </details>
+    <Card asChild className="gap-0 py-0">
+      <details className="[&>summary]:cursor-pointer">
+        <summary className="flex min-h-11 items-center px-6 py-5 font-display text-lg font-extrabold">
+          {translate(locale, "duplicate.title")}
+        </summary>
+        <div className="grid gap-3 border-t px-6 pt-5 pb-6">
+          {defaultOrganizer ? (
+            <form className="grid gap-5" onSubmit={duplicate}>
+              <FieldDescription>{translate(locale, "duplicate.help")}</FieldDescription>
+              {organizers.length > 1 ? (
+                <Field>
+                  <Label htmlFor="duplicate-organizer">
+                    {translate(locale, "dashboard.organizingAs")}
+                  </Label>
+                  <NativeSelect
+                    defaultValue={defaultOrganizer.id}
+                    id="duplicate-organizer"
+                    name="organizerProfileId"
+                  >
+                    {organizers.map((organizer) => (
+                      <NativeSelectOption key={organizer.id} value={organizer.id}>
+                        {organizer.displayName}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </Field>
+              ) : null}
+              <Field>
+                <Label htmlFor="duplicate-title">{translate(locale, "dashboard.eventTitle")}</Label>
+                <Input
+                  defaultValue={event.title}
+                  id="duplicate-title"
+                  maxLength={120}
+                  name="title"
+                  required
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field>
+                  <Label htmlFor="duplicate-start">{translate(locale, "dashboard.startsAt")}</Label>
+                  <Input
+                    defaultValue={nextYear(interval?.startsAt)}
+                    id="duplicate-start"
+                    name="startsAt"
+                    required
+                    type="datetime-local"
+                  />
+                </Field>
+                <Field>
+                  <Label htmlFor="duplicate-end">{translate(locale, "dashboard.endsAt")}</Label>
+                  <Input
+                    defaultValue={nextYear(interval?.endsAt)}
+                    id="duplicate-end"
+                    name="endsAt"
+                    required
+                    type="datetime-local"
+                  />
+                </Field>
+              </div>
+              <Button className="justify-self-start" disabled={busy} type="submit">
+                {busy ? translate(locale, "common.saving") : translate(locale, "duplicate.create")}
+              </Button>
+            </form>
+          ) : (
+            <FieldDescription>{translate(locale, "duplicate.noOrganizer")}</FieldDescription>
+          )}
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
+          </p>
+        </div>
+      </details>
+    </Card>
   );
 }

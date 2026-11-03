@@ -1,9 +1,13 @@
-import { useExpectedAccountId } from "../lib/account-session";
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { IncomingEventTeamInviteSummary } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { getPromenadisApiClient, getBrowserAuthClient } from "../lib/supabase";
+import { useExpectedAccountId } from "../lib/account-session";
+import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export function IncomingTeamInvites({
   displayName,
@@ -68,45 +72,63 @@ export function IncomingTeamInvites({
   if (invites.length === 0 && !status) return null;
 
   return (
-    <section aria-labelledby="incoming-team-invites-heading" className="incoming-invites panel">
-      <h2 id="incoming-team-invites-heading">{translate(locale, "team.incomingTitle")}</h2>
-      {invites.length > 0 ? (
-        <ul className="incoming-invite-list">
-          {invites.map((invite) => (
-            <li key={invite.id}>
-              <div className="team-member-copy">
-                <strong>{invite.eventTitle}</strong>
-                <span>{invite.organizerDisplayName}</span>
-                <span>
-                  {translate(locale, `team.role.${invite.role}`)} ·{" "}
-                  {translate(locale, "team.expires")}{" "}
-                  {formatDateTime(locale, invite.expiresAt, "Europe/Stockholm")}
-                </span>
-              </div>
-              <form onSubmit={(formEvent) => void accept(formEvent, invite.id)}>
-                <label className="team-control-label" htmlFor={`invite-display-name-${invite.id}`}>
-                  {translate(locale, "team.acceptDisplayName")}
-                </label>
-                <input
-                  defaultValue={displayName}
-                  disabled={busy !== null}
-                  id={`invite-display-name-${invite.id}`}
-                  name="displayName"
-                  required
-                />
-                <button className="primary-button" disabled={busy !== null} type="submit">
-                  {busy === invite.id
-                    ? translate(locale, "team.accepting")
-                    : translate(locale, "team.accept")}
-                </button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </section>
+    <Card asChild className="border-sun/60">
+      <section aria-labelledby="incoming-team-invites-heading">
+        <CardHeader>
+          <CardTitle id="incoming-team-invites-heading">
+            {translate(locale, "team.incomingTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="gap-2">
+          {invites.length > 0 ? (
+            <ul className="m-0 grid list-none divide-y p-0">
+              {invites.map((invite) => (
+                <li
+                  className="flex flex-wrap items-end justify-between gap-4 py-4 first:pt-0"
+                  key={invite.id}
+                >
+                  <div className="grid gap-0.5">
+                    <strong>{invite.eventTitle}</strong>
+                    <span className="text-sm text-muted-foreground">
+                      {invite.organizerDisplayName}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {translate(locale, `team.role.${invite.role}`)} ·{" "}
+                      {translate(locale, "team.expires")}{" "}
+                      {formatDateTime(locale, invite.expiresAt, "Europe/Stockholm")}
+                    </span>
+                  </div>
+                  <form
+                    className="grid w-full max-w-md gap-2"
+                    onSubmit={(formEvent) => void accept(formEvent, invite.id)}
+                  >
+                    <Label htmlFor={`invite-display-name-${invite.id}`}>
+                      {translate(locale, "team.acceptDisplayName")}
+                    </Label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        defaultValue={displayName}
+                        disabled={busy !== null}
+                        id={`invite-display-name-${invite.id}`}
+                        name="displayName"
+                        required
+                      />
+                      <Button disabled={busy !== null} type="submit">
+                        {busy === invite.id
+                          ? translate(locale, "team.accepting")
+                          : translate(locale, "team.accept")}
+                      </Button>
+                    </div>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
+          </p>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

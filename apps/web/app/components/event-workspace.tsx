@@ -1,7 +1,8 @@
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
-import { lazy, Suspense } from "react";
+import { lazy, type ReactNode, Suspense } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useAccountData } from "../lib/use-account-data";
+import { cn } from "../lib/utils";
 import { AccountShell } from "./account-shell";
 import { CreationProgress } from "./creation-progress";
 import { EventControls } from "./event-controls";
@@ -13,8 +14,13 @@ import { EventFeedbackSummary, EventMessages } from "./event-messages";
 import { EventPublicLink } from "./event-public-link";
 import { EventSellers } from "./event-sellers";
 import { EventTeam } from "./event-team";
+import { backLink, PageHeading, PageMain, SummaryList } from "./page";
 import { PublicationReadiness } from "./publication-readiness";
 import { RegistrationEditor } from "./registration-editor";
+import { Alert } from "./ui/alert";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 
 // Map pages load maplibre on demand so other workspace pages stay light.
 const BoundaryEditor = lazy(() =>
@@ -50,141 +56,143 @@ function EventWorkspaceContent({
 
   if (loadFailed) {
     return (
-      <main className="account-page app-page" id="main">
-        <p className="notice notice-error" role="alert">
+      <PageMain>
+        <Alert role="alert" variant="destructive">
           {translate(locale, "dashboard.sessionExpired")}
-        </p>
-      </main>
+        </Alert>
+      </PageMain>
     );
   }
 
   if (!dashboard) {
     return (
-      <main className="account-page app-page" id="main">
+      <PageMain>
         <p aria-live="polite">{translate(locale, "common.loading")}</p>
-      </main>
+      </PageMain>
     );
   }
 
   if (!event) {
     return (
-      <main className="account-page app-page" id="main">
-        <Link className="back-link" to="/dashboard">
+      <PageMain>
+        <Link className={backLink} to="/dashboard">
           ← {translate(locale, "event.backToEvents")}
         </Link>
-        <div className="notice notice-error" role="alert">
+        <Alert role="alert" variant="destructive">
           {translate(locale, "event.notFound")}
-        </div>
-      </main>
+        </Alert>
+      </PageMain>
     );
   }
 
   const interval = event.intervals[0];
+  const schedule = interval
+    ? `${formatDateTime(locale, interval.startsAt, event.timezone)} – ${formatDateTime(locale, interval.endsAt, event.timezone)}`
+    : "—";
+  const registrationWindow = event.registration
+    ? `${formatDateTime(locale, event.registration.opensAt, event.timezone)} – ${formatDateTime(locale, event.registration.closesAt, event.timezone)}`
+    : translate(locale, "registration.missing");
 
   if (view === "area") {
     return (
-      <main className="account-page flow-page wide-flow-page" id="main" tabIndex={-1}>
-        <Link className="back-link" to={`/events/${event.id}`}>
+      <PageMain width="wide">
+        <Link className={backLink} to={`/events/${event.id}`}>
           ← {translate(locale, "event.backToOverview")}
         </Link>
         {isCreationFlow ? <CreationProgress currentStep={2} locale={locale} /> : null}
-        <header className="app-heading flow-heading">
-          <p className="eyebrow">
-            {isCreationFlow ? translate(locale, "creation.stepArea") : event.title}
-          </p>
-          <h1>{translate(locale, "boundary.title")}</h1>
-          <p className="lede">{translate(locale, "boundary.intro")}</p>
-        </header>
-        <section aria-label={translate(locale, "boundary.title")} className="panel map-panel">
-          <Suspense fallback={<p role="status">{translate(locale, "common.loading")}</p>}>
-            <BoundaryEditor
-              events={[event]}
-              locale={locale}
-              onSaved={async () => {
-                await loadDashboard();
-                if (isCreationFlow) await navigate(`/events/${event.id}/review`);
-              }}
-            />
-          </Suspense>
-        </section>
-      </main>
+        <PageHeading
+          description={translate(locale, "boundary.intro")}
+          eyebrow={isCreationFlow ? translate(locale, "creation.stepArea") : event.title}
+          title={translate(locale, "boundary.title")}
+        />
+        <Card asChild className="px-5 py-5 sm:px-8 sm:py-8">
+          <section aria-label={translate(locale, "boundary.title")}>
+            <Suspense fallback={<p role="status">{translate(locale, "common.loading")}</p>}>
+              <BoundaryEditor
+                events={[event]}
+                locale={locale}
+                onSaved={async () => {
+                  await loadDashboard();
+                  if (isCreationFlow) await navigate(`/events/${event.id}/review`);
+                }}
+              />
+            </Suspense>
+          </section>
+        </Card>
+      </PageMain>
     );
   }
 
   if (view === "review") {
     return (
-      <main className="account-page flow-page" id="main" tabIndex={-1}>
-        <Link className="back-link" to={`/events/${event.id}/area?new=1`}>
+      <PageMain width="flow">
+        <Link className={backLink} to={`/events/${event.id}/area?new=1`}>
           ← {translate(locale, "creation.backToArea")}
         </Link>
         <CreationProgress currentStep={3} locale={locale} />
-        <header className="app-heading flow-heading">
-          <p className="eyebrow">{translate(locale, "creation.stepReview")}</p>
-          <h1>{translate(locale, "creation.reviewTitle")}</h1>
-          <p className="lede">{translate(locale, "creation.reviewIntro")}</p>
-        </header>
-        <section className="panel review-card">
-          <div className="review-card-heading">
-            <span className="status-pill status-pill-muted">
-              {translate(locale, `event.state.${event.state}`)}
-            </span>
-            <h2>{event.title}</h2>
-            <p>{event.organizerDisplayName}</p>
-          </div>
-          <dl className="summary-list">
-            <div>
-              <dt>{translate(locale, "event.schedule")}</dt>
-              <dd>
-                {interval
-                  ? `${formatDateTime(locale, interval.startsAt, event.timezone)} – ${formatDateTime(locale, interval.endsAt, event.timezone)}`
-                  : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt>{translate(locale, "dashboard.visibility")}</dt>
-              <dd>{translate(locale, `visibility.${event.visibility}`)}</dd>
-            </div>
-            <div>
-              <dt>{translate(locale, "boundary.title")}</dt>
-              <dd>
-                {event.boundary
-                  ? event.boundary.displayLabel || translate(locale, "event.areaReady")
-                  : translate(locale, "event.areaMissing")}
-              </dd>
-            </div>
-            <div>
-              <dt>{translate(locale, "registration.title")}</dt>
-              <dd>
-                {event.registration
-                  ? `${formatDateTime(locale, event.registration.opensAt, event.timezone)} – ${formatDateTime(locale, event.registration.closesAt, event.timezone)}`
-                  : translate(locale, "registration.missing")}
-              </dd>
-            </div>
-          </dl>
-          <div className="form-actions">
-            <Link className="secondary-button button-link" to={`/events/${event.id}/area?new=1`}>
-              {translate(locale, "creation.editArea")}
-            </Link>
-            <Link className="primary-button button-link" to={`/events/${event.id}`}>
-              {translate(locale, "creation.finish")}
-            </Link>
-          </div>
-        </section>
-      </main>
+        <PageHeading
+          description={translate(locale, "creation.reviewIntro")}
+          eyebrow={translate(locale, "creation.stepReview")}
+          title={translate(locale, "creation.reviewTitle")}
+        />
+        <Card asChild>
+          <section>
+            <CardHeader>
+              <Badge variant="secondary">{translate(locale, `event.state.${event.state}`)}</Badge>
+              <CardTitle className="mt-2 text-2xl">{event.title}</CardTitle>
+              <CardDescription className="text-base">{event.organizerDisplayName}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SummaryList>
+                <div>
+                  <dt>{translate(locale, "event.schedule")}</dt>
+                  <dd>{schedule}</dd>
+                </div>
+                <div>
+                  <dt>{translate(locale, "dashboard.visibility")}</dt>
+                  <dd>{translate(locale, `visibility.${event.visibility}`)}</dd>
+                </div>
+                <div>
+                  <dt>{translate(locale, "boundary.title")}</dt>
+                  <dd>
+                    {event.boundary
+                      ? event.boundary.displayLabel || translate(locale, "event.areaReady")
+                      : translate(locale, "event.areaMissing")}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{translate(locale, "registration.title")}</dt>
+                  <dd>{registrationWindow}</dd>
+                </div>
+              </SummaryList>
+            </CardContent>
+            <CardFooter className="border-t">
+              <Button asChild variant="outline">
+                <Link to={`/events/${event.id}/area?new=1`}>
+                  {translate(locale, "creation.editArea")}
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link to={`/events/${event.id}`}>{translate(locale, "creation.finish")}</Link>
+              </Button>
+            </CardFooter>
+          </section>
+        </Card>
+      </PageMain>
     );
   }
 
   if (view === "sellers") {
     return (
-      <main className="account-page flow-page" id="main" tabIndex={-1}>
-        <Link className="back-link" to={`/events/${event.id}`}>
+      <PageMain width="flow">
+        <Link className={backLink} to={`/events/${event.id}`}>
           ← {translate(locale, "event.backToOverview")}
         </Link>
-        <header className="app-heading flow-heading">
-          <p className="eyebrow">{event.title}</p>
-          <h1>{translate(locale, "sellers.title")}</h1>
-          <p className="lede">{translate(locale, "sellers.intro")}</p>
-        </header>
+        <PageHeading
+          description={translate(locale, "sellers.intro")}
+          eyebrow={event.title}
+          title={translate(locale, "sellers.title")}
+        />
         <EventSellers
           accessToken={accessToken}
           event={event}
@@ -192,73 +200,71 @@ function EventWorkspaceContent({
           onChanged={loadDashboard}
         />
         <EventExport accessToken={accessToken} event={event} locale={locale} />
-      </main>
+      </PageMain>
     );
   }
 
   if (view === "walking") {
     return (
-      <main className="account-page flow-page wide-flow-page" id="main" tabIndex={-1}>
-        <Link className="back-link" to={`/events/${event.id}`}>
+      <PageMain width="wide">
+        <Link className={backLink} to={`/events/${event.id}`}>
           ← {translate(locale, "event.backToOverview")}
         </Link>
-        <header className="app-heading flow-heading">
-          <p className="eyebrow">{event.title}</p>
-          <h1>{translate(locale, "walking.title")}</h1>
-          <p className="lede">{translate(locale, "walking.intro")}</p>
-        </header>
+        <PageHeading
+          description={translate(locale, "walking.intro")}
+          eyebrow={event.title}
+          title={translate(locale, "walking.title")}
+        />
         <Suspense fallback={<p role="status">{translate(locale, "common.loading")}</p>}>
           <WalkingNetwork accessToken={accessToken} event={event} locale={locale} />
         </Suspense>
-      </main>
+      </PageMain>
     );
   }
 
   if (view === "registration") {
     return (
-      <main className="account-page flow-page" id="main" tabIndex={-1}>
-        <Link className="back-link" to={`/events/${event.id}`}>
+      <PageMain width="flow">
+        <Link className={backLink} to={`/events/${event.id}`}>
           ← {translate(locale, "event.backToOverview")}
         </Link>
-        <header className="app-heading flow-heading">
-          <p className="eyebrow">{event.title}</p>
-          <h1>{translate(locale, "registration.title")}</h1>
-          <p className="lede">{translate(locale, "registration.intro")}</p>
-        </header>
+        <PageHeading
+          description={translate(locale, "registration.intro")}
+          eyebrow={event.title}
+          title={translate(locale, "registration.title")}
+        />
         <RegistrationEditor event={event} locale={locale} onSaved={loadDashboard} />
-      </main>
+      </PageMain>
     );
   }
 
   return (
-    <main className="account-page app-page" id="main" tabIndex={-1}>
-      <Link className="back-link" to="/dashboard">
+    <PageMain>
+      <Link className={backLink} to="/dashboard">
         ← {translate(locale, "event.backToEvents")}
       </Link>
-      <header className="event-heading">
-        <div>
-          <div className="event-heading-status">
-            <span className="status-pill status-pill-muted">
-              {translate(locale, `event.state.${event.state}`)}
+      <PageHeading
+        description={event.organizerDisplayName}
+        meta={
+          <>
+            <Badge variant="secondary">{translate(locale, `event.state.${event.state}`)}</Badge>
+            <span className="text-sm font-semibold text-muted-foreground">
+              {translate(locale, `visibility.${event.visibility}`)}
             </span>
-            <span>{translate(locale, `visibility.${event.visibility}`)}</span>
-          </div>
-          <h1>{event.title}</h1>
-          <p className="lede">{event.organizerDisplayName}</p>
-        </div>
-      </header>
+          </>
+        }
+        title={event.title}
+      />
 
-      <div className="workspace-layout">
-        <section aria-labelledby="overview-heading" className="workspace-main">
-          <h2 id="overview-heading">{translate(locale, "event.overview")}</h2>
-          <dl className="summary-list summary-list-card">
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+        <section aria-labelledby="overview-heading" className="grid min-w-0 content-start gap-5">
+          <h2 className="font-display text-2xl font-extrabold" id="overview-heading">
+            {translate(locale, "event.overview")}
+          </h2>
+          <SummaryList className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
             <div>
               <dt>{translate(locale, "event.schedule")}</dt>
-              <dd>
-                {interval
-                  ? `${formatDateTime(locale, interval.startsAt, event.timezone)} – ${formatDateTime(locale, interval.endsAt, event.timezone)}`
-                  : "—"}
-              </dd>
+              <dd>{schedule}</dd>
             </div>
             <div>
               <dt>{translate(locale, "dashboard.visibility")}</dt>
@@ -266,13 +272,9 @@ function EventWorkspaceContent({
             </div>
             <div>
               <dt>{translate(locale, "registration.title")}</dt>
-              <dd>
-                {event.registration
-                  ? `${formatDateTime(locale, event.registration.opensAt, event.timezone)} – ${formatDateTime(locale, event.registration.closesAt, event.timezone)}`
-                  : translate(locale, "registration.missing")}
-              </dd>
+              <dd>{registrationWindow}</dd>
             </div>
-          </dl>
+          </SummaryList>
           <EventDetailsEditor
             accessToken={accessToken}
             event={event}
@@ -308,80 +310,121 @@ function EventWorkspaceContent({
           />
         </section>
 
-        <aside aria-labelledby="setup-heading" className="setup-panel">
-          <h2 id="setup-heading">{translate(locale, "event.setup")}</h2>
-          <p>{translate(locale, "event.setupIntro")}</p>
-          <ol className="setup-list">
-            <li className="is-complete">
-              <span aria-hidden="true" className="setup-number">
-                ✓
-              </span>
-              <div>
-                <strong>{translate(locale, "event.detailsReady")}</strong>
-                <small>{translate(locale, "event.detailsReadyHelp")}</small>
+        <Card asChild className="lg:sticky lg:top-6">
+          <aside aria-labelledby="setup-heading">
+            <CardHeader>
+              <CardTitle id="setup-heading">{translate(locale, "event.setup")}</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                {translate(locale, "event.setupIntro")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="gap-5">
+              <ol className="m-0 grid list-none divide-y border-t p-0">
+                <SetupStep complete marker="✓">
+                  <strong>{translate(locale, "event.detailsReady")}</strong>
+                  <small>{translate(locale, "event.detailsReadyHelp")}</small>
+                </SetupStep>
+                <SetupStep
+                  action={
+                    event.state === "draft" ? (
+                      <Link className="font-semibold" to={`/events/${event.id}/area`}>
+                        {event.boundary
+                          ? translate(locale, "event.editArea")
+                          : translate(locale, "event.addArea")}
+                      </Link>
+                    ) : null
+                  }
+                  complete={Boolean(event.boundary)}
+                  marker={event.boundary ? "✓" : "2"}
+                >
+                  <strong>
+                    {event.boundary
+                      ? translate(locale, "event.areaReady")
+                      : translate(locale, "event.areaMissing")}
+                  </strong>
+                  <small>
+                    {event.boundary
+                      ? translate(locale, "event.areaReadyHelp")
+                      : translate(locale, "event.areaMissingHelp")}
+                  </small>
+                </SetupStep>
+                <SetupStep
+                  action={
+                    event.state === "draft" ? (
+                      <Link className="font-semibold" to={`/events/${event.id}/registration`}>
+                        {event.registration
+                          ? translate(locale, "registration.edit")
+                          : translate(locale, "registration.add")}
+                      </Link>
+                    ) : null
+                  }
+                  complete={Boolean(event.registration)}
+                  marker={event.registration ? "✓" : "3"}
+                >
+                  <strong>
+                    {event.registration
+                      ? translate(locale, "registration.ready")
+                      : translate(locale, "registration.missing")}
+                  </strong>
+                  <small>
+                    {event.registration
+                      ? translate(locale, "registration.readyHelp")
+                      : translate(locale, "registration.missingHelp")}
+                  </small>
+                </SetupStep>
+              </ol>
+              <div className="grid gap-3">
+                <Button asChild variant="outline">
+                  <Link to={`/events/${event.id}/sellers`}>
+                    {translate(locale, "sellers.open")}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to={`/events/${event.id}/walking`}>
+                    {translate(locale, "walking.open")}
+                  </Link>
+                </Button>
               </div>
-            </li>
-            <li className={event.boundary ? "is-complete" : undefined}>
-              <span aria-hidden="true" className="setup-number">
-                {event.boundary ? "✓" : "2"}
-              </span>
-              <div>
-                <strong>
-                  {event.boundary
-                    ? translate(locale, "event.areaReady")
-                    : translate(locale, "event.areaMissing")}
+              <div className="grid gap-1 rounded-xl bg-muted p-4 text-sm text-muted-foreground">
+                <strong className="text-foreground">
+                  {translate(locale, "event.nextFeatures")}
                 </strong>
-                <small>
-                  {event.boundary
-                    ? translate(locale, "event.areaReadyHelp")
-                    : translate(locale, "event.areaMissingHelp")}
-                </small>
+                <span>{translate(locale, "event.nextFeaturesHelp")}</span>
               </div>
-              {event.state === "draft" ? (
-                <Link className="text-link" to={`/events/${event.id}/area`}>
-                  {event.boundary
-                    ? translate(locale, "event.editArea")
-                    : translate(locale, "event.addArea")}
-                </Link>
-              ) : null}
-            </li>
-            <li className={event.registration ? "is-complete" : undefined}>
-              <span aria-hidden="true" className="setup-number">
-                {event.registration ? "✓" : "3"}
-              </span>
-              <div>
-                <strong>
-                  {event.registration
-                    ? translate(locale, "registration.ready")
-                    : translate(locale, "registration.missing")}
-                </strong>
-                <small>
-                  {event.registration
-                    ? translate(locale, "registration.readyHelp")
-                    : translate(locale, "registration.missingHelp")}
-                </small>
-              </div>
-              {event.state === "draft" ? (
-                <Link className="text-link" to={`/events/${event.id}/registration`}>
-                  {event.registration
-                    ? translate(locale, "registration.edit")
-                    : translate(locale, "registration.add")}
-                </Link>
-              ) : null}
-            </li>
-          </ol>
-          <Link className="secondary-button button-link" to={`/events/${event.id}/sellers`}>
-            {translate(locale, "sellers.open")}
-          </Link>
-          <Link className="secondary-button button-link" to={`/events/${event.id}/walking`}>
-            {translate(locale, "walking.open")}
-          </Link>
-          <div className="upcoming-note">
-            <strong>{translate(locale, "event.nextFeatures")}</strong>
-            <span>{translate(locale, "event.nextFeaturesHelp")}</span>
-          </div>
-        </aside>
+            </CardContent>
+          </aside>
+        </Card>
       </div>
-    </main>
+    </PageMain>
+  );
+}
+
+function SetupStep({
+  complete,
+  marker,
+  action,
+  children,
+}: {
+  readonly complete: boolean;
+  readonly marker: string;
+  readonly action?: ReactNode;
+  readonly children: ReactNode;
+}) {
+  return (
+    <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 py-4">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "grid size-8 place-items-center rounded-full font-extrabold text-primary-foreground",
+          complete ? "bg-success" : "bg-primary",
+        )}
+      >
+        {marker}
+      </span>
+      <div className="grid gap-0.5 [&_small]:text-sm [&_small]:leading-snug [&_small]:text-muted-foreground">
+        {children}
+      </div>
+      {action ? <div className="col-start-2 justify-self-start">{action}</div> : null}
+    </li>
   );
 }

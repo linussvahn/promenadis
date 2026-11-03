@@ -4,6 +4,12 @@ import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Field } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export function AccountDeletion({
   accessToken,
@@ -84,69 +90,89 @@ export function AccountDeletion({
   };
 
   return (
-    <section aria-labelledby="deletion-heading" className="panel">
-      <h2 id="deletion-heading">{translate(locale, "deletion.title")}</h2>
-      {!deletion ? (
-        <p aria-live="polite">{translate(locale, "common.loading")}</p>
-      ) : deletion.pending ? (
-        <>
-          <p>
-            {translate(locale, "deletion.pending")}{" "}
-            {deletion.eraseAfter
-              ? formatDateTime(locale, deletion.eraseAfter, "Europe/Stockholm")
-              : null}
-          </p>
-          <p>{translate(locale, "deletion.pendingHelp")}</p>
-          <button
-            className="primary-button"
-            disabled={busy}
-            onClick={() => void cancel()}
-            type="button"
-          >
-            {translate(locale, "deletion.cancel")}
-          </button>
-        </>
-      ) : (
-        <>
-          <p>{translate(locale, "deletion.help")}</p>
-          {deletion.blockers.length > 0 ? (
+    <Card asChild className="border-destructive/40">
+      <section aria-labelledby="deletion-heading">
+        <CardHeader>
+          <CardTitle className="text-destructive-foreground" id="deletion-heading">
+            {translate(locale, "deletion.title")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!deletion ? (
+            <p aria-live="polite">{translate(locale, "common.loading")}</p>
+          ) : deletion.pending ? (
             <>
-              <p>{translate(locale, "deletion.blockersIntro")}</p>
-              <ul>
-                {deletion.blockers.map((blocker) => (
-                  <li key={`${blocker.kind}-${blocker.id}`}>
-                    {blocker.kind === "owned_event" ? (
-                      <Link to={`/events/${blocker.id}`}>{blocker.title}</Link>
-                    ) : (
-                      blocker.title
-                    )}{" "}
-                    — {translate(locale, `deletion.blocker.${blocker.kind}`)}
-                  </li>
-                ))}
-              </ul>
+              <Alert variant="warning">
+                <AlertDescription>
+                  <p className="font-semibold">
+                    {translate(locale, "deletion.pending")}{" "}
+                    {deletion.eraseAfter
+                      ? formatDateTime(locale, deletion.eraseAfter, "Europe/Stockholm")
+                      : null}
+                  </p>
+                  <p>{translate(locale, "deletion.pendingHelp")}</p>
+                </AlertDescription>
+              </Alert>
+              <div>
+                <Button disabled={busy} onClick={() => void cancel()} type="button">
+                  {translate(locale, "deletion.cancel")}
+                </Button>
+              </div>
             </>
           ) : (
-            <form className="form-panel" onSubmit={request}>
-              <label htmlFor="deletion-confirmation">
-                {translate(locale, "deletion.confirmLabel")}
-              </label>
-              <input
-                autoComplete="off"
-                id="deletion-confirmation"
-                name="confirmationEmail"
-                required
-                type="email"
-              />
-              <button className="danger-button" disabled={busy} type="submit">
-                {translate(locale, "deletion.request")}
-              </button>
-            </form>
+            <>
+              <p className="max-w-prose text-muted-foreground">
+                {translate(locale, "deletion.help")}
+              </p>
+              {deletion.blockers.length > 0 ? (
+                <div className="grid gap-2 rounded-xl bg-muted/60 p-4">
+                  <p className="font-semibold">{translate(locale, "deletion.blockersIntro")}</p>
+                  <ul className="m-0 grid list-disc gap-1 pl-5">
+                    {deletion.blockers.map((blocker) => (
+                      <li key={`${blocker.kind}-${blocker.id}`}>
+                        {blocker.kind === "owned_event" ? (
+                          <Link className="font-semibold" to={`/events/${blocker.id}`}>
+                            {blocker.title}
+                          </Link>
+                        ) : (
+                          blocker.title
+                        )}{" "}
+                        — {translate(locale, `deletion.blocker.${blocker.kind}`)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <form
+                  className="grid max-w-md gap-4 rounded-xl border border-destructive/30 bg-destructive-soft/50 p-4"
+                  onSubmit={request}
+                >
+                  <Field>
+                    <Label htmlFor="deletion-confirmation">
+                      {translate(locale, "deletion.confirmLabel")}
+                    </Label>
+                    <Input
+                      autoComplete="off"
+                      id="deletion-confirmation"
+                      name="confirmationEmail"
+                      required
+                      type="email"
+                    />
+                  </Field>
+                  <div>
+                    <Button disabled={busy} type="submit" variant="destructive">
+                      {translate(locale, "deletion.request")}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </>
           )}
-        </>
-      )}
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </section>
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
+          </p>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

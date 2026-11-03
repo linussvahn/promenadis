@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getBrowserAuthClient } from "../lib/supabase";
+import { Eyebrow } from "./page";
 
 export function AuthCallback() {
   const navigate = useNavigate();
@@ -42,13 +43,23 @@ export function AuthCallback() {
   }, [navigate]);
 
   return (
-    <main className="callback-page" id="main" tabIndex={-1}>
-      <p className="eyebrow">Promenadis</p>
-      <h1>{failed ? translate(locale, "auth.error") : translate(locale, "auth.callback")}</h1>
+    <main
+      className="mx-auto grid min-h-screen w-[min(100%-2rem,28rem)] content-center justify-items-center gap-3 py-16 text-center"
+      id="main"
+      tabIndex={-1}
+    >
+      <Eyebrow>Promenadis</Eyebrow>
+      <h1 className="text-3xl font-extrabold tracking-tight">
+        {failed ? translate(locale, "auth.error") : translate(locale, "auth.callback")}
+      </h1>
       {failed ? (
-        <a href="/sign-in">{translate(locale, "nav.signIn")}</a>
+        <a className="font-semibold" href="/sign-in">
+          {translate(locale, "nav.signIn")}
+        </a>
       ) : (
-        <p aria-live="polite">{translate(locale, "common.loading")}</p>
+        <p aria-live="polite" className="text-muted-foreground">
+          {translate(locale, "common.loading")}
+        </p>
       )}
     </main>
   );

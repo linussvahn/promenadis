@@ -3,6 +3,11 @@ import type { MyModerationAction } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Field } from "./ui/field";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 
 // Decisions that affected the signed-in seller, with an appeal per decision.
 export function MyModeration({
@@ -60,46 +65,61 @@ export function MyModeration({
   if (items.length === 0) return null;
 
   return (
-    <section aria-labelledby="my-moderation-heading" className="panel">
-      <h2 id="my-moderation-heading">{translate(locale, "appeal.title")}</h2>
-      <p className="field-help">{translate(locale, "appeal.help")}</p>
-      {items.map((item) => (
-        <article className="review-item" key={item.id}>
-          <h3>
-            {item.eventTitle}: {translate(locale, `appeal.action.${item.action}`)}
-          </h3>
-          <p className="field-help">
-            {formatDateTime(locale, item.createdAt, "Europe/Stockholm")}
-            {item.reason ? ` · ${item.reason}` : ""}
+    <Card aria-labelledby="my-moderation-heading" asChild>
+      <section>
+        <CardHeader>
+          <CardTitle id="my-moderation-heading">{translate(locale, "appeal.title")}</CardTitle>
+          <CardDescription>{translate(locale, "appeal.help")}</CardDescription>
+        </CardHeader>
+        <CardContent className="gap-0 divide-y">
+          {items.map((item) => (
+            <article className="grid gap-3 py-5 first:pt-0 last:pb-0" key={item.id}>
+              <h3 className="text-lg font-bold">
+                {item.eventTitle}: {translate(locale, `appeal.action.${item.action}`)}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {formatDateTime(locale, item.createdAt, "Europe/Stockholm")}
+                {item.reason ? ` · ${item.reason}` : ""}
+              </p>
+              {item.appeal ? (
+                <p>
+                  {translate(locale, `appeal.state.${item.appeal.state}`)}
+                  {item.appeal.decisionReason ? ` · ${item.appeal.decisionReason}` : ""}
+                  {item.appeal.independent === false
+                    ? ` ${translate(locale, "appeal.notIndependent")}`
+                    : ""}
+                </p>
+              ) : (
+                <form
+                  className="grid max-w-xl gap-4"
+                  onSubmit={(formEvent) => void appeal(item, formEvent)}
+                >
+                  <Field>
+                    <Label htmlFor={`appeal-${item.id}`}>
+                      {translate(locale, "appeal.statement")}
+                    </Label>
+                    <Textarea
+                      id={`appeal-${item.id}`}
+                      maxLength={1000}
+                      minLength={10}
+                      name="statement"
+                      required
+                    />
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button type="submit" variant="outline">
+                      {translate(locale, "appeal.submit")}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </article>
+          ))}
+          <p aria-live="polite" className="min-h-6 pt-4 text-sm font-semibold">
+            {status}
           </p>
-          {item.appeal ? (
-            <p>
-              {translate(locale, `appeal.state.${item.appeal.state}`)}
-              {item.appeal.decisionReason ? ` · ${item.appeal.decisionReason}` : ""}
-              {item.appeal.independent === false
-                ? ` ${translate(locale, "appeal.notIndependent")}`
-                : ""}
-            </p>
-          ) : (
-            <form className="details-form" onSubmit={(formEvent) => void appeal(item, formEvent)}>
-              <label htmlFor={`appeal-${item.id}`}>{translate(locale, "appeal.statement")}</label>
-              <textarea
-                id={`appeal-${item.id}`}
-                maxLength={1000}
-                minLength={10}
-                name="statement"
-                required
-              />
-              <button className="secondary-button" type="submit">
-                {translate(locale, "appeal.submit")}
-              </button>
-            </form>
-          )}
-        </article>
-      ))}
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </section>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

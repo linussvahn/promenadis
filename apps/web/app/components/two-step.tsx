@@ -1,8 +1,14 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { MfaStatus, TotpEnrollment } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
+import { ShieldCheckIcon } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Field } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export function TwoStep({
   accessToken,
@@ -90,63 +96,73 @@ export function TwoStep({
   };
 
   return (
-    <section aria-labelledby="two-step-heading" className="panel">
-      <h2 id="two-step-heading">{translate(locale, "mfa.title")}</h2>
-      <p>{translate(locale, "mfa.intro")}</p>
-      {!mfa ? (
-        <p aria-live="polite">{translate(locale, "common.loading")}</p>
-      ) : mfa.totpEnabled ? (
-        <>
-          <p>{translate(locale, "mfa.on")}</p>
-          <button
-            className="secondary-button"
-            disabled={busy}
-            onClick={() => void remove()}
-            type="button"
-          >
-            {translate(locale, "mfa.remove")}
-          </button>
-        </>
-      ) : enrollment ? (
-        <form className="form-panel" onSubmit={confirm}>
-          <p>{translate(locale, "mfa.scan")}</p>
-          <img
-            alt={translate(locale, "mfa.qrAlt")}
-            height={180}
-            src={enrollment.qrCode}
-            width={180}
-          />
-          <p>
-            {translate(locale, "mfa.secret")} <code>{enrollment.secret}</code>
+    <Card asChild>
+      <section aria-labelledby="two-step-heading">
+        <CardHeader>
+          <CardTitle id="two-step-heading">{translate(locale, "mfa.title")}</CardTitle>
+          <CardDescription>{translate(locale, "mfa.intro")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!mfa ? (
+            <p aria-live="polite">{translate(locale, "common.loading")}</p>
+          ) : mfa.totpEnabled ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-success-soft p-4">
+              <p className="flex items-center gap-2 font-semibold text-success-foreground">
+                <ShieldCheckIcon aria-hidden="true" className="size-5" />
+                {translate(locale, "mfa.on")}
+              </p>
+              <Button disabled={busy} onClick={() => void remove()} type="button" variant="outline">
+                {translate(locale, "mfa.remove")}
+              </Button>
+            </div>
+          ) : enrollment ? (
+            <form className="grid max-w-md gap-4" onSubmit={confirm}>
+              <p>{translate(locale, "mfa.scan")}</p>
+              <img
+                alt={translate(locale, "mfa.qrAlt")}
+                className="rounded-xl border bg-white p-2"
+                height={180}
+                src={enrollment.qrCode}
+                width={180}
+              />
+              <p className="text-sm">
+                {translate(locale, "mfa.secret")}{" "}
+                <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono [overflow-wrap:anywhere]">
+                  {enrollment.secret}
+                </code>
+              </p>
+              <Field>
+                <Label htmlFor="totp-setup-code">{translate(locale, "mfa.code")}</Label>
+                <Input
+                  autoComplete="one-time-code"
+                  className="max-w-48 font-mono tracking-[0.2em]"
+                  id="totp-setup-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  minLength={6}
+                  name="totpSetupCode"
+                  pattern="[0-9]{6}"
+                  required
+                />
+              </Field>
+              <div>
+                <Button disabled={busy} type="submit">
+                  {translate(locale, "mfa.confirm")}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div>
+              <Button disabled={busy} onClick={() => void start()} type="button">
+                {translate(locale, "mfa.enable")}
+              </Button>
+            </div>
+          )}
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
           </p>
-          <label htmlFor="totp-setup-code">{translate(locale, "mfa.code")}</label>
-          <input
-            autoComplete="one-time-code"
-            id="totp-setup-code"
-            inputMode="numeric"
-            maxLength={6}
-            minLength={6}
-            name="totpSetupCode"
-            pattern="[0-9]{6}"
-            required
-          />
-          <button className="primary-button" disabled={busy} type="submit">
-            {translate(locale, "mfa.confirm")}
-          </button>
-        </form>
-      ) : (
-        <button
-          className="primary-button"
-          disabled={busy}
-          onClick={() => void start()}
-          type="button"
-        >
-          {translate(locale, "mfa.enable")}
-        </button>
-      )}
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </section>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

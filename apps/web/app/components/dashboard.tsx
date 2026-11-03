@@ -8,6 +8,11 @@ import { IncomingSellerInvites } from "./incoming-seller-invites";
 import { MyModeration } from "./my-moderation";
 import { MyNotifications } from "./my-notifications";
 import { MyParticipations } from "./my-participations";
+import { EmptyState, PageHeading, PageMain } from "./page";
+import { Alert } from "./ui/alert";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 
 export function Dashboard() {
   return <AccountShell>{({ locale }) => <DashboardContent locale={locale} />}</AccountShell>;
@@ -17,17 +22,17 @@ function DashboardContent({ locale }: { readonly locale: "sv" | "en" }) {
   const { accessToken, dashboard, loadDashboard, loadFailed } = useAccountData();
 
   return (
-    <main className="account-page app-page" id="main" tabIndex={-1}>
-      <header className="app-heading app-heading-row">
-        <div>
-          <p className="eyebrow">Promenadis</p>
-          <h1>{translate(locale, "dashboard.events")}</h1>
-          <p className="lede">{translate(locale, "dashboard.intro")}</p>
-        </div>
-        <Link className="primary-button button-link" to="/events/new">
-          {translate(locale, "dashboard.newEvent")}
-        </Link>
-      </header>
+    <PageMain>
+      <PageHeading
+        actions={
+          <Button asChild>
+            <Link to="/events/new">{translate(locale, "dashboard.newEvent")}</Link>
+          </Button>
+        }
+        description={translate(locale, "dashboard.intro")}
+        eyebrow="Promenadis"
+        title={translate(locale, "dashboard.events")}
+      />
 
       {dashboard ? (
         <>
@@ -49,61 +54,80 @@ function DashboardContent({ locale }: { readonly locale: "sv" | "en" }) {
       ) : null}
 
       {loadFailed ? (
-        <p className="notice notice-error" role="alert">
+        <Alert role="alert" variant="destructive">
           {translate(locale, "dashboard.sessionExpired")}
-        </p>
+        </Alert>
       ) : !dashboard ? (
         <p aria-live="polite">{translate(locale, "common.loading")}</p>
       ) : dashboard.events.length === 0 ? (
-        <section className="empty-state">
-          <div aria-hidden="true" className="empty-state-mark">
-            1
-          </div>
-          <h2>{translate(locale, "dashboard.emptyTitle")}</h2>
+        <EmptyState
+          action={
+            <Button asChild>
+              <Link to="/events/new">{translate(locale, "dashboard.createFirstEvent")}</Link>
+            </Button>
+          }
+          mark="1"
+          title={translate(locale, "dashboard.emptyTitle")}
+        >
           <p>{translate(locale, "dashboard.emptyBody")}</p>
-          <Link className="primary-button button-link" to="/events/new">
-            {translate(locale, "dashboard.createFirstEvent")}
-          </Link>
-        </section>
+        </EmptyState>
       ) : (
-        <ul aria-label={translate(locale, "dashboard.events")} className="event-card-list">
+        <ul
+          aria-label={translate(locale, "dashboard.events")}
+          className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,22rem),1fr))] gap-5 p-0"
+        >
           {dashboard.events.map((draft) => {
             const interval = draft.intervals[0];
             return (
-              <li className="event-card" key={draft.id}>
-                <div className="event-card-topline">
-                  <span className="status-pill status-pill-muted">
-                    {translate(locale, `event.state.${draft.state}`)}
-                  </span>
-                  <span className="event-card-visibility">
-                    {translate(locale, `visibility.${draft.visibility}`)}
-                  </span>
-                </div>
-                <div className="event-card-copy">
-                  <h2>{draft.title}</h2>
-                  <p>{draft.organizerDisplayName}</p>
-                  {interval ? (
-                    <p>
-                      {formatDateTime(locale, interval.startsAt, draft.timezone)} –{" "}
-                      {formatDateTime(locale, interval.endsAt, draft.timezone)}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="event-card-footer">
-                  <span className={draft.boundary ? "setup-state is-complete" : "setup-state"}>
-                    {draft.boundary
-                      ? translate(locale, "event.areaReady")
-                      : translate(locale, "event.areaMissing")}
-                  </span>
-                  <Link className="text-link" to={`/events/${draft.id}`}>
-                    {translate(locale, draft.state === "draft" ? "event.continue" : "event.open")}
-                  </Link>
-                </div>
-              </li>
+              <Card asChild key={draft.id}>
+                <li>
+                  <CardHeader>
+                    <div className="flex items-center justify-between gap-3">
+                      <Badge variant="secondary">
+                        {translate(locale, `event.state.${draft.state}`)}
+                      </Badge>
+                      <span className="text-sm font-semibold text-muted-foreground">
+                        {translate(locale, `visibility.${draft.visibility}`)}
+                      </span>
+                    </div>
+                    <CardTitle className="mt-3 text-2xl">{draft.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="gap-1 text-muted-foreground">
+                    <p>{draft.organizerDisplayName}</p>
+                    {interval ? (
+                      <p>
+                        {formatDateTime(locale, interval.startsAt, draft.timezone)} –{" "}
+                        {formatDateTime(locale, interval.endsAt, draft.timezone)}
+                      </p>
+                    ) : null}
+                  </CardContent>
+                  <CardFooter className="mt-auto justify-between border-t">
+                    <span
+                      className={
+                        draft.boundary
+                          ? "text-sm font-semibold text-success-foreground"
+                          : "text-sm font-semibold text-warning-foreground"
+                      }
+                    >
+                      {draft.boundary
+                        ? translate(locale, "event.areaReady")
+                        : translate(locale, "event.areaMissing")}
+                    </span>
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={`/events/${draft.id}`}>
+                        {translate(
+                          locale,
+                          draft.state === "draft" ? "event.continue" : "event.open",
+                        )}
+                      </Link>
+                    </Button>
+                  </CardFooter>
+                </li>
+              </Card>
             );
           })}
         </ul>
       )}
-    </main>
+    </PageMain>
   );
 }

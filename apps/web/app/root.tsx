@@ -8,6 +8,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import type { Route } from "./+types/root";
+import { Eyebrow } from "./components/page";
 import { useCspNonce } from "./lib/csp-nonce";
 import stylesheet from "./styles/app.css?url";
 
@@ -68,11 +69,13 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="error-page" id="main" tabIndex={-1}>
-      <p className="eyebrow">Promenadis</p>
-      <h1>{heading}</h1>
-      <p>{message}</p>
-      <a href="/">Till startsidan</a>
+    <main className="mx-auto my-[10vh] grid w-[min(100%-2rem,52rem)] gap-4" id="main" tabIndex={-1}>
+      <Eyebrow>Promenadis</Eyebrow>
+      <h1 className="text-4xl font-extrabold sm:text-5xl">{heading}</h1>
+      <p className="text-lg text-muted-foreground">{message}</p>
+      <a className="font-semibold" href="/">
+        Till startsidan
+      </a>
     </main>
   );
 }

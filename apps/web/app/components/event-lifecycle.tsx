@@ -5,6 +5,12 @@ import { type FormEvent, useState } from "react";
 import { useExpectedAccountId } from "../lib/account-session";
 import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
 import { wallTimeToIso } from "../lib/wall-time";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Field } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 
 // Live-event controls: owners cancel a published event; owners and co-hosts
 // end a live event early. Drafts use EventControls instead.
@@ -118,111 +124,139 @@ export function EventLifecycle({
   };
 
   return (
-    <section aria-labelledby="lifecycle-heading" className="panel">
-      <h2 id="lifecycle-heading">{translate(locale, "lifecycle.title")}</h2>
-      {canEnd ? (
-        <>
-          <p>{translate(locale, "lifecycle.endHelp")}</p>
-          <button
-            className="danger-button"
-            disabled={busy}
-            onClick={() => void run("end")}
-            type="button"
-          >
-            {translate(locale, "lifecycle.end")}
-          </button>
-        </>
-      ) : canCancel ? (
-        <details className="danger-zone">
-          <summary>{translate(locale, "lifecycle.cancel")}</summary>
-          <form
-            className="danger-zone-body"
-            onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
-              formEvent.preventDefault();
-              void run("cancel");
-            }}
-          >
-            <p>{translate(locale, "lifecycle.cancelHelp")}</p>
-            <label htmlFor="cancel-reason">{translate(locale, "lifecycle.reason")}</label>
-            <textarea
-              id="cancel-reason"
-              maxLength={500}
-              minLength={3}
-              onChange={(inputEvent) => setReason(inputEvent.currentTarget.value)}
-              required
-              value={reason}
-            />
-            <label htmlFor="cancel-title">{translate(locale, "event.deleteConfirmation")}</label>
-            <input
-              autoComplete="off"
-              id="cancel-title"
-              onChange={(inputEvent) => setConfirmTitle(inputEvent.currentTarget.value)}
-              placeholder={event.title}
-              required
-              value={confirmTitle}
-            />
-            <button
-              className="danger-button"
-              disabled={busy || confirmTitle.trim() !== event.title || reason.trim().length < 3}
-              type="submit"
-            >
-              {translate(locale, "lifecycle.confirmCancel")}
-            </button>
-          </form>
-        </details>
-      ) : null}
-      {canPostpone || canReschedule ? (
-        <details className="danger-zone">
-          <summary>
-            {translate(locale, canReschedule ? "lifecycle.reschedule" : "lifecycle.postpone")}
-          </summary>
-          <form
-            className="danger-zone-body"
-            onSubmit={(formEvent) => void runPostponement(formEvent)}
-          >
-            <p>
-              {translate(
-                locale,
-                canReschedule ? "lifecycle.rescheduleHelp" : "lifecycle.postponeHelp",
-              )}
-            </p>
-            {canReschedule ? (
-              <div className="schedule-fields">
-                <div>
-                  <label htmlFor="reschedule-start">
-                    {translate(locale, "dashboard.startsAt")}
-                  </label>
-                  <input id="reschedule-start" name="startsAt" required type="datetime-local" />
-                </div>
-                <div>
-                  <label htmlFor="reschedule-end">{translate(locale, "dashboard.endsAt")}</label>
-                  <input id="reschedule-end" name="endsAt" required type="datetime-local" />
-                </div>
-              </div>
-            ) : (
-              <>
-                <label htmlFor="postpone-reason">{translate(locale, "lifecycle.reason")}</label>
-                <textarea
-                  id="postpone-reason"
-                  maxLength={500}
-                  minLength={3}
-                  name="postponeReason"
-                  required
-                />
-              </>
-            )}
-            <button className="danger-button" disabled={busy} type="submit">
-              {translate(
-                locale,
-                canReschedule ? "lifecycle.confirmReschedule" : "lifecycle.confirmPostpone",
-              )}
-            </button>
-          </form>
-        </details>
-      ) : null}
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </section>
+    <Card asChild>
+      <section aria-labelledby="lifecycle-heading">
+        <CardHeader>
+          <CardTitle id="lifecycle-heading">{translate(locale, "lifecycle.title")}</CardTitle>
+        </CardHeader>
+        <CardContent className="gap-5">
+          {canEnd ? (
+            <div className="grid justify-items-start gap-3">
+              <p className="leading-relaxed text-muted-foreground">
+                {translate(locale, "lifecycle.endHelp")}
+              </p>
+              <Button
+                disabled={busy}
+                onClick={() => void run("end")}
+                type="button"
+                variant="destructive"
+              >
+                {translate(locale, "lifecycle.end")}
+              </Button>
+            </div>
+          ) : canCancel ? (
+            <details className={dangerDetails}>
+              <summary>{translate(locale, "lifecycle.cancel")}</summary>
+              <form
+                className={dangerBody}
+                onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
+                  formEvent.preventDefault();
+                  void run("cancel");
+                }}
+              >
+                <p className="leading-relaxed">{translate(locale, "lifecycle.cancelHelp")}</p>
+                <Field>
+                  <Label htmlFor="cancel-reason">{translate(locale, "lifecycle.reason")}</Label>
+                  <Textarea
+                    id="cancel-reason"
+                    maxLength={500}
+                    minLength={3}
+                    onChange={(inputEvent) => setReason(inputEvent.currentTarget.value)}
+                    required
+                    value={reason}
+                  />
+                </Field>
+                <Field>
+                  <Label htmlFor="cancel-title">
+                    {translate(locale, "event.deleteConfirmation")}
+                  </Label>
+                  <Input
+                    autoComplete="off"
+                    id="cancel-title"
+                    onChange={(inputEvent) => setConfirmTitle(inputEvent.currentTarget.value)}
+                    placeholder={event.title}
+                    required
+                    value={confirmTitle}
+                  />
+                </Field>
+                <Button
+                  className="justify-self-start"
+                  disabled={busy || confirmTitle.trim() !== event.title || reason.trim().length < 3}
+                  type="submit"
+                  variant="destructive"
+                >
+                  {translate(locale, "lifecycle.confirmCancel")}
+                </Button>
+              </form>
+            </details>
+          ) : null}
+          {canPostpone || canReschedule ? (
+            <details className={dangerDetails}>
+              <summary>
+                {translate(locale, canReschedule ? "lifecycle.reschedule" : "lifecycle.postpone")}
+              </summary>
+              <form
+                className={dangerBody}
+                onSubmit={(formEvent) => void runPostponement(formEvent)}
+              >
+                <p className="leading-relaxed">
+                  {translate(
+                    locale,
+                    canReschedule ? "lifecycle.rescheduleHelp" : "lifecycle.postponeHelp",
+                  )}
+                </p>
+                {canReschedule ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field>
+                      <Label htmlFor="reschedule-start">
+                        {translate(locale, "dashboard.startsAt")}
+                      </Label>
+                      <Input id="reschedule-start" name="startsAt" required type="datetime-local" />
+                    </Field>
+                    <Field>
+                      <Label htmlFor="reschedule-end">
+                        {translate(locale, "dashboard.endsAt")}
+                      </Label>
+                      <Input id="reschedule-end" name="endsAt" required type="datetime-local" />
+                    </Field>
+                  </div>
+                ) : (
+                  <Field>
+                    <Label htmlFor="postpone-reason">{translate(locale, "lifecycle.reason")}</Label>
+                    <Textarea
+                      id="postpone-reason"
+                      maxLength={500}
+                      minLength={3}
+                      name="postponeReason"
+                      required
+                    />
+                  </Field>
+                )}
+                <Button
+                  className="justify-self-start"
+                  disabled={busy}
+                  type="submit"
+                  variant="destructive"
+                >
+                  {translate(
+                    locale,
+                    canReschedule ? "lifecycle.confirmReschedule" : "lifecycle.confirmPostpone",
+                  )}
+                </Button>
+              </form>
+            </details>
+          ) : null}
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
+          </p>
+        </CardContent>
+      </section>
+    </Card>
   );
 }
+
+const dangerDetails =
+  "border-t pt-5 first:border-t-0 first:pt-0 [&>summary]:min-h-11 [&>summary]:cursor-pointer [&>summary]:font-semibold [&>summary]:text-destructive-foreground";
+
+const dangerBody =
+  "mt-3 grid max-w-xl gap-3 rounded-xl border border-destructive/40 bg-destructive-soft p-4 text-destructive-foreground";

@@ -2,6 +2,12 @@ import { type createPromenadisApiClient, PromenadisApiError } from "@promenadis/
 import type { AdminEventSummary } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useState } from "react";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Field } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
 
@@ -88,88 +94,96 @@ export function AdminEventIntervention({
   const canPostpone = event?.state === "published" || event?.state === "active";
 
   return (
-    <section aria-labelledby="admin-event-heading" className="panel">
-      <h2 id="admin-event-heading">{translate(locale, "admin.eventTitle")}</h2>
-      <p>{translate(locale, "admin.eventHelp")}</p>
-      <form className="inline-control" onSubmit={lookup}>
-        <label className="visually-hidden" htmlFor="admin-event-id">
-          {translate(locale, "admin.eventId")}
-        </label>
-        <input
-          autoComplete="off"
-          id="admin-event-id"
-          name="eventId"
-          pattern="[0-9a-fA-F-]{36}"
-          placeholder={translate(locale, "admin.eventId")}
-          required
-        />
-        <button className="secondary-button" disabled={busy} type="submit">
-          {translate(locale, "admin.lookup")}
-        </button>
-      </form>
-      {event ? (
-        <article className="review-item">
-          <h3>{event.title}</h3>
-          <p>
-            {event.organizerDisplayName} · {translate(locale, `event.state.${event.state}`)}
-            {event.startsAt ? ` · ${formatDateTime(locale, event.startsAt, event.timezone)}` : null}
+    <Card aria-labelledby="admin-event-heading" asChild>
+      <section>
+        <CardHeader>
+          <CardTitle id="admin-event-heading">{translate(locale, "admin.eventTitle")}</CardTitle>
+          <CardDescription>{translate(locale, "admin.eventHelp")}</CardDescription>
+        </CardHeader>
+        <CardContent className="gap-5">
+          <form className="flex max-w-xl flex-wrap items-center gap-2" onSubmit={lookup}>
+            <label className="sr-only" htmlFor="admin-event-id">
+              {translate(locale, "admin.eventId")}
+            </label>
+            <Input
+              autoComplete="off"
+              className="min-w-0 flex-1 basis-64"
+              id="admin-event-id"
+              name="eventId"
+              pattern="[0-9a-fA-F-]{36}"
+              placeholder={translate(locale, "admin.eventId")}
+              required
+            />
+            <Button disabled={busy} type="submit" variant="outline">
+              {translate(locale, "admin.lookup")}
+            </Button>
+          </form>
+          {event ? (
+            <article className="grid gap-3 border-t pt-5">
+              <h3 className="text-lg font-bold">{event.title}</h3>
+              <p className="text-sm text-muted-foreground">
+                {event.organizerDisplayName} · {translate(locale, `event.state.${event.state}`)}
+                {event.startsAt
+                  ? ` · ${formatDateTime(locale, event.startsAt, event.timezone)}`
+                  : null}
+              </p>
+              {canCancel || canEnd || canPostpone ? (
+                <form className="grid max-w-xl gap-4" onSubmit={intervene}>
+                  {canCancel || canPostpone ? (
+                    <Field>
+                      <Label htmlFor="admin-public-reason">
+                        {translate(locale, "lifecycle.reason")}
+                      </Label>
+                      <Textarea
+                        id="admin-public-reason"
+                        maxLength={500}
+                        minLength={3}
+                        name="publicReason"
+                      />
+                    </Field>
+                  ) : null}
+                  <Field>
+                    <Label htmlFor="admin-internal-reason">
+                      {translate(locale, "admin.internalReason")}
+                    </Label>
+                    <Textarea
+                      id="admin-internal-reason"
+                      maxLength={500}
+                      minLength={3}
+                      name="internalReason"
+                      required
+                    />
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {canEnd ? (
+                      <Button disabled={busy} type="submit" value="end_early" variant="destructive">
+                        {translate(locale, "lifecycle.end")}
+                      </Button>
+                    ) : null}
+                    {canCancel ? (
+                      <Button disabled={busy} type="submit" value="cancel" variant="destructive">
+                        {translate(locale, "lifecycle.cancel")}
+                      </Button>
+                    ) : null}
+                    {canPostpone ? (
+                      <Button disabled={busy} type="submit" value="postpone" variant="outline">
+                        {translate(locale, "lifecycle.postpone")}
+                      </Button>
+                    ) : null}
+                  </div>
+                </form>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {translate(locale, "admin.noIntervention")}
+                </p>
+              )}
+            </article>
+          ) : null}
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
           </p>
-          {canCancel || canEnd || canPostpone ? (
-            <form className="details-form" onSubmit={intervene}>
-              {canCancel || canPostpone ? (
-                <>
-                  <label htmlFor="admin-public-reason">
-                    {translate(locale, "lifecycle.reason")}
-                  </label>
-                  <textarea
-                    id="admin-public-reason"
-                    maxLength={500}
-                    minLength={3}
-                    name="publicReason"
-                  />
-                </>
-              ) : null}
-              <label htmlFor="admin-internal-reason">
-                {translate(locale, "admin.internalReason")}
-              </label>
-              <textarea
-                id="admin-internal-reason"
-                maxLength={500}
-                minLength={3}
-                name="internalReason"
-                required
-              />
-              <div className="form-actions">
-                {canEnd ? (
-                  <button className="danger-button" disabled={busy} type="submit" value="end_early">
-                    {translate(locale, "lifecycle.end")}
-                  </button>
-                ) : null}
-                {canCancel ? (
-                  <button className="danger-button" disabled={busy} type="submit" value="cancel">
-                    {translate(locale, "lifecycle.cancel")}
-                  </button>
-                ) : null}
-                {canPostpone ? (
-                  <button
-                    className="secondary-button"
-                    disabled={busy}
-                    type="submit"
-                    value="postpone"
-                  >
-                    {translate(locale, "lifecycle.postpone")}
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          ) : (
-            <p className="field-help">{translate(locale, "admin.noIntervention")}</p>
-          )}
-        </article>
-      ) : null}
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </section>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

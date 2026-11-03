@@ -3,6 +3,11 @@ import { type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { RelayMessages } from "./organizer-contact";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Field } from "./ui/field";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 
 // Messages visitors sent through the event page; answered in the app.
 export function EventMessages({
@@ -52,31 +57,44 @@ export function EventMessages({
     }
   };
   return (
-    <section aria-labelledby="event-messages-heading" className="panel">
-      <h3 id="event-messages-heading">{translate(locale, "contact.teamTitle")}</h3>
-      <p className="field-hint">{translate(locale, "contact.teamHint")}</p>
-      {threads.map((thread) => (
-        <article key={thread.id}>
-          <RelayMessages locale={locale} thread={thread} />
-          <form className="form-panel" onSubmit={(formEvent) => void reply(thread.id, formEvent)}>
-            <label htmlFor={`reply-${thread.id}`}>{translate(locale, "contact.reply")}</label>
-            <textarea
-              id={`reply-${thread.id}`}
-              maxLength={1000}
-              minLength={10}
-              name="message"
-              required
-            />
-            <button className="secondary-button" type="submit">
-              {translate(locale, "contact.send")}
-            </button>
-          </form>
-        </article>
-      ))}
-      <p aria-live="polite" role="status">
-        {status}
-      </p>
-    </section>
+    <Card asChild>
+      <section aria-labelledby="event-messages-heading">
+        <CardHeader>
+          <CardTitle asChild>
+            <h3 id="event-messages-heading">{translate(locale, "contact.teamTitle")}</h3>
+          </CardTitle>
+          <CardDescription>{translate(locale, "contact.teamHint")}</CardDescription>
+        </CardHeader>
+        <CardContent className="gap-0 divide-y">
+          {threads.map((thread) => (
+            <article className="grid gap-4 py-5 first:pt-0" key={thread.id}>
+              <RelayMessages locale={locale} thread={thread} />
+              <form
+                className="grid gap-3"
+                onSubmit={(formEvent) => void reply(thread.id, formEvent)}
+              >
+                <Field>
+                  <Label htmlFor={`reply-${thread.id}`}>{translate(locale, "contact.reply")}</Label>
+                  <Textarea
+                    id={`reply-${thread.id}`}
+                    maxLength={1000}
+                    minLength={10}
+                    name="message"
+                    required
+                  />
+                </Field>
+                <Button className="justify-self-start" type="submit" variant="outline">
+                  {translate(locale, "contact.send")}
+                </Button>
+              </form>
+            </article>
+          ))}
+          <p aria-live="polite" className="min-h-6 pt-4 text-sm font-semibold" role="status">
+            {status}
+          </p>
+        </CardContent>
+      </section>
+    </Card>
   );
 }
 
@@ -110,12 +128,20 @@ export function EventFeedbackSummary({
   }, [accessToken, ended, event.id]);
   if (!summary || summary.responses === 0) return null;
   return (
-    <section aria-labelledby="feedback-summary-heading" className="panel">
-      <h3 id="feedback-summary-heading">{translate(locale, "feedback.summary")}</h3>
-      <p>
-        {summary.responses} {translate(locale, "feedback.responses")} ·{" "}
-        {translate(locale, "feedback.average")} {summary.averageRating ?? "—"}
-      </p>
-    </section>
+    <Card asChild>
+      <section aria-labelledby="feedback-summary-heading">
+        <CardHeader>
+          <CardTitle asChild>
+            <h3 id="feedback-summary-heading">{translate(locale, "feedback.summary")}</h3>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg">
+            {summary.responses} {translate(locale, "feedback.responses")} ·{" "}
+            {translate(locale, "feedback.average")} {summary.averageRating ?? "—"}
+          </p>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

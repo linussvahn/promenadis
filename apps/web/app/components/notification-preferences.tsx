@@ -1,6 +1,9 @@
 import { type Locale, translate } from "@promenadis/i18n";
 import { useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Checkbox } from "./ui/checkbox";
+import { ChoiceField } from "./ui/field";
 
 // Required notices (decisions, cancellations, security) always arrive;
 // reminders are optional and off until the account turns them on.
@@ -39,23 +42,28 @@ export function NotificationPreferences({
   };
 
   return (
-    <section aria-labelledby="notification-preferences-heading" className="panel form-panel">
-      <h2 id="notification-preferences-heading">
-        {translate(locale, "notifications.preferences")}
-      </h2>
-      <p className="field-hint">{translate(locale, "notifications.requiredHint")}</p>
-      <label className="checkbox-field">
-        <input
-          checked={reminders ?? false}
-          disabled={reminders === null}
-          onChange={(event) => void change(event.currentTarget.checked)}
-          type="checkbox"
-        />
-        <span>{translate(locale, "notifications.reminders")}</span>
-      </label>
-      <p aria-live="polite" role="status">
-        {status}
-      </p>
-    </section>
+    <Card asChild>
+      <section aria-labelledby="notification-preferences-heading">
+        <CardHeader>
+          <CardTitle id="notification-preferences-heading">
+            {translate(locale, "notifications.preferences")}
+          </CardTitle>
+          <CardDescription>{translate(locale, "notifications.requiredHint")}</CardDescription>
+        </CardHeader>
+        <CardContent className="gap-2">
+          <ChoiceField className="rounded-xl border bg-muted/40 p-4">
+            <Checkbox
+              checked={reminders ?? false}
+              disabled={reminders === null}
+              onChange={(event) => void change(event.currentTarget.checked)}
+            />
+            <span>{translate(locale, "notifications.reminders")}</span>
+          </ChoiceField>
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold" role="status">
+            {status}
+          </p>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

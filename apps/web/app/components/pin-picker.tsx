@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import MapView, { Layer, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { DEFAULT_CENTER, MAP_STYLE, MapErrorBoundary } from "./boundary-editor";
+import { Field, FieldDescription, FieldLegend, FieldSet } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 // Click the map or type coordinates; the typed fields are the non-map path.
 export function PinPicker({
@@ -51,12 +54,17 @@ export function PinPicker({
   };
 
   return (
-    <div className="pin-picker">
-      <section aria-label={translate(locale, "seller.mapLabel")} className="boundary-map">
+    <div className="grid gap-5">
+      <section
+        aria-label={translate(locale, "seller.mapLabel")}
+        className="h-[clamp(18rem,55vw,30rem)] overflow-hidden rounded-xl border border-input bg-muted [&_.maplibregl-map]:size-full"
+      >
         {mounted ? (
           <MapErrorBoundary
             fallback={
-              <p className="map-fallback">{translate(locale, "boundary.mapUnavailable")}</p>
+              <p className="m-6 max-w-xl rounded-lg bg-card p-4 text-sm">
+                {translate(locale, "boundary.mapUnavailable")}
+              </p>
             }
           >
             <MapView
@@ -113,24 +121,32 @@ export function PinPicker({
           </MapErrorBoundary>
         ) : null}
       </section>
-      <fieldset className="coordinate-fields">
-        <legend>{translate(locale, "seller.coordinates")}</legend>
-        <p className="field-help">{translate(locale, "seller.coordinatesHelp")}</p>
-        <label htmlFor={`${idPrefix}-latitude`}>{translate(locale, "boundary.latitude")}</label>
-        <input
-          id={`${idPrefix}-latitude`}
-          inputMode="decimal"
-          onChange={(event) => setCoordinate(1, event.currentTarget.value)}
-          value={text[1]}
-        />
-        <label htmlFor={`${idPrefix}-longitude`}>{translate(locale, "boundary.longitude")}</label>
-        <input
-          id={`${idPrefix}-longitude`}
-          inputMode="decimal"
-          onChange={(event) => setCoordinate(0, event.currentTarget.value)}
-          value={text[0]}
-        />
-      </fieldset>
+      <FieldSet>
+        <FieldLegend>{translate(locale, "seller.coordinates")}</FieldLegend>
+        <FieldDescription>{translate(locale, "seller.coordinatesHelp")}</FieldDescription>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <Label htmlFor={`${idPrefix}-latitude`}>{translate(locale, "boundary.latitude")}</Label>
+            <Input
+              id={`${idPrefix}-latitude`}
+              inputMode="decimal"
+              onChange={(event) => setCoordinate(1, event.currentTarget.value)}
+              value={text[1]}
+            />
+          </Field>
+          <Field>
+            <Label htmlFor={`${idPrefix}-longitude`}>
+              {translate(locale, "boundary.longitude")}
+            </Label>
+            <Input
+              id={`${idPrefix}-longitude`}
+              inputMode="decimal"
+              onChange={(event) => setCoordinate(0, event.currentTarget.value)}
+              value={text[0]}
+            />
+          </Field>
+        </div>
+      </FieldSet>
     </div>
   );
 }

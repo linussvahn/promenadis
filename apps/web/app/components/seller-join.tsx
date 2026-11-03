@@ -6,8 +6,16 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { useAccountData } from "../lib/use-account-data";
 import { AccountShell } from "./account-shell";
+import { backLink, PageHeading, PageMain, SummaryList } from "./page";
 import { SellerAddressForm, type SellerAddressInput } from "./seller-address-form";
 import { SellerListingEditor } from "./seller-listing-editor";
+import { Alert } from "./ui/alert";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Field, FieldDescription } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export function SellerJoin() {
   return <AccountShell>{({ locale }) => <SellerJoinContent locale={locale} />}</AccountShell>;
@@ -123,18 +131,18 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
 
   if (failed) {
     return (
-      <main className="account-page flow-page" id="main">
-        <p className="notice notice-error" role="alert">
+      <PageMain width="flow">
+        <Alert role="alert" variant="destructive">
           {translate(locale, "seller.notFound")}
-        </p>
-      </main>
+        </Alert>
+      </PageMain>
     );
   }
   if (!event) {
     return (
-      <main className="account-page flow-page" id="main">
+      <PageMain width="flow">
         <p aria-live="polite">{translate(locale, "common.loading")}</p>
-      </main>
+      </PageMain>
     );
   }
 
@@ -144,119 +152,139 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
     : false;
 
   return (
-    <main className="account-page flow-page" id="main" tabIndex={-1}>
-      <Link className="back-link" to="/dashboard">
+    <PageMain width="flow">
+      <Link className={backLink} to="/dashboard">
         ← {translate(locale, "event.backToEvents")}
       </Link>
-      <header className="app-heading flow-heading">
-        <p className="eyebrow">{translate(locale, "seller.eyebrow")}</p>
-        <h1>{event.title}</h1>
-        <p className="lede">
-          {event.organizerDisplayName}
-          {event.startsAt ? ` · ${formatDateTime(locale, event.startsAt, event.timezone)}` : null}
-        </p>
-        {event.description ? <p>{event.description}</p> : null}
-      </header>
+      <div className="grid gap-3">
+        <PageHeading
+          description={
+            <>
+              {event.organizerDisplayName}
+              {event.startsAt
+                ? ` · ${formatDateTime(locale, event.startsAt, event.timezone)}`
+                : null}
+            </>
+          }
+          eyebrow={translate(locale, "seller.eyebrow")}
+          title={event.title}
+        />
+        {event.description ? (
+          <p className="max-w-2xl leading-relaxed">{event.description}</p>
+        ) : null}
+      </div>
 
       {participation ? (
-        <section aria-labelledby="participation-heading" className="panel">
-          <h2 id="participation-heading">{translate(locale, "seller.yourApplication")}</h2>
-          <p>
-            <span className="status-pill status-pill-muted">
-              {translate(locale, `participation.${participation.state}`)}
-            </span>
-          </p>
-          <p>{translate(locale, `participation.${participation.state}.help`)}</p>
-          {participation.decisionReason ? (
-            <p>
-              {translate(locale, "seller.reason")}: {participation.decisionReason}
-            </p>
-          ) : null}
-          {participation.location ? (
-            <dl className="summary-list">
-              <div>
-                <dt>{translate(locale, "seller.address")}</dt>
-                <dd>
-                  {participation.location.addressLine}
-                  {participation.location.postalCode
-                    ? `, ${participation.location.postalCode}`
-                    : ""}
-                  {participation.location.locality ? ` ${participation.location.locality}` : ""}
-                </dd>
-              </div>
-              <div>
-                <dt>{translate(locale, "seller.publicName")}</dt>
-                <dd>{participation.displayName}</dd>
-              </div>
-            </dl>
-          ) : null}
-          {participation.state === "pending_reschedule_confirmation" &&
-          event.state === "published" ? (
-            <div className="form-actions">
-              {([true, false] as const).map((accept) => (
-                <button
-                  className={accept ? "primary-button" : "secondary-button"}
-                  disabled={busy}
-                  key={String(accept)}
-                  onClick={() => void confirmReschedule(accept)}
-                  type="button"
-                >
-                  {translate(locale, accept ? "seller.acceptNewDate" : "seller.declineNewDate")}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {event.state === "postponed" ? (
-            <p className="notice">{translate(locale, "seller.eventPostponed")}</p>
-          ) : null}
-          {participation.location?.quarantined ? (
-            <p className="notice notice-error">{translate(locale, "seller.quarantined")}</p>
-          ) : null}
-          {participation.geographicException && !closed ? (
-            <p className="field-help">{translate(locale, "seller.outsideHelp")}</p>
-          ) : null}
-          {participation.location?.sellerCount && participation.location.sellerCount > 1 ? (
-            <p className="field-help">{translate(locale, "seller.sharedStop")}</p>
-          ) : null}
-          {!closed &&
-          ["pending", "waitlisted", "approved", "pending_address_change"].includes(
-            participation.state,
-          ) &&
-          ["draft", "published", "active"].includes(event.state) ? (
-            <details className="settings-details">
-              <summary>{translate(locale, "seller.changeAddress")}</summary>
-              <p className="field-help">
-                {translate(
-                  locale,
-                  ["approved", "pending_address_change"].includes(participation.state)
-                    ? "seller.changeAddressReview"
-                    : "seller.changeAddressHelp",
-                )}
+        <Card asChild>
+          <section aria-labelledby="participation-heading">
+            <CardHeader>
+              <CardTitle id="participation-heading">
+                {translate(locale, "seller.yourApplication")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>
+                <Badge variant="secondary">
+                  {translate(locale, `participation.${participation.state}`)}
+                </Badge>
               </p>
-              <SellerAddressForm
-                call={call}
-                eventBoundary={event.boundary}
-                eventId={eventId}
-                idPrefix="change"
-                initial={participation.location}
-                key={participation.version}
-                locale={locale}
-                onSubmit={changeAddress}
-                submitLabel={translate(locale, "seller.saveAddress")}
-              />
-            </details>
-          ) : null}
-          {!closed ? (
-            <button
-              className="secondary-button"
-              disabled={busy}
-              onClick={() => void withdraw()}
-              type="button"
-            >
-              {translate(locale, "seller.withdraw")}
-            </button>
-          ) : null}
-        </section>
+              <p className="leading-relaxed">
+                {translate(locale, `participation.${participation.state}.help`)}
+              </p>
+              {participation.decisionReason ? (
+                <p>
+                  {translate(locale, "seller.reason")}: {participation.decisionReason}
+                </p>
+              ) : null}
+              {participation.location ? (
+                <SummaryList>
+                  <div>
+                    <dt>{translate(locale, "seller.address")}</dt>
+                    <dd>
+                      {participation.location.addressLine}
+                      {participation.location.postalCode
+                        ? `, ${participation.location.postalCode}`
+                        : ""}
+                      {participation.location.locality ? ` ${participation.location.locality}` : ""}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{translate(locale, "seller.publicName")}</dt>
+                    <dd>{participation.displayName}</dd>
+                  </div>
+                </SummaryList>
+              ) : null}
+              {participation.state === "pending_reschedule_confirmation" &&
+              event.state === "published" ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  {([true, false] as const).map((accept) => (
+                    <Button
+                      disabled={busy}
+                      key={String(accept)}
+                      onClick={() => void confirmReschedule(accept)}
+                      type="button"
+                      variant={accept ? "default" : "outline"}
+                    >
+                      {translate(locale, accept ? "seller.acceptNewDate" : "seller.declineNewDate")}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+              {event.state === "postponed" ? (
+                <Alert variant="warning">{translate(locale, "seller.eventPostponed")}</Alert>
+              ) : null}
+              {participation.location?.quarantined ? (
+                <Alert variant="destructive">{translate(locale, "seller.quarantined")}</Alert>
+              ) : null}
+              {participation.geographicException && !closed ? (
+                <FieldDescription>{translate(locale, "seller.outsideHelp")}</FieldDescription>
+              ) : null}
+              {participation.location?.sellerCount && participation.location.sellerCount > 1 ? (
+                <FieldDescription>{translate(locale, "seller.sharedStop")}</FieldDescription>
+              ) : null}
+              {!closed &&
+              ["pending", "waitlisted", "approved", "pending_address_change"].includes(
+                participation.state,
+              ) &&
+              ["draft", "published", "active"].includes(event.state) ? (
+                <details className="grid gap-3 rounded-xl border bg-muted/40 px-4 py-3 [&>summary]:min-h-6 [&>summary]:cursor-pointer [&>summary]:font-semibold [&[open]>summary]:mb-3">
+                  <summary>{translate(locale, "seller.changeAddress")}</summary>
+                  <FieldDescription className="mb-4">
+                    {translate(
+                      locale,
+                      ["approved", "pending_address_change"].includes(participation.state)
+                        ? "seller.changeAddressReview"
+                        : "seller.changeAddressHelp",
+                    )}
+                  </FieldDescription>
+                  <SellerAddressForm
+                    call={call}
+                    eventBoundary={event.boundary}
+                    eventId={eventId}
+                    idPrefix="change"
+                    initial={participation.location}
+                    key={participation.version}
+                    locale={locale}
+                    onSubmit={changeAddress}
+                    submitLabel={translate(locale, "seller.saveAddress")}
+                  />
+                </details>
+              ) : null}
+              {!closed ? (
+                <div>
+                  <Button
+                    disabled={busy}
+                    onClick={() => void withdraw()}
+                    type="button"
+                    variant="outline"
+                  >
+                    {translate(locale, "seller.withdraw")}
+                  </Button>
+                </div>
+              ) : null}
+            </CardContent>
+          </section>
+        </Card>
       ) : null}
       {participation && !closed && !["ended", "cancelled", "archived"].includes(event.state) ? (
         <SellerListingEditor
@@ -271,48 +299,58 @@ export function SellerJoinContent({ locale }: { readonly locale: Locale }) {
         />
       ) : null}
       {participation ? null : inviteId || event.registrationOpen ? (
-        <section aria-labelledby="apply-heading" className="panel">
-          <h2 id="apply-heading">
-            {translate(locale, inviteId ? "sellerInvite.acceptTitle" : "seller.applyTitle")}
-          </h2>
-          <p>{translate(locale, "seller.applyIntro")}</p>
-          {event.placesFull ? (
-            <p className="notice">{translate(locale, "seller.placesFull")}</p>
-          ) : null}
-          <SellerAddressForm
-            call={call}
-            eventBoundary={event.boundary}
-            eventId={eventId}
-            idPrefix="seller"
-            locale={locale}
-            onSubmit={inviteId ? acceptInvite : apply}
-            submitLabel={translate(locale, inviteId ? "sellerInvite.accept" : "seller.submit")}
-          >
-            <label htmlFor="seller-display-name">{translate(locale, "seller.publicName")}</label>
-            <input
-              aria-describedby="seller-display-name-help"
-              defaultValue={dashboard?.profile.displayName ?? ""}
-              id="seller-display-name"
-              maxLength={80}
-              name="displayName"
-              required
-            />
-            <p className="field-help" id="seller-display-name-help">
-              {translate(locale, "seller.publicNameHelp")}
-            </p>
-          </SellerAddressForm>
-        </section>
+        <Card asChild>
+          <section aria-labelledby="apply-heading">
+            <CardHeader>
+              <CardTitle id="apply-heading">
+                {translate(locale, inviteId ? "sellerInvite.acceptTitle" : "seller.applyTitle")}
+              </CardTitle>
+              <p className="text-muted-foreground">{translate(locale, "seller.applyIntro")}</p>
+            </CardHeader>
+            <CardContent>
+              {event.placesFull ? (
+                <Alert variant="warning">{translate(locale, "seller.placesFull")}</Alert>
+              ) : null}
+              <SellerAddressForm
+                call={call}
+                eventBoundary={event.boundary}
+                eventId={eventId}
+                idPrefix="seller"
+                locale={locale}
+                onSubmit={inviteId ? acceptInvite : apply}
+                submitLabel={translate(locale, inviteId ? "sellerInvite.accept" : "seller.submit")}
+              >
+                <Field>
+                  <Label htmlFor="seller-display-name">
+                    {translate(locale, "seller.publicName")}
+                  </Label>
+                  <Input
+                    aria-describedby="seller-display-name-help"
+                    defaultValue={dashboard?.profile.displayName ?? ""}
+                    id="seller-display-name"
+                    maxLength={80}
+                    name="displayName"
+                    required
+                  />
+                  <FieldDescription id="seller-display-name-help">
+                    {translate(locale, "seller.publicNameHelp")}
+                  </FieldDescription>
+                </Field>
+              </SellerAddressForm>
+            </CardContent>
+          </section>
+        </Card>
       ) : (
-        <p className="notice">
+        <Alert>
           {translate(
             locale,
             event.admissionMode === "invite_only" ? "seller.inviteOnly" : "seller.closed",
           )}
-        </p>
+        </Alert>
       )}
-      <p aria-live="polite" className="form-status">
+      <p aria-live="polite" className="min-h-6 text-sm font-semibold">
         {status}
       </p>
-    </main>
+    </PageMain>
   );
 }

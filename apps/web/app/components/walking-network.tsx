@@ -11,6 +11,14 @@ import MapView, { Layer, type MapLayerMouseEvent, Source } from "react-map-gl/ma
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getPromenadisApiClient } from "../lib/supabase";
 import { DEFAULT_CENTER, MAP_STYLE, MapErrorBoundary } from "./boundary-editor";
+import { SummaryList } from "./page";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Checkbox } from "./ui/checkbox";
+import { ChoiceField, Field, FieldGroup } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 const errorKeys: Record<string, MessageKey> = {
   boundary_required: "walking.error.boundary",
@@ -161,231 +169,317 @@ export function WalkingNetwork({
   };
 
   if (!routing) {
-    return <p aria-live="polite">{status || translate(locale, "common.loading")}</p>;
+    return (
+      <p aria-live="polite" className="text-muted-foreground">
+        {status || translate(locale, "common.loading")}
+      </p>
+    );
   }
 
   return (
-    <div className="form-stack">
-      <section aria-labelledby="walking-status" className="panel">
-        <h2 id="walking-status">{translate(locale, "walking.status")}</h2>
-        <p>
-          <span className="status-pill status-pill-muted">
-            {translate(locale, routing.ready ? "walking.ready" : "walking.notReady")}
-          </span>
-        </p>
-        {latest ? (
-          <dl className="summary-list">
-            <div>
-              <dt>{translate(locale, "walking.latestBuild")}</dt>
-              <dd>{translate(locale, `walking.state.${latest.state}`)}</dd>
-            </div>
-            <div>
-              <dt>{translate(locale, "walking.graph")}</dt>
-              <dd>
-                {latest.nodeCount ?? 0} {translate(locale, "walking.nodes")} ·{" "}
-                {latest.edgeCount ?? 0} {translate(locale, "walking.edges")} ·{" "}
-                {latest.componentCount ?? 0} {translate(locale, "walking.components")}
-              </dd>
-            </div>
-            <div>
-              <dt>{translate(locale, "walking.source")}</dt>
-              <dd>
-                {String(latest.source.name ?? "")} · {String(latest.source.license ?? "")} ·{" "}
-                {String(latest.source.attribution ?? "")}
-              </dd>
-            </div>
-            {latest.warnings.length > 0 ? (
-              <div>
-                <dt>{translate(locale, "walking.warnings")}</dt>
-                <dd>{latest.warnings.join(", ")}</dd>
+    <div className="grid gap-5">
+      <Card aria-labelledby="walking-status" asChild>
+        <section>
+          <CardHeader>
+            <CardTitle id="walking-status">{translate(locale, "walking.status")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>
+              <Badge variant={routing.ready ? "success" : "secondary"}>
+                {translate(locale, routing.ready ? "walking.ready" : "walking.notReady")}
+              </Badge>
+            </p>
+            {latest ? (
+              <SummaryList>
+                <div>
+                  <dt>{translate(locale, "walking.latestBuild")}</dt>
+                  <dd>{translate(locale, `walking.state.${latest.state}`)}</dd>
+                </div>
+                <div>
+                  <dt>{translate(locale, "walking.graph")}</dt>
+                  <dd>
+                    {latest.nodeCount ?? 0} {translate(locale, "walking.nodes")} ·{" "}
+                    {latest.edgeCount ?? 0} {translate(locale, "walking.edges")} ·{" "}
+                    {latest.componentCount ?? 0} {translate(locale, "walking.components")}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{translate(locale, "walking.source")}</dt>
+                  <dd className="break-words">
+                    {String(latest.source.name ?? "")} · {String(latest.source.license ?? "")} ·{" "}
+                    {String(latest.source.attribution ?? "")}
+                  </dd>
+                </div>
+                {latest.warnings.length > 0 ? (
+                  <div>
+                    <dt>{translate(locale, "walking.warnings")}</dt>
+                    <dd>{latest.warnings.join(", ")}</dd>
+                  </div>
+                ) : null}
+              </SummaryList>
+            ) : (
+              <p className="text-muted-foreground">{translate(locale, "walking.noBuild")}</p>
+            )}
+            {canEdit ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  disabled={busy}
+                  onClick={() => void run((api, token) => api.buildEventRouting(token, event.id))}
+                  type="button"
+                >
+                  {translate(locale, "walking.build")}
+                </Button>
+                {latest?.state === "awaiting_host_preview" ? (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void run((api, token) => api.confirmRoutingBuild(token, event.id, latest.id))
+                    }
+                    type="button"
+                    variant="outline"
+                  >
+                    {translate(locale, "walking.confirm")}
+                  </Button>
+                ) : null}
               </div>
-            ) : null}
-          </dl>
-        ) : (
-          <p>{translate(locale, "walking.noBuild")}</p>
-        )}
-        {canEdit ? (
-          <div className="button-row">
-            <button
-              className="primary-button"
-              disabled={busy}
-              onClick={() => void run((api, token) => api.buildEventRouting(token, event.id))}
-              type="button"
-            >
-              {translate(locale, "walking.build")}
-            </button>
-            {latest?.state === "awaiting_host_preview" ? (
-              <button
-                className="secondary-button"
-                disabled={busy}
-                onClick={() =>
-                  void run((api, token) => api.confirmRoutingBuild(token, event.id, latest.id))
-                }
-                type="button"
-              >
-                {translate(locale, "walking.confirm")}
-              </button>
-            ) : null}
-          </div>
-        ) : (
-          <p className="field-hint">{translate(locale, "walking.inspectOnly")}</p>
-        )}
-        <p aria-live="polite" role="status">
-          {status}
-        </p>
-      </section>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {translate(locale, "walking.inspectOnly")}
+              </p>
+            )}
+            <p aria-live="polite" className="min-h-6 text-sm font-semibold" role="status">
+              {status}
+            </p>
+          </CardContent>
+        </section>
+      </Card>
 
       {lines ? (
-        <section aria-label={translate(locale, "walking.mapLabel")} className="boundary-map">
-          {mounted ? (
-            <MapErrorBoundary
-              fallback={
-                <p className="map-fallback">{translate(locale, "boundary.mapUnavailable")}</p>
-              }
-            >
-              <MapView
-                initialViewState={{ latitude: center[1], longitude: center[0], zoom: 15 }}
-                interactiveLayerIds={["walking-edges"]}
-                mapStyle={MAP_STYLE}
-                onClick={(mapEvent: MapLayerMouseEvent) => {
-                  const key = mapEvent.features?.[0]?.properties?.key;
-                  if (typeof key === "string" && !key.startsWith("c:")) setEdgeKey(key);
-                }}
+        <section aria-label={translate(locale, "walking.mapLabel")} className="grid gap-2">
+          <div className="h-[clamp(20rem,55vw,34rem)] overflow-hidden rounded-2xl border border-input bg-[#e7eadc]">
+            {mounted ? (
+              <MapErrorBoundary
+                fallback={
+                  <p className="m-8 max-w-xl rounded-lg bg-card p-4">
+                    {translate(locale, "boundary.mapUnavailable")}
+                  </p>
+                }
               >
-                <Source data={lines} id="walking-network" type="geojson">
-                  <Layer
-                    id="walking-edges"
-                    paint={{
-                      "line-color": ["case", ["get", "connector"], "#bd5b35", "#2e6b4f"],
-                      "line-width": 3,
-                    }}
-                    type="line"
-                  />
-                </Source>
-              </MapView>
-            </MapErrorBoundary>
-          ) : null}
-          <p className="field-hint">{translate(locale, "walking.mapHint")}</p>
+                <MapView
+                  initialViewState={{ latitude: center[1], longitude: center[0], zoom: 15 }}
+                  interactiveLayerIds={["walking-edges"]}
+                  mapStyle={MAP_STYLE}
+                  onClick={(mapEvent: MapLayerMouseEvent) => {
+                    const key = mapEvent.features?.[0]?.properties?.key;
+                    if (typeof key === "string" && !key.startsWith("c:")) setEdgeKey(key);
+                  }}
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <Source data={lines} id="walking-network" type="geojson">
+                    <Layer
+                      id="walking-edges"
+                      paint={{
+                        "line-color": ["case", ["get", "connector"], "#bd5b35", "#2e6b4f"],
+                        "line-width": 3,
+                      }}
+                      type="line"
+                    />
+                  </Source>
+                </MapView>
+              </MapErrorBoundary>
+            ) : null}
+          </div>
+          <p className="text-sm text-muted-foreground">{translate(locale, "walking.mapHint")}</p>
         </section>
       ) : null}
 
       {latest ? (
-        <section aria-labelledby="walking-locations" className="panel">
-          <h2 id="walking-locations">{translate(locale, "walking.locations")}</h2>
-          {latest.locations.length === 0 ? <p>{translate(locale, "walking.noLocations")}</p> : null}
-          <ul className="stop-list">
-            {latest.locations.map((location) => (
-              <li className="review-item" key={location.id}>
-                <h3>{location.sellerNames.join(", ") || location.id}</h3>
-                <p>
-                  <span className="status-pill status-pill-muted">
-                    {translate(locale, `walking.location.${location.status}`)}
-                  </span>{" "}
-                  {location.snapMeters !== null
-                    ? `${location.snapMeters} m ${translate(locale, "walking.toPath")}`
-                    : ""}
-                  {location.detourRatio !== null && location.detourRatio > 3
-                    ? ` · ${translate(locale, "walking.detour")}`
-                    : ""}
-                </p>
-                {canEdit && location.status === "disconnected" ? (
-                  <form
-                    className="form-panel"
-                    onSubmit={(formEvent) => markManual(location.id, formEvent)}
-                  >
-                    <label htmlFor={`manual-${location.id}`}>
-                      {translate(locale, "walking.reason")}
-                    </label>
-                    <input
-                      id={`manual-${location.id}`}
-                      maxLength={500}
-                      minLength={3}
-                      name="reason"
-                      required
-                    />
-                    <button className="secondary-button" disabled={busy} type="submit">
-                      {translate(locale, "walking.markManual")}
-                    </button>
-                  </form>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
+        <Card aria-labelledby="walking-locations" asChild>
+          <section>
+            <CardHeader>
+              <CardTitle id="walking-locations">{translate(locale, "walking.locations")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {latest.locations.length === 0 ? (
+                <p className="text-muted-foreground">{translate(locale, "walking.noLocations")}</p>
+              ) : null}
+              <ul className="m-0 grid list-none divide-y p-0">
+                {latest.locations.map((location) => (
+                  <li className="grid gap-3 py-4 first:pt-0 last:pb-0" key={location.id}>
+                    <h3 className="text-lg font-bold break-words">
+                      {location.sellerNames.join(", ") || location.id}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      <Badge
+                        variant={location.status === "disconnected" ? "destructive" : "secondary"}
+                      >
+                        {translate(locale, `walking.location.${location.status}`)}
+                      </Badge>{" "}
+                      {location.snapMeters !== null
+                        ? `${location.snapMeters} m ${translate(locale, "walking.toPath")}`
+                        : ""}
+                      {location.detourRatio !== null && location.detourRatio > 3
+                        ? ` · ${translate(locale, "walking.detour")}`
+                        : ""}
+                    </p>
+                    {canEdit && location.status === "disconnected" ? (
+                      <form
+                        className="flex max-w-xl flex-wrap items-end gap-3"
+                        onSubmit={(formEvent) => markManual(location.id, formEvent)}
+                      >
+                        <Field className="min-w-0 flex-1 basis-56">
+                          <Label htmlFor={`manual-${location.id}`}>
+                            {translate(locale, "walking.reason")}
+                          </Label>
+                          <Input
+                            id={`manual-${location.id}`}
+                            maxLength={500}
+                            minLength={3}
+                            name="reason"
+                            required
+                          />
+                        </Field>
+                        <Button disabled={busy} type="submit" variant="outline">
+                          {translate(locale, "walking.markManual")}
+                        </Button>
+                      </form>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </section>
+        </Card>
       ) : null}
 
       {canEdit ? (
         <>
-          <form className="panel form-panel" onSubmit={submitBlock}>
-            <h2>{translate(locale, "walking.blockTitle")}</h2>
-            <p className="field-hint">
-              {translate(locale, live ? "walking.blockLiveHint" : "walking.blockHint")}
-            </p>
-            <label htmlFor="block-edge">{translate(locale, "walking.edgeKey")}</label>
-            <input
-              id="block-edge"
-              name="edgeKey"
-              onChange={(changeEvent) => setEdgeKey(changeEvent.currentTarget.value)}
-              pattern="[0-9]+-[0-9]+"
-              required
-              value={edgeKey}
-            />
-            <label htmlFor="block-reason">{translate(locale, "walking.reason")}</label>
-            <input id="block-reason" maxLength={500} minLength={3} name="reason" required />
-            <button className="secondary-button" disabled={busy} type="submit">
-              {translate(locale, "walking.block")}
-            </button>
-          </form>
-          {live ? null : (
-            <form className="panel form-panel" onSubmit={submitConnector}>
-              <h2>{translate(locale, "walking.connectorTitle")}</h2>
-              <p className="field-hint">{translate(locale, "walking.connectorHint")}</p>
-              <label htmlFor="connector-from">{translate(locale, "walking.connectorFrom")}</label>
-              <input id="connector-from" name="from" placeholder="18.0612, 59.3121" required />
-              <label htmlFor="connector-to">{translate(locale, "walking.connectorTo")}</label>
-              <input id="connector-to" name="to" placeholder="18.0615, 59.3123" required />
-              <label htmlFor="connector-reason">{translate(locale, "walking.reason")}</label>
-              <input id="connector-reason" maxLength={500} minLength={3} name="reason" required />
-              <label className="checkbox-field">
-                <input name="attested" required type="checkbox" />
-                <span>{translate(locale, "walking.attest")}</span>
-              </label>
-              <button className="secondary-button" disabled={busy} type="submit">
-                {translate(locale, "walking.addConnector")}
-              </button>
+          <Card asChild>
+            <form onSubmit={submitBlock}>
+              <CardHeader>
+                <CardTitle>{translate(locale, "walking.blockTitle")}</CardTitle>
+                <CardDescription>
+                  {translate(locale, live ? "walking.blockLiveHint" : "walking.blockHint")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FieldGroup className="max-w-xl">
+                  <Field>
+                    <Label htmlFor="block-edge">{translate(locale, "walking.edgeKey")}</Label>
+                    <Input
+                      id="block-edge"
+                      name="edgeKey"
+                      onChange={(changeEvent) => setEdgeKey(changeEvent.currentTarget.value)}
+                      pattern="[0-9]+-[0-9]+"
+                      required
+                      value={edgeKey}
+                    />
+                  </Field>
+                  <Field>
+                    <Label htmlFor="block-reason">{translate(locale, "walking.reason")}</Label>
+                    <Input id="block-reason" maxLength={500} minLength={3} name="reason" required />
+                  </Field>
+                </FieldGroup>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button disabled={busy} type="submit" variant="outline">
+                    {translate(locale, "walking.block")}
+                  </Button>
+                </div>
+              </CardContent>
             </form>
+          </Card>
+          {live ? null : (
+            <Card asChild>
+              <form onSubmit={submitConnector}>
+                <CardHeader>
+                  <CardTitle>{translate(locale, "walking.connectorTitle")}</CardTitle>
+                  <CardDescription>{translate(locale, "walking.connectorHint")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FieldGroup className="max-w-xl">
+                    <Field>
+                      <Label htmlFor="connector-from">
+                        {translate(locale, "walking.connectorFrom")}
+                      </Label>
+                      <Input
+                        id="connector-from"
+                        name="from"
+                        placeholder="18.0612, 59.3121"
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <Label htmlFor="connector-to">
+                        {translate(locale, "walking.connectorTo")}
+                      </Label>
+                      <Input id="connector-to" name="to" placeholder="18.0615, 59.3123" required />
+                    </Field>
+                    <Field>
+                      <Label htmlFor="connector-reason">
+                        {translate(locale, "walking.reason")}
+                      </Label>
+                      <Input
+                        id="connector-reason"
+                        maxLength={500}
+                        minLength={3}
+                        name="reason"
+                        required
+                      />
+                    </Field>
+                    <ChoiceField>
+                      <Checkbox name="attested" required />
+                      <span>{translate(locale, "walking.attest")}</span>
+                    </ChoiceField>
+                  </FieldGroup>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button disabled={busy} type="submit" variant="outline">
+                      {translate(locale, "walking.addConnector")}
+                    </Button>
+                  </div>
+                </CardContent>
+              </form>
+            </Card>
           )}
         </>
       ) : null}
 
       {routing.overrides.length > 0 ? (
-        <section aria-labelledby="walking-overrides" className="panel">
-          <h2 id="walking-overrides">{translate(locale, "walking.overrides")}</h2>
-          <ul className="stop-list">
-            {routing.overrides.map((override) => (
-              <li className="review-item" key={override.id}>
-                <p>
-                  <strong>{translate(locale, `walking.override.${override.kind}`)}</strong>
-                  {override.edgeKey ? ` · ${override.edgeKey}` : ""} · {override.reason}
-                </p>
-                {canEdit ? (
-                  <button
-                    className="quiet-button"
-                    disabled={busy}
-                    onClick={() =>
-                      void run((api, token) =>
-                        api.removeRoutingOverride(token, event.id, override.id),
-                      )
-                    }
-                    type="button"
+        <Card aria-labelledby="walking-overrides" asChild>
+          <section>
+            <CardHeader>
+              <CardTitle id="walking-overrides">{translate(locale, "walking.overrides")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="m-0 grid list-none divide-y p-0">
+                {routing.overrides.map((override) => (
+                  <li
+                    className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"
+                    key={override.id}
                   >
-                    {translate(locale, "walking.remove")}
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
+                    <p className="min-w-0 break-words">
+                      <strong>{translate(locale, `walking.override.${override.kind}`)}</strong>
+                      {override.edgeKey ? ` · ${override.edgeKey}` : ""} · {override.reason}
+                    </p>
+                    {canEdit ? (
+                      <Button
+                        disabled={busy}
+                        onClick={() =>
+                          void run((api, token) =>
+                            api.removeRoutingOverride(token, event.id, override.id),
+                          )
+                        }
+                        type="button"
+                        variant="link"
+                      >
+                        {translate(locale, "walking.remove")}
+                      </Button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </section>
+        </Card>
       ) : null}
     </div>
   );

@@ -1,9 +1,15 @@
-import { useExpectedAccountId } from "../lib/account-session";
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useEffect, useState } from "react";
-import { getPromenadisApiClient, getBrowserAuthClient } from "../lib/supabase";
+import { useExpectedAccountId } from "../lib/account-session";
+import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Field, FieldDescription } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 
 export function EventControls({
   event,
@@ -92,90 +98,102 @@ export function EventControls({
   };
 
   return (
-    <section aria-labelledby="event-controls-heading" className="event-controls">
-      <div>
-        <h2 id="event-controls-heading">{translate(locale, "event.controls")}</h2>
-        <p className="field-help">{translate(locale, "event.controlsHelp")}</p>
-      </div>
+    <Card asChild>
+      <section aria-labelledby="event-controls-heading">
+        <CardHeader>
+          <CardTitle id="event-controls-heading">{translate(locale, "event.controls")}</CardTitle>
+          <CardDescription>{translate(locale, "event.controlsHelp")}</CardDescription>
+        </CardHeader>
 
-      <form
-        className="visibility-form"
-        onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
-          formEvent.preventDefault();
-          void saveVisibility();
-        }}
-      >
-        <label className="event-control-label" htmlFor="event-visibility">
-          {translate(locale, "dashboard.visibility")}
-        </label>
-        <div className="inline-control">
-          <select
-            disabled={busyAction !== null}
-            id="event-visibility"
-            onChange={(inputEvent) =>
-              setVisibility(inputEvent.currentTarget.value as typeof visibility)
-            }
-            value={visibility}
+        <CardContent className="gap-6">
+          <form
+            className="grid gap-2"
+            onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
+              formEvent.preventDefault();
+              void saveVisibility();
+            }}
           >
-            <option value="public">{translate(locale, "visibility.public")}</option>
-            <option value="unlisted">{translate(locale, "visibility.unlisted")}</option>
-          </select>
-          <button
-            className="secondary-button"
-            disabled={busyAction !== null || visibility === event.visibility}
-            type="submit"
-          >
-            {busyAction === "visibility"
-              ? translate(locale, "common.saving")
-              : translate(locale, "event.saveVisibility")}
-          </button>
-        </div>
-        <p className="field-help">
-          {visibility === "unlisted"
-            ? translate(locale, "event.unlistedHelp")
-            : translate(locale, "event.publicHelp")}
-        </p>
-      </form>
-
-      {event.role === "owner" ? (
-        <details className="danger-zone">
-          <summary>{translate(locale, "event.deleteDraft")}</summary>
-          <div className="danger-zone-body">
-            <p>{translate(locale, "event.deleteHelp")}</p>
-            <form
-              onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
-                formEvent.preventDefault();
-                void deleteDraft();
-              }}
-            >
-              <label className="event-control-label" htmlFor="confirm-event-title">
-                {translate(locale, "event.deleteConfirmation")}
-              </label>
-              <input
-                autoComplete="off"
-                id="confirm-event-title"
-                onChange={(inputEvent) => setConfirmTitle(inputEvent.currentTarget.value)}
-                placeholder={event.title}
-                required
-                value={confirmTitle}
-              />
-              <button
-                className="danger-button"
-                disabled={busyAction !== null || confirmTitle.trim() !== event.title}
+            <Label htmlFor="event-visibility">{translate(locale, "dashboard.visibility")}</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="w-full sm:w-64">
+                <NativeSelect
+                  disabled={busyAction !== null}
+                  id="event-visibility"
+                  onChange={(inputEvent) =>
+                    setVisibility(inputEvent.currentTarget.value as typeof visibility)
+                  }
+                  value={visibility}
+                >
+                  <NativeSelectOption value="public">
+                    {translate(locale, "visibility.public")}
+                  </NativeSelectOption>
+                  <NativeSelectOption value="unlisted">
+                    {translate(locale, "visibility.unlisted")}
+                  </NativeSelectOption>
+                </NativeSelect>
+              </div>
+              <Button
+                disabled={busyAction !== null || visibility === event.visibility}
                 type="submit"
+                variant="outline"
               >
-                {busyAction === "delete"
-                  ? translate(locale, "event.deletingDraft")
-                  : translate(locale, "event.confirmDelete")}
-              </button>
-            </form>
-          </div>
-        </details>
-      ) : null}
+                {busyAction === "visibility"
+                  ? translate(locale, "common.saving")
+                  : translate(locale, "event.saveVisibility")}
+              </Button>
+            </div>
+            <FieldDescription>
+              {visibility === "unlisted"
+                ? translate(locale, "event.unlistedHelp")
+                : translate(locale, "event.publicHelp")}
+            </FieldDescription>
+          </form>
 
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </section>
+          {event.role === "owner" ? (
+            <details className="border-t pt-5 [&>summary]:min-h-11 [&>summary]:cursor-pointer [&>summary]:font-semibold [&>summary]:text-destructive-foreground">
+              <summary>{translate(locale, "event.deleteDraft")}</summary>
+              <div className="mt-3 grid max-w-xl gap-3 rounded-xl border border-destructive/40 bg-destructive-soft p-4 text-destructive-foreground">
+                <p className="leading-relaxed">{translate(locale, "event.deleteHelp")}</p>
+                <form
+                  className="grid gap-3"
+                  onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
+                    formEvent.preventDefault();
+                    void deleteDraft();
+                  }}
+                >
+                  <Field>
+                    <Label htmlFor="confirm-event-title">
+                      {translate(locale, "event.deleteConfirmation")}
+                    </Label>
+                    <Input
+                      autoComplete="off"
+                      id="confirm-event-title"
+                      onChange={(inputEvent) => setConfirmTitle(inputEvent.currentTarget.value)}
+                      placeholder={event.title}
+                      required
+                      value={confirmTitle}
+                    />
+                  </Field>
+                  <Button
+                    className="justify-self-start"
+                    disabled={busyAction !== null || confirmTitle.trim() !== event.title}
+                    type="submit"
+                    variant="destructive"
+                  >
+                    {busyAction === "delete"
+                      ? translate(locale, "event.deletingDraft")
+                      : translate(locale, "event.confirmDelete")}
+                  </Button>
+                </form>
+              </div>
+            </details>
+          ) : null}
+
+          <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+            {status}
+          </p>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

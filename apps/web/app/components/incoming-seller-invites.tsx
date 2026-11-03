@@ -3,6 +3,7 @@ import { type Locale, translate } from "@promenadis/i18n";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 export function IncomingSellerInvites({
   accessToken,
@@ -33,19 +34,33 @@ export function IncomingSellerInvites({
 
   if (invites.length === 0) return null;
   return (
-    <section aria-labelledby="seller-invites-heading" className="panel">
-      <h2 id="seller-invites-heading">{translate(locale, "sellerInvite.incomingTitle")}</h2>
-      <ul className="resource-list">
-        {invites.map((invite) => (
-          <li key={invite.id}>
-            <strong>{invite.eventTitle}</strong>
-            <span>{invite.organizerDisplayName}</span>
-            <Link className="text-link" to={`/events/${invite.eventId}/join?invite=${invite.id}`}>
-              {translate(locale, "sellerInvite.respond")}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <Card asChild>
+      <section aria-labelledby="seller-invites-heading">
+        <CardHeader>
+          <CardTitle id="seller-invites-heading">
+            {translate(locale, "sellerInvite.incomingTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="m-0 grid list-none divide-y p-0">
+            {invites.map((invite) => (
+              <li
+                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-4 first:pt-0 last:pb-0"
+                key={invite.id}
+              >
+                <strong className="min-w-0 basis-full sm:basis-auto">{invite.eventTitle}</strong>
+                <span className="text-sm text-muted-foreground">{invite.organizerDisplayName}</span>
+                <Link
+                  className="font-semibold sm:ml-auto"
+                  to={`/events/${invite.eventId}/join?invite=${invite.id}`}
+                >
+                  {translate(locale, "sellerInvite.respond")}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </section>
+    </Card>
   );
 }

@@ -1,11 +1,20 @@
-import { useExpectedAccountId } from "../lib/account-session";
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { BoundaryPoint, DraftEventSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
 import { Component, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import MapView, { Layer, Source } from "react-map-gl/maplibre";
+import { useExpectedAccountId } from "../lib/account-session";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { getPromenadisApiClient, getBrowserAuthClient } from "../lib/supabase";
+import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
+import { cn } from "../lib/utils";
+import { Button } from "./ui/button";
+import { Field, FieldLegend, FieldSet } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
+
+const coordinateBox = "gap-3 rounded-xl border p-4";
+const coordinateLabel = "grid gap-1.5 text-sm font-semibold";
 
 export const DEFAULT_CENTER: BoundaryPoint = [18.0686, 59.3293];
 export const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
@@ -204,76 +213,85 @@ export function BoundaryEditor({
   };
 
   return (
-    <div className="boundary-editor">
+    <div className="grid gap-5">
       {events.length > 1 ? (
-        <>
-          <label htmlFor="boundary-event">{translate(locale, "boundary.event")}</label>
-          <select
+        <Field>
+          <Label htmlFor="boundary-event">{translate(locale, "boundary.event")}</Label>
+          <NativeSelect
             id="boundary-event"
             onChange={(event) => setSelectedEventId(event.currentTarget.value)}
             value={selectedEvent.id}
           >
             {events.map((event) => (
-              <option key={event.id} value={event.id}>
+              <NativeSelectOption key={event.id} value={event.id}>
                 {event.title}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-        </>
+          </NativeSelect>
+        </Field>
       ) : null}
 
-      <label htmlFor="boundary-label">{translate(locale, "boundary.displayLabel")}</label>
-      <input
-        id="boundary-label"
-        maxLength={120}
-        onChange={(event) => setDisplayLabel(event.currentTarget.value)}
-        placeholder={translate(locale, "boundary.displayLabelPlaceholder")}
-        value={displayLabel}
-      />
+      <Field>
+        <Label htmlFor="boundary-label">{translate(locale, "boundary.displayLabel")}</Label>
+        <Input
+          id="boundary-label"
+          maxLength={120}
+          onChange={(event) => setDisplayLabel(event.currentTarget.value)}
+          placeholder={translate(locale, "boundary.displayLabelPlaceholder")}
+          value={displayLabel}
+        />
+      </Field>
 
-      <div className="boundary-map-toolbar">
-        <p className="field-help">{translate(locale, "boundary.instructions")}</p>
-        <div className="boundary-map-actions">
-          <button
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <p className="max-w-prose text-sm text-muted-foreground">
+          {translate(locale, "boundary.instructions")}
+        </p>
+        <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <Button
             aria-pressed={addingOnMap}
-            className="secondary-button"
+            className="col-span-full w-full sm:w-auto"
             onClick={() => setAddingOnMap((current) => !current)}
             type="button"
           >
             {addingOnMap
               ? translate(locale, "boundary.stopAdding")
               : translate(locale, "boundary.addOnMap")}
-          </button>
-          <button
-            className="quiet-button"
+          </Button>
+          <Button
             disabled={ring.length === 0}
             onClick={() => {
               setRing((current) => current.slice(0, -1));
               setPointIds((current) => current.slice(0, -1));
             }}
             type="button"
+            variant="ghost"
           >
             {translate(locale, "boundary.undo")}
-          </button>
-          <button
-            className="quiet-button"
+          </Button>
+          <Button
             disabled={ring.length === 0}
             onClick={() => {
               setRing([]);
               setPointIds([]);
             }}
             type="button"
+            variant="ghost"
           >
             {translate(locale, "boundary.clear")}
-          </button>
+          </Button>
         </div>
       </div>
 
-      <section aria-label={translate(locale, "boundary.mapLabel")} className="boundary-map">
+      <section
+        aria-label={translate(locale, "boundary.mapLabel")}
+        className="h-[clamp(20rem,55vw,34rem)] overflow-hidden rounded-2xl border border-input bg-[#e7eadc]"
+      >
         {mounted ? (
           <MapErrorBoundary
             fallback={
-              <p className="map-fallback">{translate(locale, "boundary.mapUnavailable")}</p>
+              <p className="m-8 max-w-xl rounded-lg bg-card p-4">
+                {translate(locale, "boundary.mapUnavailable")}
+              </p>
             }
             key={selectedEvent.id}
           >
@@ -288,6 +306,7 @@ export function BoundaryEditor({
               onClick={({ lngLat }) => {
                 if (addingOnMap) addPoint([lngLat.lng, lngLat.lat]);
               }}
+              style={{ height: "100%", width: "100%" }}
             >
               {ring.length >= 2 ? (
                 <Source data={polygonData} id="draft-boundary" type="geojson">
@@ -322,46 +341,50 @@ export function BoundaryEditor({
         ) : null}
       </section>
 
-      <div className="boundary-save-row">
-        <p className="boundary-point-count">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="font-bold text-muted-foreground">
           {ring.length === 1
             ? translate(locale, "boundary.onePoint")
             : translate(locale, "boundary.pointCount").replace("{count}", String(ring.length))}
         </p>
-        <button
-          className="primary-button"
-          disabled={busy || ring.length < 3}
-          onClick={saveBoundary}
-          type="button"
-        >
+        <Button disabled={busy || ring.length < 3} onClick={saveBoundary} type="button">
           {busy ? translate(locale, "boundary.saving") : translate(locale, "boundary.save")}
-        </button>
+        </Button>
       </div>
       {selectedEvent.boundary?.warnings.length ? (
-        <ul className="notice notice-warning">
+        <ul className="grid max-w-2xl list-disc gap-1 rounded-xl border border-sun/60 bg-warning-soft py-3 ps-8 pe-4 text-sm text-warning-foreground">
           {selectedEvent.boundary.warnings.map((warning) => (
             <li key={warning}>{translate(locale, `boundary.warning.${warning}`)}</li>
           ))}
         </ul>
       ) : null}
-      <p aria-live="polite" className="form-status">
+      <p aria-live="polite" className="min-h-6 text-sm font-semibold">
         {status}
       </p>
 
-      <details className="advanced-editor">
+      <details className="mt-2 border-t pt-5 [&>summary]:min-h-11 [&>summary]:cursor-pointer [&>summary]:content-center [&>summary]:font-semibold">
         <summary>{translate(locale, "boundary.advanced")}</summary>
-        <p className="field-help">{translate(locale, "boundary.advancedHelp")}</p>
-        <div className="advanced-editor-content">
-          <fieldset className="boundary-points">
-            <legend>{translate(locale, "boundary.points")}</legend>
-            {ring.length === 0 ? <p>{translate(locale, "boundary.noPoints")}</p> : null}
-            <ol>
+        <p className="mt-3 max-w-prose text-sm text-muted-foreground">
+          {translate(locale, "boundary.advancedHelp")}
+        </p>
+        <div className="mt-4 grid gap-4">
+          <FieldSet className={coordinateBox}>
+            <FieldLegend className="px-1.5">{translate(locale, "boundary.points")}</FieldLegend>
+            {ring.length === 0 ? (
+              <p className="text-muted-foreground">{translate(locale, "boundary.noPoints")}</p>
+            ) : null}
+            <ol className="m-0 grid list-none gap-3 p-0">
               {ring.map((point, index) => (
-                <li key={pointIds[index]}>
-                  <span className="point-number">{index + 1}</span>
-                  <label>
+                <li
+                  className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-xl bg-muted p-3 sm:grid-cols-[auto_repeat(2,minmax(0,1fr))]"
+                  key={pointIds[index]}
+                >
+                  <span className="grid size-8 place-items-center rounded-full bg-primary font-extrabold text-primary-foreground">
+                    {index + 1}
+                  </span>
+                  <label className={coordinateLabel}>
                     {translate(locale, "boundary.longitude")}
-                    <input
+                    <Input
                       aria-label={`${translate(locale, "boundary.longitude")} ${index + 1}`}
                       max="180"
                       min="-180"
@@ -371,9 +394,9 @@ export function BoundaryEditor({
                       value={point[0]}
                     />
                   </label>
-                  <label>
+                  <label className={cn(coordinateLabel, "col-start-2 sm:col-start-auto")}>
                     {translate(locale, "boundary.latitude")}
-                    <input
+                    <Input
                       aria-label={`${translate(locale, "boundary.latitude")} ${index + 1}`}
                       max="90"
                       min="-90"
@@ -383,67 +406,86 @@ export function BoundaryEditor({
                       value={point[1]}
                     />
                   </label>
-                  <div className="point-actions">
-                    <button
+                  <div className="col-start-2 flex flex-wrap gap-2 sm:col-end-[-1]">
+                    <Button
                       disabled={index === 0}
                       onClick={() => movePoint(index, -1)}
+                      size="sm"
                       type="button"
+                      variant="outline"
                     >
                       {translate(locale, "boundary.moveUp")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       disabled={index === ring.length - 1}
                       onClick={() => movePoint(index, 1)}
+                      size="sm"
                       type="button"
+                      variant="outline"
                     >
                       {translate(locale, "boundary.moveDown")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => {
                         setRing((current) => current.filter((_, item) => item !== index));
                         setPointIds((current) => current.filter((_, item) => item !== index));
                       }}
+                      size="sm"
                       type="button"
+                      variant="outline"
                     >
                       {translate(locale, "boundary.remove")}
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}
             </ol>
-          </fieldset>
+          </FieldSet>
 
-          <fieldset className="add-coordinate">
-            <legend>{translate(locale, "boundary.addCoordinate")}</legend>
-            <label htmlFor="new-boundary-longitude">
-              {translate(locale, "boundary.longitude")}
-            </label>
-            <input
-              id="new-boundary-longitude"
-              max="180"
-              min="-180"
-              onChange={(event) => setLongitude(event.currentTarget.value)}
-              step="0.000001"
-              type="number"
-              value={longitude}
-            />
-            <label htmlFor="new-boundary-latitude">{translate(locale, "boundary.latitude")}</label>
-            <input
-              id="new-boundary-latitude"
-              max="90"
-              min="-90"
-              onChange={(event) => setLatitude(event.currentTarget.value)}
-              step="0.000001"
-              type="number"
-              value={latitude}
-            />
-            <button className="secondary-button" onClick={addStructuredPoint} type="button">
+          <FieldSet className={cn(coordinateBox, "sm:grid-cols-2")}>
+            <FieldLegend className="px-1.5">
+              {translate(locale, "boundary.addCoordinate")}
+            </FieldLegend>
+            <Field>
+              <Label htmlFor="new-boundary-longitude">
+                {translate(locale, "boundary.longitude")}
+              </Label>
+              <Input
+                id="new-boundary-longitude"
+                max="180"
+                min="-180"
+                onChange={(event) => setLongitude(event.currentTarget.value)}
+                step="0.000001"
+                type="number"
+                value={longitude}
+              />
+            </Field>
+            <Field>
+              <Label htmlFor="new-boundary-latitude">
+                {translate(locale, "boundary.latitude")}
+              </Label>
+              <Input
+                id="new-boundary-latitude"
+                max="90"
+                min="-90"
+                onChange={(event) => setLatitude(event.currentTarget.value)}
+                step="0.000001"
+                type="number"
+                value={latitude}
+              />
+            </Field>
+            <Button
+              className="justify-self-start sm:col-span-full"
+              onClick={addStructuredPoint}
+              type="button"
+              variant="outline"
+            >
               {translate(locale, "boundary.addPoint")}
-            </button>
-          </fieldset>
+            </Button>
+          </FieldSet>
 
           {selectedEvent.boundary ? (
-            <p className="boundary-metrics">
+            <p className="font-bold">
               {translate(locale, "boundary.currentMetrics")}:{" "}
               {selectedEvent.boundary.areaSquareKilometers.toFixed(2)} km² ·{" "}
               {selectedEvent.boundary.spanKilometers.toFixed(2)} km · v

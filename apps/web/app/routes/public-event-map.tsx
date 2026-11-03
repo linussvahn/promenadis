@@ -1,5 +1,6 @@
 import { translate } from "@promenadis/i18n";
 import { data, Link } from "react-router";
+import { backLink, PageHeading } from "../components/page";
 import { PublicEventMap } from "../components/public-event-map";
 import { PublicShell } from "../components/public-pages";
 import { loadPublic, noIndexHeaders } from "../lib/public-api.server";
@@ -33,14 +34,15 @@ export default function PublicEventMapRoute({ loaderData }: Route.ComponentProps
   return (
     <PublicShell>
       {(locale) => (
-        <section aria-labelledby="map-title" className="public-event">
-          <p>
-            <Link className="text-link" to={landing}>
-              ← {translate(locale, "map.back")}
-            </Link>
-          </p>
-          <h1 id="map-title">{event.title}</h1>
-          <p className="lede">{translate(locale, "map.title")}</p>
+        <section aria-labelledby="map-title" className="grid gap-4">
+          <Link className={backLink} to={landing}>
+            ← {translate(locale, "map.back")}
+          </Link>
+          <PageHeading
+            description={translate(locale, "map.title")}
+            title={event.title}
+            titleId="map-title"
+          />
           <PublicEventMap eventKey={event.publicKey} locale={locale} route={route} />
         </section>
       )}

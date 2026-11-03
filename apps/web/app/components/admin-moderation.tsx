@@ -7,6 +7,17 @@ import type {
 } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { Alert } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Field } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+
+/** A queue item inside an admin card; the card's dividers separate rows. */
+const row = "grid gap-3 py-5 first:pt-0 last:pb-0";
+const rowForm = "grid max-w-xl gap-4";
 
 type ApiClient = ReturnType<typeof createPromenadisApiClient>;
 type Call = () => Promise<{ api: ApiClient; token: string } | null>;
@@ -75,221 +86,290 @@ export function AdminModeration({
 
   return (
     <>
-      <section aria-labelledby="appeals-heading" className="panel">
-        <h2 id="appeals-heading">{translate(locale, "adminModeration.appeals")}</h2>
-        {appeals.length === 0 ? <p>{translate(locale, "adminModeration.noAppeals")}</p> : null}
-        {appeals.map((item) => (
-          <article className="review-item" key={item.id}>
-            <h3>
-              {item.eventTitle}: {item.action}
-            </h3>
-            <p className="field-help">{item.actionReason}</p>
-            <blockquote>{item.statement}</blockquote>
-            {item.ownDecision ? (
-              <p className="notice">{translate(locale, "adminModeration.ownDecision")}</p>
+      <Card aria-labelledby="appeals-heading" asChild>
+        <section>
+          <CardHeader>
+            <CardTitle id="appeals-heading">
+              {translate(locale, "adminModeration.appeals")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="gap-0 divide-y">
+            {appeals.length === 0 ? (
+              <p className="text-muted-foreground">
+                {translate(locale, "adminModeration.noAppeals")}
+              </p>
             ) : null}
+            {appeals.map((item) => (
+              <article className={row} key={item.id}>
+                <h3 className="text-lg font-bold">
+                  {item.eventTitle}: {item.action}
+                </h3>
+                <p className="text-sm text-muted-foreground">{item.actionReason}</p>
+                <blockquote className="border-s-4 border-primary/40 ps-4 italic">
+                  {item.statement}
+                </blockquote>
+                {item.ownDecision ? (
+                  <Alert>{translate(locale, "adminModeration.ownDecision")}</Alert>
+                ) : null}
+                <form
+                  className={rowForm}
+                  onSubmit={(formEvent) => {
+                    formEvent.preventDefault();
+                    const submitter = (formEvent.nativeEvent as SubmitEvent)
+                      .submitter as HTMLButtonElement | null;
+                    const reason = reasonFrom(formEvent);
+                    void run(async ({ api, token }) => {
+                      setAppeals(
+                        await api.decideAppeal(token, item.id, {
+                          decision: submitter?.value === "reverse" ? "reverse" : "uphold",
+                          reason,
+                        }),
+                      );
+                    });
+                  }}
+                >
+                  <Field>
+                    <Label htmlFor={`appeal-reason-${item.id}`}>
+                      {translate(locale, "cases.reason")}
+                    </Label>
+                    <Textarea
+                      id={`appeal-reason-${item.id}`}
+                      maxLength={500}
+                      name="reason"
+                      required
+                    />
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button type="submit" value="reverse">
+                      {translate(locale, "adminModeration.reverse")}
+                    </Button>
+                    <Button type="submit" value="uphold" variant="outline">
+                      {translate(locale, "adminModeration.uphold")}
+                    </Button>
+                  </div>
+                </form>
+              </article>
+            ))}
+          </CardContent>
+        </section>
+      </Card>
+
+      <Card aria-labelledby="admin-cases-heading" asChild>
+        <section>
+          <CardHeader>
+            <CardTitle id="admin-cases-heading">
+              {translate(locale, "adminModeration.cases")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="gap-0 divide-y">
+            {cases.length === 0 ? (
+              <p className="text-muted-foreground">{translate(locale, "cases.empty")}</p>
+            ) : null}
+            {cases.map((item) => (
+              <article className={row} key={item.id}>
+                <h3 className="text-lg font-bold">
+                  {item.eventTitle} · {translate(locale, `cases.subject.${item.subjectType}`)}
+                  {item.quarantined ? ` · ${translate(locale, "cases.quarantined")}` : ""}
+                </h3>
+                <ul className="m-0 grid list-none gap-3 p-0">
+                  {item.reports.map((report) => (
+                    <li className="grid gap-2 rounded-xl bg-muted p-4" key={report.id}>
+                      <span className="text-sm">
+                        <strong>{translate(locale, `report.reason.${report.reason}`)}</strong> ·{" "}
+                        {formatDateTime(locale, report.createdAt, "Europe/Stockholm")}
+                      </span>
+                      <p className="break-words">{report.details}</p>
+                      {report.hasContact ? (
+                        contacts[report.id] ? (
+                          <p className="font-semibold break-all">{contacts[report.id]}</p>
+                        ) : (
+                          <form
+                            className="flex flex-wrap items-center gap-2"
+                            onSubmit={(formEvent) => {
+                              formEvent.preventDefault();
+                              const reason = reasonFrom(formEvent);
+                              void run(async ({ api, token }) => {
+                                const result = await api.readReportContact(
+                                  token,
+                                  report.id,
+                                  reason,
+                                );
+                                setContacts((current) => ({
+                                  ...current,
+                                  [report.id]: result.contact ?? "",
+                                }));
+                              });
+                            }}
+                          >
+                            <label className="sr-only" htmlFor={`contact-reason-${report.id}`}>
+                              {translate(locale, "adminModeration.contactReason")}
+                            </label>
+                            <Input
+                              className="min-w-0 flex-1 basis-48"
+                              id={`contact-reason-${report.id}`}
+                              name="reason"
+                              placeholder={translate(locale, "adminModeration.contactReason")}
+                              required
+                            />
+                            <Button type="submit" variant="outline">
+                              {translate(locale, "adminModeration.showContact")}
+                            </Button>
+                          </form>
+                        )
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </CardContent>
+        </section>
+      </Card>
+
+      <Card aria-labelledby="accounts-heading" asChild>
+        <section>
+          <CardHeader>
+            <CardTitle id="accounts-heading">
+              {translate(locale, "adminModeration.accounts")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="gap-6">
             <form
-              className="details-form"
+              className={rowForm}
               onSubmit={(formEvent) => {
                 formEvent.preventDefault();
-                const submitter = (formEvent.nativeEvent as SubmitEvent)
-                  .submitter as HTMLButtonElement | null;
-                const reason = reasonFrom(formEvent);
+                const form = new FormData(formEvent.currentTarget);
                 void run(async ({ api, token }) => {
-                  setAppeals(
-                    await api.decideAppeal(token, item.id, {
-                      decision: submitter?.value === "reverse" ? "reverse" : "uphold",
-                      reason,
+                  setAccount(
+                    await api.findAccount(token, {
+                      email: String(form.get("email") ?? "").trim(),
+                      reason: String(form.get("reason") ?? "").trim(),
                     }),
                   );
                 });
               }}
             >
-              <label htmlFor={`appeal-reason-${item.id}`}>
-                {translate(locale, "cases.reason")}
-              </label>
-              <textarea id={`appeal-reason-${item.id}`} maxLength={500} name="reason" required />
-              <div className="form-actions">
-                <button className="primary-button" type="submit" value="reverse">
-                  {translate(locale, "adminModeration.reverse")}
-                </button>
-                <button className="secondary-button" type="submit" value="uphold">
-                  {translate(locale, "adminModeration.uphold")}
-                </button>
+              <Field>
+                <Label htmlFor="account-email">{translate(locale, "adminModeration.email")}</Label>
+                <Input id="account-email" name="email" required type="email" />
+              </Field>
+              <Field>
+                <Label htmlFor="account-reason">
+                  {translate(locale, "adminModeration.lookupReason")}
+                </Label>
+                <Input id="account-reason" name="reason" required />
+              </Field>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="submit" variant="outline">
+                  {translate(locale, "admin.lookup")}
+                </Button>
               </div>
             </form>
-          </article>
-        ))}
-      </section>
-
-      <section aria-labelledby="admin-cases-heading" className="panel">
-        <h2 id="admin-cases-heading">{translate(locale, "adminModeration.cases")}</h2>
-        {cases.length === 0 ? <p>{translate(locale, "cases.empty")}</p> : null}
-        {cases.map((item) => (
-          <article className="review-item" key={item.id}>
-            <h3>
-              {item.eventTitle} · {translate(locale, `cases.subject.${item.subjectType}`)}
-              {item.quarantined ? ` · ${translate(locale, "cases.quarantined")}` : ""}
-            </h3>
-            <ul>
-              {item.reports.map((report) => (
-                <li key={report.id}>
-                  <strong>{translate(locale, `report.reason.${report.reason}`)}</strong> ·{" "}
-                  {formatDateTime(locale, report.createdAt, "Europe/Stockholm")}
-                  <p>{report.details}</p>
-                  {report.hasContact ? (
-                    contacts[report.id] ? (
-                      <p>{contacts[report.id]}</p>
-                    ) : (
-                      <form
-                        className="inline-control"
-                        onSubmit={(formEvent) => {
-                          formEvent.preventDefault();
-                          const reason = reasonFrom(formEvent);
-                          void run(async ({ api, token }) => {
-                            const result = await api.readReportContact(token, report.id, reason);
-                            setContacts((current) => ({
-                              ...current,
-                              [report.id]: result.contact ?? "",
-                            }));
-                          });
-                        }}
-                      >
-                        <label className="visually-hidden" htmlFor={`contact-reason-${report.id}`}>
-                          {translate(locale, "adminModeration.contactReason")}
-                        </label>
-                        <input
-                          id={`contact-reason-${report.id}`}
-                          name="reason"
-                          placeholder={translate(locale, "adminModeration.contactReason")}
-                          required
-                        />
-                        <button className="secondary-button" type="submit">
-                          {translate(locale, "adminModeration.showContact")}
-                        </button>
-                      </form>
-                    )
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </article>
-        ))}
-      </section>
-
-      <section aria-labelledby="accounts-heading" className="panel">
-        <h2 id="accounts-heading">{translate(locale, "adminModeration.accounts")}</h2>
-        <form
-          className="details-form"
-          onSubmit={(formEvent) => {
-            formEvent.preventDefault();
-            const form = new FormData(formEvent.currentTarget);
-            void run(async ({ api, token }) => {
-              setAccount(
-                await api.findAccount(token, {
-                  email: String(form.get("email") ?? "").trim(),
-                  reason: String(form.get("reason") ?? "").trim(),
-                }),
-              );
-            });
-          }}
-        >
-          <label htmlFor="account-email">{translate(locale, "adminModeration.email")}</label>
-          <input id="account-email" name="email" required type="email" />
-          <label htmlFor="account-reason">
-            {translate(locale, "adminModeration.lookupReason")}
-          </label>
-          <input id="account-reason" name="reason" required />
-          <button className="secondary-button" type="submit">
-            {translate(locale, "admin.lookup")}
-          </button>
-        </form>
-        {account ? (
-          <article className="review-item">
-            <h3>{account.displayName ?? account.accountId}</h3>
-            {account.restriction ? (
-              <p>
-                {translate(locale, "adminModeration.restricted")}: {account.restriction.reason}
-                {account.restriction.pendingLift
-                  ? ` · ${translate(locale, "adminModeration.pendingLift")}`
-                  : ""}
-              </p>
-            ) : (
-              <p>{translate(locale, "adminModeration.notRestricted")}</p>
-            )}
-            <form
-              className="details-form"
-              onSubmit={(formEvent) => {
-                formEvent.preventDefault();
-                const reason = reasonFrom(formEvent);
-                const restriction = account.restriction;
-                void run(async ({ api, token }) => {
-                  if (restriction) {
-                    const result = await api.liftRestriction(token, restriction.id, reason);
-                    setAccount({
-                      ...account,
-                      restriction: result.pendingApproval
-                        ? { ...restriction, pendingLift: true }
-                        : null,
-                    });
-                    setApprovals(await api.listAdminApprovals(token));
-                  } else {
-                    setAccount(await api.restrictAccount(token, account.accountId, reason));
-                  }
-                });
-              }}
-            >
-              <label htmlFor="restriction-reason">{translate(locale, "cases.reason")}</label>
-              <textarea id="restriction-reason" maxLength={500} name="reason" required />
-              <button
-                className={account.restriction ? "secondary-button" : "danger-button"}
-                type="submit"
-              >
-                {translate(
-                  locale,
-                  account.restriction ? "adminModeration.lift" : "adminModeration.restrict",
+            {account ? (
+              <article className="grid gap-3 border-t pt-5">
+                <h3 className="text-lg font-bold break-words">
+                  {account.displayName ?? account.accountId}
+                </h3>
+                {account.restriction ? (
+                  <p>
+                    {translate(locale, "adminModeration.restricted")}: {account.restriction.reason}
+                    {account.restriction.pendingLift
+                      ? ` · ${translate(locale, "adminModeration.pendingLift")}`
+                      : ""}
+                  </p>
+                ) : (
+                  <p>{translate(locale, "adminModeration.notRestricted")}</p>
                 )}
-              </button>
-            </form>
-          </article>
-        ) : null}
-      </section>
+                <form
+                  className={rowForm}
+                  onSubmit={(formEvent) => {
+                    formEvent.preventDefault();
+                    const reason = reasonFrom(formEvent);
+                    const restriction = account.restriction;
+                    void run(async ({ api, token }) => {
+                      if (restriction) {
+                        const result = await api.liftRestriction(token, restriction.id, reason);
+                        setAccount({
+                          ...account,
+                          restriction: result.pendingApproval
+                            ? { ...restriction, pendingLift: true }
+                            : null,
+                        });
+                        setApprovals(await api.listAdminApprovals(token));
+                      } else {
+                        setAccount(await api.restrictAccount(token, account.accountId, reason));
+                      }
+                    });
+                  }}
+                >
+                  <Field>
+                    <Label htmlFor="restriction-reason">{translate(locale, "cases.reason")}</Label>
+                    <Textarea id="restriction-reason" maxLength={500} name="reason" required />
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button type="submit" variant={account.restriction ? "outline" : "destructive"}>
+                      {translate(
+                        locale,
+                        account.restriction ? "adminModeration.lift" : "adminModeration.restrict",
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </article>
+            ) : null}
+          </CardContent>
+        </section>
+      </Card>
 
-      <section aria-labelledby="approvals-heading" className="panel">
-        <h2 id="approvals-heading">{translate(locale, "adminModeration.approvals")}</h2>
-        {approvals.length === 0 ? <p>{translate(locale, "adminModeration.noApprovals")}</p> : null}
-        {approvals.map((item) => (
-          <article className="review-item" key={item.id}>
-            <p>
-              {translate(locale, "adminModeration.liftRequest")}: {item.reason}
-            </p>
-            {item.ownRequest ? (
-              <p className="field-help">{translate(locale, "adminModeration.ownRequest")}</p>
-            ) : (
-              <div className="form-actions">
-                {([true, false] as const).map((approve) => (
-                  <button
-                    className={approve ? "primary-button" : "secondary-button"}
-                    key={String(approve)}
-                    onClick={() =>
-                      void run(async ({ api, token }) => {
-                        setApprovals(await api.decideAdminApproval(token, item.id, approve));
-                      })
-                    }
-                    type="button"
-                  >
-                    {translate(
-                      locale,
-                      approve ? "adminModeration.approve" : "adminModeration.reject",
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </article>
-        ))}
-      </section>
-      <p aria-live="polite" className="form-status">
+      <Card aria-labelledby="approvals-heading" asChild>
+        <section>
+          <CardHeader>
+            <CardTitle id="approvals-heading">
+              {translate(locale, "adminModeration.approvals")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="gap-0 divide-y">
+            {approvals.length === 0 ? (
+              <p className="text-muted-foreground">
+                {translate(locale, "adminModeration.noApprovals")}
+              </p>
+            ) : null}
+            {approvals.map((item) => (
+              <article className={row} key={item.id}>
+                <p>
+                  {translate(locale, "adminModeration.liftRequest")}: {item.reason}
+                </p>
+                {item.ownRequest ? (
+                  <p className="text-sm text-muted-foreground">
+                    {translate(locale, "adminModeration.ownRequest")}
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {([true, false] as const).map((approve) => (
+                      <Button
+                        key={String(approve)}
+                        onClick={() =>
+                          void run(async ({ api, token }) => {
+                            setApprovals(await api.decideAdminApproval(token, item.id, approve));
+                          })
+                        }
+                        type="button"
+                        variant={approve ? "default" : "outline"}
+                      >
+                        {translate(
+                          locale,
+                          approve ? "adminModeration.approve" : "adminModeration.reject",
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </article>
+            ))}
+          </CardContent>
+        </section>
+      </Card>
+      <p aria-live="polite" className="min-h-6 text-sm font-semibold">
         {status}
       </p>
     </>

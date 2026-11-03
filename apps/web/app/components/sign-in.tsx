@@ -3,7 +3,14 @@ import { type FormEvent, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getBrowserAuthClient, hasLocalBackendConfiguration } from "../lib/supabase";
+import { backLink, PageHeading, PageMain, siteShell, skipLink } from "./page";
 import { PageHeader } from "./page-header";
+import { Alert } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Field } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export function SignIn() {
   const navigate = useNavigate();
@@ -90,83 +97,109 @@ export function SignIn() {
   };
 
   return (
-    <div className="site-shell">
-      <a className="skip-link" href="#main">
+    <div className={siteShell}>
+      <a className={skipLink} href="#main">
         {translate(locale, "home.skip")}
       </a>
       <PageHeader locale={locale} onLocaleChange={setLocale} />
-      <main className="account-page" id="main" tabIndex={-1}>
-        <a className="back-link" href="/">
+      <PageMain className="mx-auto w-full max-w-md" width="flow">
+        <a className={backLink} href="/">
           ← {translate(locale, "common.backHome")}
         </a>
-        <div className="account-heading">
-          <p className="eyebrow">Promenadis</p>
-          <h1>{translate(locale, "auth.title")}</h1>
-          <p className="lede">{translate(locale, "auth.intro")}</p>
-        </div>
+        <PageHeading
+          description={translate(locale, "auth.intro")}
+          eyebrow="Promenadis"
+          title={translate(locale, "auth.title")}
+        />
 
         {!configured ? (
-          <p className="notice notice-error" role="alert">
+          <Alert role="alert" variant="destructive">
             {translate(locale, "auth.configMissing")}
-          </p>
+          </Alert>
         ) : mfaStep ? (
-          <form className="panel form-panel" onSubmit={verifyTotp}>
-            <h2>{translate(locale, "mfa.stepTitle")}</h2>
-            <p>{translate(locale, "mfa.stepHelp")}</p>
-            <label htmlFor="totp">{translate(locale, "mfa.code")}</label>
-            <input
-              autoComplete="one-time-code"
-              id="totp"
-              inputMode="numeric"
-              maxLength={6}
-              minLength={6}
-              name="totp"
-              pattern="[0-9]{6}"
-              required
-            />
-            <button className="primary-button" disabled={busy} type="submit">
-              {busy ? translate(locale, "auth.working") : translate(locale, "mfa.verify")}
-            </button>
-          </form>
-        ) : (
-          <div className="form-stack">
-            <form className="panel form-panel" onSubmit={sendCode}>
-              <label htmlFor="email">{translate(locale, "auth.email")}</label>
-              <input autoComplete="email" id="email" name="email" required type="email" />
-              <button className="primary-button" disabled={busy} type="submit">
-                {busy ? translate(locale, "auth.working") : translate(locale, "auth.send")}
-              </button>
-              <a href="/recover-account">{translate(locale, "accountRecovery.link")}</a>
+          <Card asChild>
+            <form onSubmit={verifyTotp}>
+              <CardHeader>
+                <CardTitle>{translate(locale, "mfa.stepTitle")}</CardTitle>
+                <CardDescription>{translate(locale, "mfa.stepHelp")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Field>
+                  <Label htmlFor="totp">{translate(locale, "mfa.code")}</Label>
+                  <Input
+                    autoComplete="one-time-code"
+                    id="totp"
+                    inputMode="numeric"
+                    maxLength={6}
+                    minLength={6}
+                    name="totp"
+                    pattern="[0-9]{6}"
+                    required
+                  />
+                </Field>
+                <Button className="w-full" disabled={busy} type="submit">
+                  {busy ? translate(locale, "auth.working") : translate(locale, "mfa.verify")}
+                </Button>
+              </CardContent>
             </form>
+          </Card>
+        ) : (
+          <div className="grid gap-5">
+            <Card asChild>
+              <form onSubmit={sendCode}>
+                <CardContent>
+                  <Field>
+                    <Label htmlFor="email">{translate(locale, "auth.email")}</Label>
+                    <Input autoComplete="email" id="email" name="email" required type="email" />
+                  </Field>
+                  <Button className="w-full" disabled={busy} type="submit">
+                    {busy ? translate(locale, "auth.working") : translate(locale, "auth.send")}
+                  </Button>
+                  <a className="justify-self-center font-semibold" href="/recover-account">
+                    {translate(locale, "accountRecovery.link")}
+                  </a>
+                </CardContent>
+              </form>
+            </Card>
 
             {sent ? (
-              <form className="panel form-panel" onSubmit={verifyCode}>
-                <label htmlFor="otp">{translate(locale, "auth.otp")}</label>
-                <input
-                  autoComplete="one-time-code"
-                  id="otp"
-                  inputMode="numeric"
-                  maxLength={6}
-                  minLength={6}
-                  name="otp"
-                  pattern="[0-9]{6}"
-                  required
-                />
-                <button className="primary-button" disabled={busy} type="submit">
-                  {busy ? translate(locale, "auth.working") : translate(locale, "auth.verify")}
-                </button>
-                <a href="http://127.0.0.1:54324" rel="noreferrer">
-                  {translate(locale, "auth.mailpit")}
-                </a>
-              </form>
+              <Card asChild>
+                <form onSubmit={verifyCode}>
+                  <CardContent>
+                    <Field>
+                      <Label htmlFor="otp">{translate(locale, "auth.otp")}</Label>
+                      <Input
+                        autoComplete="one-time-code"
+                        id="otp"
+                        inputMode="numeric"
+                        maxLength={6}
+                        minLength={6}
+                        name="otp"
+                        pattern="[0-9]{6}"
+                        required
+                      />
+                    </Field>
+                    <Button className="w-full" disabled={busy} type="submit">
+                      {busy ? translate(locale, "auth.working") : translate(locale, "auth.verify")}
+                    </Button>
+                    <a
+                      className="justify-self-center font-semibold"
+                      href="http://127.0.0.1:54324"
+                      rel="noreferrer"
+                    >
+                      {translate(locale, "auth.mailpit")}
+                    </a>
+                  </CardContent>
+                </form>
+              </Card>
             ) : null}
           </div>
         )}
 
-        <p aria-live="polite" className="form-status">
+        <p aria-live="polite" className="min-h-6 text-sm font-semibold">
           {status}
         </p>
-      </main>
+      </PageMain>
     </div>
   );
 }

@@ -20,7 +20,7 @@ test("theme follows the device and persists an explicit override", async ({ page
   await expect(theme).toHaveValue("dark");
   await expect(page.getByRole("textbox", { name: /e-post/iu })).toHaveCSS(
     "background-color",
-    "rgb(31, 26, 22)",
+    "rgb(38, 32, 27)",
   );
   await theme.selectOption("system");
   await page.emulateMedia({ colorScheme: "light" });

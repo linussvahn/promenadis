@@ -1,10 +1,16 @@
-import { useExpectedAccountId } from "../lib/account-session";
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { DraftEventSummary } from "@promenadis/contracts";
 import { type Locale, translate } from "@promenadis/i18n";
 import { type FormEvent, useEffect, useState } from "react";
-import { getPromenadisApiClient, getBrowserAuthClient } from "../lib/supabase";
+import { useExpectedAccountId } from "../lib/account-session";
+import { getBrowserAuthClient, getPromenadisApiClient } from "../lib/supabase";
 import { toDateTimeLocal, wallTimeToIso } from "../lib/wall-time";
+import { Button } from "./ui/button";
+import { Card, CardContent } from "./ui/card";
+import { Checkbox } from "./ui/checkbox";
+import { ChoiceField, Field, FieldDescription } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 function initialWindow(event: DraftEventSummary) {
   const interval = event.intervals[0];
@@ -81,82 +87,90 @@ export function RegistrationEditor({
   };
 
   return (
-    <form
-      className="panel registration-form"
-      onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
-        formEvent.preventDefault();
-        void saveRegistration(formEvent.currentTarget);
-      }}
-    >
-      <div className="form-section">
-        <h2>{translate(locale, "registration.windowTitle")}</h2>
-        <p className="field-help">{translate(locale, "registration.windowHelp")}</p>
-        <div className="schedule-fields">
-          <div>
-            <label htmlFor="registration-opens">{translate(locale, "registration.opensAt")}</label>
-            <input
-              id="registration-opens"
-              name="opensAt"
-              onChange={(inputEvent) => {
-                const value = inputEvent.currentTarget.value;
-                setWindow((current) => ({ ...current, opensAt: value }));
-              }}
-              required
-              type="datetime-local"
-              value={window.opensAt}
-            />
+    <Card asChild className="gap-0 py-2">
+      <form
+        onSubmit={(formEvent: FormEvent<HTMLFormElement>) => {
+          formEvent.preventDefault();
+          void saveRegistration(formEvent.currentTarget);
+        }}
+      >
+        <CardContent className="gap-0 divide-y sm:px-8">
+          <div className="grid gap-3 py-6">
+            <h2 className="font-display text-xl font-extrabold">
+              {translate(locale, "registration.windowTitle")}
+            </h2>
+            <FieldDescription>{translate(locale, "registration.windowHelp")}</FieldDescription>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <Label htmlFor="registration-opens">
+                  {translate(locale, "registration.opensAt")}
+                </Label>
+                <Input
+                  id="registration-opens"
+                  name="opensAt"
+                  onChange={(inputEvent) => {
+                    const value = inputEvent.currentTarget.value;
+                    setWindow((current) => ({ ...current, opensAt: value }));
+                  }}
+                  required
+                  type="datetime-local"
+                  value={window.opensAt}
+                />
+              </Field>
+              <Field>
+                <Label htmlFor="registration-closes">
+                  {translate(locale, "registration.closesAt")}
+                </Label>
+                <Input
+                  id="registration-closes"
+                  name="closesAt"
+                  onChange={(inputEvent) => {
+                    const value = inputEvent.currentTarget.value;
+                    setWindow((current) => ({ ...current, closesAt: value }));
+                  }}
+                  required
+                  type="datetime-local"
+                  value={window.closesAt}
+                />
+              </Field>
+            </div>
+            <FieldDescription>
+              {translate(locale, "registration.timezoneHelp")} {event.timezone}
+            </FieldDescription>
           </div>
-          <div>
-            <label htmlFor="registration-closes">
-              {translate(locale, "registration.closesAt")}
-            </label>
-            <input
-              id="registration-closes"
-              name="closesAt"
-              onChange={(inputEvent) => {
-                const value = inputEvent.currentTarget.value;
-                setWindow((current) => ({ ...current, closesAt: value }));
-              }}
-              required
-              type="datetime-local"
-              value={window.closesAt}
-            />
+
+          <div className="py-6">
+            <ChoiceField>
+              <Checkbox
+                checked={window.allowDuringEvent}
+                name="allowDuringEvent"
+                onChange={(inputEvent) => {
+                  const checked = inputEvent.currentTarget.checked;
+                  setWindow((current) => ({
+                    ...current,
+                    allowDuringEvent: checked,
+                  }));
+                }}
+              />
+              <span>
+                <strong>{translate(locale, "registration.allowDuringEvent")}</strong>
+                <small>{translate(locale, "registration.allowDuringEventHelp")}</small>
+              </span>
+            </ChoiceField>
           </div>
-        </div>
-        <p className="field-help">
-          {translate(locale, "registration.timezoneHelp")} {event.timezone}
-        </p>
-      </div>
 
-      <div className="form-section">
-        <label className="checkbox-field">
-          <input
-            checked={window.allowDuringEvent}
-            name="allowDuringEvent"
-            onChange={(inputEvent) => {
-              const checked = inputEvent.currentTarget.checked;
-              setWindow((current) => ({
-                ...current,
-                allowDuringEvent: checked,
-              }));
-            }}
-            type="checkbox"
-          />
-          <span>
-            <strong>{translate(locale, "registration.allowDuringEvent")}</strong>
-            <small>{translate(locale, "registration.allowDuringEventHelp")}</small>
-          </span>
-        </label>
-      </div>
-
-      <div className="form-actions">
-        <button className="primary-button" disabled={busy} type="submit">
-          {busy ? translate(locale, "common.saving") : translate(locale, "registration.save")}
-        </button>
-      </div>
-      <p aria-live="polite" className="form-status">
-        {status}
-      </p>
-    </form>
+          <div className="grid gap-3 py-6">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button disabled={busy} type="submit">
+                {busy ? translate(locale, "common.saving") : translate(locale, "registration.save")}
+              </Button>
+            </div>
+            <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+              {status}
+            </p>
+          </div>
+        </CardContent>
+      </form>
+    </Card>
   );
 }

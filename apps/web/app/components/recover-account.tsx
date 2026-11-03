@@ -4,7 +4,15 @@ import { formatDateTime, translate } from "@promenadis/i18n";
 import { type FormEvent, useEffect, useState } from "react";
 import { useStoredLocale } from "../lib/locale";
 import { getPromenadisApiClient, hasLocalBackendConfiguration } from "../lib/supabase";
+import { backLink, PageHeading, PageMain, siteShell, skipLink } from "./page";
 import { PageHeader } from "./page-header";
+import { Alert } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Radio } from "./ui/checkbox";
+import { ChoiceField, Field, FieldGroup, FieldLegend, FieldSet } from "./ui/field";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export function RecoverAccount() {
   const { locale, setLocale } = useStoredLocale();
@@ -146,147 +154,193 @@ export function RecoverAccount() {
   };
 
   return (
-    <div className="site-shell">
-      <a className="skip-link" href="#main">
+    <div className={siteShell}>
+      <a className={skipLink} href="#main">
         {translate(locale, "home.skip")}
       </a>
       <PageHeader locale={locale} onLocaleChange={setLocale} />
-      <main className="account-page" id="main" tabIndex={-1}>
-        <a className="back-link" href="/sign-in">
+      <PageMain className="mx-auto w-full max-w-md" width="flow">
+        <a className={backLink} href="/sign-in">
           ← {translate(locale, "accountRecovery.back")}
         </a>
-        <div className="account-heading">
-          <p className="eyebrow">Promenadis</p>
-          <h1>{translate(locale, "accountRecovery.title")}</h1>
-          <p className="lede">{translate(locale, "accountRecovery.intro")}</p>
-        </div>
-        <p className="notice">{translate(locale, "accountRecovery.preview")}</p>
+        <PageHeading
+          description={translate(locale, "accountRecovery.intro")}
+          eyebrow="Promenadis"
+          title={translate(locale, "accountRecovery.title")}
+        />
+        <Alert>{translate(locale, "accountRecovery.preview")}</Alert>
         {!hasLocalBackendConfiguration() ? (
-          <p className="notice notice-error" role="alert">
+          <Alert role="alert" variant="destructive">
             {translate(locale, "auth.configMissing")}
-          </p>
+          </Alert>
         ) : checking ? (
-          <p className="form-status">{translate(locale, "accountRecovery.checking")}</p>
+          <p className="min-h-6 text-sm font-semibold">
+            {translate(locale, "accountRecovery.checking")}
+          </p>
         ) : completion === "completed" ? (
-          <section className="panel form-panel">
-            <a className="primary-button" href="/sign-in">
-              {translate(locale, "accountRecovery.signIn")}
-            </a>
-          </section>
+          <Card asChild>
+            <section>
+              <CardContent>
+                <Button asChild className="w-full">
+                  <a href="/sign-in">{translate(locale, "accountRecovery.signIn")}</a>
+                </Button>
+              </CardContent>
+            </section>
+          </Card>
         ) : claim && link && Date.parse(claim.readyAt) <= Date.now() ? (
-          <section className="panel form-panel">
-            <h2>{translate(locale, "accountRecovery.readyTitle")}</h2>
-            <p>{translate(locale, "accountRecovery.completeHelp")}</p>
-            <button
-              className="primary-button"
-              disabled={busy}
-              onClick={() => void complete()}
-              type="button"
-            >
-              {translate(locale, "accountRecovery.complete")}
-            </button>
-          </section>
+          <Card asChild>
+            <section>
+              <CardHeader>
+                <CardTitle>{translate(locale, "accountRecovery.readyTitle")}</CardTitle>
+                <CardDescription>
+                  {translate(locale, "accountRecovery.completeHelp")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  className="w-full"
+                  disabled={busy}
+                  onClick={() => void complete()}
+                  type="button"
+                >
+                  {translate(locale, "accountRecovery.complete")}
+                </Button>
+              </CardContent>
+            </section>
+          </Card>
         ) : claim ? (
-          <section className="panel form-panel">
-            <h2>{translate(locale, "accountRecovery.waitTitle")}</h2>
-            <p>{translate(locale, "accountRecovery.waitHelp")}</p>
-            <p>
-              {translate(locale, "accountRecovery.readyAt")}{" "}
-              {formatDateTime(locale, claim.readyAt, "Europe/Stockholm")}
-            </p>
-            <p>
-              {translate(locale, "accountRecovery.expiresAt")}{" "}
-              {formatDateTime(locale, claim.expiresAt, "Europe/Stockholm")}
-            </p>
-          </section>
+          <Card asChild>
+            <section>
+              <CardHeader>
+                <CardTitle>{translate(locale, "accountRecovery.waitTitle")}</CardTitle>
+                <CardDescription>{translate(locale, "accountRecovery.waitHelp")}</CardDescription>
+              </CardHeader>
+              <CardContent className="gap-2 text-sm">
+                <p>
+                  {translate(locale, "accountRecovery.readyAt")}{" "}
+                  {formatDateTime(locale, claim.readyAt, "Europe/Stockholm")}
+                </p>
+                <p>
+                  {translate(locale, "accountRecovery.expiresAt")}{" "}
+                  {formatDateTime(locale, claim.expiresAt, "Europe/Stockholm")}
+                </p>
+              </CardContent>
+            </section>
+          </Card>
         ) : link ? (
-          <section className="panel form-panel">
-            <p>{translate(locale, "accountRecovery.confirmHelp")}</p>
-            <button
-              className="primary-button"
-              disabled={busy}
-              onClick={() => void confirm()}
-              type="button"
-            >
-              {translate(locale, "accountRecovery.confirm")}
-            </button>
-          </section>
+          <Card asChild>
+            <section>
+              <CardContent>
+                <p>{translate(locale, "accountRecovery.confirmHelp")}</p>
+                <Button
+                  className="w-full"
+                  disabled={busy}
+                  onClick={() => void confirm()}
+                  type="button"
+                >
+                  {translate(locale, "accountRecovery.confirm")}
+                </Button>
+              </CardContent>
+            </section>
+          </Card>
         ) : (
-          <form className="panel form-panel" onSubmit={start}>
-            <label htmlFor="currentEmail">
-              {translate(locale, "accountRecovery.currentEmail")}
-            </label>
-            <input
-              autoComplete="email"
-              id="currentEmail"
-              name="currentEmail"
-              required
-              type="email"
-            />
-            <fieldset className="choice-group">
-              <legend>{translate(locale, "accountRecovery.factor")}</legend>
-              <label className="checkbox-field">
-                <input
-                  checked={factor === "recoveryCode"}
-                  name="factor"
-                  onChange={() => setFactor("recoveryCode")}
-                  type="radio"
-                />
-                <span>{translate(locale, "accountRecovery.factorCode")}</span>
-              </label>
-              <label className="checkbox-field">
-                <input
-                  checked={factor === "totp"}
-                  name="factor"
-                  onChange={() => setFactor("totp")}
-                  type="radio"
-                />
-                <span>{translate(locale, "accountRecovery.factorTotp")}</span>
-              </label>
-            </fieldset>
-            {factor === "totp" ? (
-              <>
-                <label htmlFor="totpCode">{translate(locale, "mfa.code")}</label>
-                <input
-                  autoComplete="one-time-code"
-                  id="totpCode"
-                  inputMode="numeric"
-                  maxLength={6}
-                  minLength={6}
-                  name="totpCode"
-                  pattern="[0-9]{6}"
-                  required
-                />
-              </>
-            ) : (
-              <>
-                <label htmlFor="recoveryCode">{translate(locale, "accountRecovery.code")}</label>
-                <input
-                  autoComplete="off"
-                  id="recoveryCode"
-                  name="recoveryCode"
-                  maxLength={24}
-                  pattern="[A-HJ-NP-Za-hj-np-z2-9]{4}(-[A-HJ-NP-Za-hj-np-z2-9]{4}){4}"
-                  required
-                />
-              </>
-            )}
-            <label htmlFor="newEmail">{translate(locale, "accountRecovery.newEmail")}</label>
-            <input autoComplete="email" id="newEmail" name="newEmail" required type="email" />
-            <button className="primary-button" disabled={busy} type="submit">
-              {busy
-                ? translate(locale, "common.saving")
-                : translate(locale, "accountRecovery.start")}
-            </button>
-            <a href="http://127.0.0.1:54324" rel="noreferrer">
-              {translate(locale, "auth.mailpit")}
-            </a>
-          </form>
+          <Card asChild>
+            <form onSubmit={start}>
+              <CardContent>
+                <FieldGroup>
+                  <Field>
+                    <Label htmlFor="currentEmail">
+                      {translate(locale, "accountRecovery.currentEmail")}
+                    </Label>
+                    <Input
+                      autoComplete="email"
+                      id="currentEmail"
+                      name="currentEmail"
+                      required
+                      type="email"
+                    />
+                  </Field>
+                  <FieldSet>
+                    <FieldLegend>{translate(locale, "accountRecovery.factor")}</FieldLegend>
+                    <ChoiceField>
+                      <Radio
+                        checked={factor === "recoveryCode"}
+                        name="factor"
+                        onChange={() => setFactor("recoveryCode")}
+                      />
+                      <span>{translate(locale, "accountRecovery.factorCode")}</span>
+                    </ChoiceField>
+                    <ChoiceField>
+                      <Radio
+                        checked={factor === "totp"}
+                        name="factor"
+                        onChange={() => setFactor("totp")}
+                      />
+                      <span>{translate(locale, "accountRecovery.factorTotp")}</span>
+                    </ChoiceField>
+                  </FieldSet>
+                  {factor === "totp" ? (
+                    <Field>
+                      <Label htmlFor="totpCode">{translate(locale, "mfa.code")}</Label>
+                      <Input
+                        autoComplete="one-time-code"
+                        id="totpCode"
+                        inputMode="numeric"
+                        maxLength={6}
+                        minLength={6}
+                        name="totpCode"
+                        pattern="[0-9]{6}"
+                        required
+                      />
+                    </Field>
+                  ) : (
+                    <Field>
+                      <Label htmlFor="recoveryCode">
+                        {translate(locale, "accountRecovery.code")}
+                      </Label>
+                      <Input
+                        autoComplete="off"
+                        id="recoveryCode"
+                        name="recoveryCode"
+                        maxLength={24}
+                        pattern="[A-HJ-NP-Za-hj-np-z2-9]{4}(-[A-HJ-NP-Za-hj-np-z2-9]{4}){4}"
+                        required
+                      />
+                    </Field>
+                  )}
+                  <Field>
+                    <Label htmlFor="newEmail">
+                      {translate(locale, "accountRecovery.newEmail")}
+                    </Label>
+                    <Input
+                      autoComplete="email"
+                      id="newEmail"
+                      name="newEmail"
+                      required
+                      type="email"
+                    />
+                  </Field>
+                </FieldGroup>
+                <Button className="w-full" disabled={busy} type="submit">
+                  {busy
+                    ? translate(locale, "common.saving")
+                    : translate(locale, "accountRecovery.start")}
+                </Button>
+                <a
+                  className="justify-self-center font-semibold"
+                  href="http://127.0.0.1:54324"
+                  rel="noreferrer"
+                >
+                  {translate(locale, "auth.mailpit")}
+                </a>
+              </CardContent>
+            </form>
+          </Card>
         )}
-        <p aria-live="polite" className="form-status">
+        <p aria-live="polite" className="min-h-6 text-sm font-semibold">
           {status}
         </p>
-      </main>
+      </PageMain>
     </div>
   );
 }

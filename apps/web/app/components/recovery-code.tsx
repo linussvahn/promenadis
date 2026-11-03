@@ -1,8 +1,13 @@
 import { PromenadisApiError } from "@promenadis/api-client";
 import type { AccountRecoveryStatus } from "@promenadis/contracts";
 import { formatDateTime, type Locale, translate } from "@promenadis/i18n";
+import { ChevronRightIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { FieldDescription } from "./ui/field";
 
 export function RecoveryCode({
   accessToken,
@@ -84,81 +89,108 @@ export function RecoveryCode({
   };
 
   return (
-    <section aria-labelledby="recovery-heading" className="panel recovery-panel">
-      <h2 id="recovery-heading">{translate(locale, "recovery.title")}</h2>
-      <p>{translate(locale, "recovery.intro")}</p>
-      {!recovery ? (
-        <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
-      ) : (
-        <>
-          {recovery.pendingClaim ? (
-            <div className="notice">
-              <h3>{translate(locale, "accountRecovery.pendingTitle")}</h3>
-              <p>{recovery.pendingClaim.newEmailMasked}</p>
-              <p>
-                {translate(
-                  locale,
-                  recovery.pendingClaim.emailVerified
-                    ? "accountRecovery.verified"
-                    : "accountRecovery.unverified",
-                )}
-              </p>
-              <button
-                className="secondary-button"
-                disabled={busy}
-                onClick={() => void cancelRecovery()}
-                type="button"
-              >
-                {translate(locale, "accountRecovery.cancel")}
-              </button>
-            </div>
-          ) : null}
-          <p className={recovery.active ? "notice notice-success" : "notice"}>
-            {translate(locale, recovery.active ? "recovery.active" : "recovery.missing")}
-          </p>
-          {recovery.issuedAt ? (
-            <p className="field-help">
-              {translate(locale, "recovery.issued")}{" "}
-              {formatDateTime(locale, recovery.issuedAt, "Europe/Stockholm")}
+    <Card asChild>
+      <section aria-labelledby="recovery-heading">
+        <CardHeader>
+          <CardTitle id="recovery-heading">{translate(locale, "recovery.title")}</CardTitle>
+          <CardDescription>{translate(locale, "recovery.intro")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!recovery ? (
+            <p aria-live="polite">{status || translate(locale, "common.loading")}</p>
+          ) : (
+            <>
+              {recovery.pendingClaim ? (
+                <Alert variant="warning">
+                  <AlertDescription>
+                    <h3 className="text-base font-bold">
+                      {translate(locale, "accountRecovery.pendingTitle")}
+                    </h3>
+                    <p className="break-all">{recovery.pendingClaim.newEmailMasked}</p>
+                    <p>
+                      {translate(
+                        locale,
+                        recovery.pendingClaim.emailVerified
+                          ? "accountRecovery.verified"
+                          : "accountRecovery.unverified",
+                      )}
+                    </p>
+                    <Button
+                      disabled={busy}
+                      onClick={() => void cancelRecovery()}
+                      type="button"
+                      variant="outline"
+                    >
+                      {translate(locale, "accountRecovery.cancel")}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              <Alert variant={recovery.active ? "success" : "default"}>
+                <AlertDescription>
+                  {translate(locale, recovery.active ? "recovery.active" : "recovery.missing")}
+                </AlertDescription>
+              </Alert>
+              {recovery.issuedAt ? (
+                <FieldDescription>
+                  {translate(locale, "recovery.issued")}{" "}
+                  {formatDateTime(locale, recovery.issuedAt, "Europe/Stockholm")}
+                </FieldDescription>
+              ) : null}
+              {generatedCode ? (
+                <div className="grid gap-3 rounded-xl border bg-muted/60 p-4" role="status">
+                  <strong>{translate(locale, "recovery.saveNow")}</strong>
+                  <code className="w-fit max-w-full rounded-lg border border-input bg-card px-3.5 py-2.5 font-mono text-[clamp(1rem,4vw,1.25rem)] tracking-[0.08em] [overflow-wrap:anywhere]">
+                    {generatedCode}
+                  </code>
+                  <p className="text-sm text-muted-foreground">
+                    {translate(locale, "recovery.shownOnce")}
+                  </p>
+                </div>
+              ) : null}
+              {recovery.active ? (
+                <details className="group border-t pt-2">
+                  <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 font-semibold text-link [&::-webkit-details-marker]:hidden">
+                    <ChevronRightIcon
+                      aria-hidden="true"
+                      className="size-4 transition-transform group-open:rotate-90"
+                    />
+                    {translate(locale, "recovery.rotateTitle")}
+                  </summary>
+                  <div className="grid justify-items-start gap-3 pt-1">
+                    <p className="text-sm text-muted-foreground">
+                      {translate(locale, "recovery.rotateHelp")}
+                    </p>
+                    <Button
+                      disabled={busy}
+                      onClick={() => void enroll()}
+                      type="button"
+                      variant="outline"
+                    >
+                      {busy
+                        ? translate(locale, "common.saving")
+                        : translate(locale, "recovery.rotate")}
+                    </Button>
+                  </div>
+                </details>
+              ) : (
+                <div>
+                  <Button disabled={busy} onClick={() => void enroll()} type="button">
+                    {busy
+                      ? translate(locale, "common.saving")
+                      : translate(locale, "recovery.create")}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+          {recovery ? (
+            <p aria-live="polite" className="min-h-6 text-sm font-semibold">
+              {status}
             </p>
           ) : null}
-          {generatedCode ? (
-            <div className="recovery-code-result" role="status">
-              <strong>{translate(locale, "recovery.saveNow")}</strong>
-              <code>{generatedCode}</code>
-              <p>{translate(locale, "recovery.shownOnce")}</p>
-            </div>
-          ) : null}
-          {recovery.active ? (
-            <details className="settings-details">
-              <summary>{translate(locale, "recovery.rotateTitle")}</summary>
-              <p>{translate(locale, "recovery.rotateHelp")}</p>
-              <button
-                className="secondary-button"
-                disabled={busy}
-                onClick={() => void enroll()}
-                type="button"
-              >
-                {busy ? translate(locale, "common.saving") : translate(locale, "recovery.rotate")}
-              </button>
-            </details>
-          ) : (
-            <button
-              className="primary-button"
-              disabled={busy}
-              onClick={() => void enroll()}
-              type="button"
-            >
-              {busy ? translate(locale, "common.saving") : translate(locale, "recovery.create")}
-            </button>
-          )}
-        </>
-      )}
-      {recovery ? (
-        <p aria-live="polite" className="form-status">
-          {status}
-        </p>
-      ) : null}
-    </section>
+        </CardContent>
+      </section>
+    </Card>
   );
 }
