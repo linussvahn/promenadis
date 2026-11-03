@@ -4,8 +4,8 @@ import { formatDateTime, translate } from "@promenadis/i18n";
 import { type FormEvent, useEffect, useState } from "react";
 import { useStoredLocale } from "../lib/locale";
 import { getPromenadisApiClient, hasLocalBackendConfiguration } from "../lib/supabase";
-import { backLink, PageHeading, PageMain, siteShell, skipLink } from "./page";
-import { PageHeader } from "./page-header";
+import { backLink, PageHeading, PageMain } from "./page";
+import { SiteFrame } from "./site-frame";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -154,11 +154,7 @@ export function RecoverAccount() {
   };
 
   return (
-    <div className={siteShell}>
-      <a className={skipLink} href="#main">
-        {translate(locale, "home.skip")}
-      </a>
-      <PageHeader locale={locale} onLocaleChange={setLocale} />
+    <SiteFrame locale={locale} onLocaleChange={setLocale}>
       <PageMain className="mx-auto w-full max-w-md" width="flow">
         <a className={backLink} href="/sign-in">
           ← {translate(locale, "accountRecovery.back")}
@@ -341,6 +337,6 @@ export function RecoverAccount() {
           {status}
         </p>
       </PageMain>
-    </div>
+    </SiteFrame>
   );
 }

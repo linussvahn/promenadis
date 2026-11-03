@@ -10,7 +10,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../lib/supabase", () => ({
   getBrowserAuthClient: () => ({
-    auth: { signInWithOtp: mocks.signInWithOtp, verifyOtp: mocks.verifyOtp },
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      signInWithOtp: mocks.signInWithOtp,
+      verifyOtp: mocks.verifyOtp,
+    },
   }),
   hasLocalBackendConfiguration: () => true,
 }));

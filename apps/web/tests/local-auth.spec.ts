@@ -1927,6 +1927,7 @@ test("signed-in visitors sync chosen sellers to their account and delete them ev
     await expect.poll(stored, { timeout: 10_000 }).toBe("1:false");
     await page.goto("/dashboard");
     await expect(page.getByLabel("Färgtema")).toBeEnabled();
+    await openMenu(page);
     await page.getByRole("button", { name: "Logga ut" }).click();
     await expect(page).toHaveURL(/\/sign-in$/u);
     await signIn(page, emails[1] ?? "");
@@ -2655,6 +2656,7 @@ test("the visible email OTP signs in", async ({ page, request }) => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mina evenemang");
     await expect(page.getByRole("heading", { name: "Syntetisk promenad" })).toHaveCount(0);
 
+    await openMenu(page);
     await page.getByRole("link", { name: "Inställningar" }).click();
     await expect(
       page.getByRole("heading", { name: "Din offentliga arrangörsidentitet" }),
@@ -2701,6 +2703,14 @@ test("the newest magic link performs one PKCE exchange", async ({ page, request 
     await deleteSyntheticAccount(email);
   }
 });
+
+// On phones the main menu is collapsed behind a button.
+async function openMenu(page: Page) {
+  const toggle = page.getByRole("button", { name: "Meny" });
+  if ((await toggle.isVisible()) && (await toggle.getAttribute("aria-expanded")) !== "true") {
+    await toggle.click();
+  }
+}
 
 async function signIn(page: Page, email: string) {
   await page.goto("/sign-in");
@@ -2842,6 +2852,7 @@ test("opaque sessions isolate accounts, fence stale writes, refresh safely, and 
     await first.addCookies([cookie]);
     await a.reload();
     await expect(a.locator("#profile-display-name")).toHaveValue("Synthetic Alpha");
+    await openMenu(a);
     await a.getByRole("button", { name: "Logga ut" }).click();
     await expect(a).toHaveURL(/\/sign-in$/u);
     expect(await session(a)).toBeNull();

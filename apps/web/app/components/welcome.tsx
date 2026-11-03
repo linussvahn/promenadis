@@ -1,8 +1,8 @@
 import { translate } from "@promenadis/i18n";
 import { useStoredLocale } from "../lib/locale";
 import { cn } from "../lib/utils";
-import { Eyebrow, SiteFooter, siteShell, skipLink } from "./page";
-import { headerNavItem, PageHeader } from "./page-header";
+import { Eyebrow, SiteFooter } from "./page";
+import { SiteFrame } from "./site-frame";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 
@@ -10,26 +10,7 @@ export function Welcome() {
   const { locale, setLocale } = useStoredLocale();
 
   return (
-    <div className={siteShell}>
-      <a className={skipLink} href="#main">
-        {translate(locale, "home.skip")}
-      </a>
-
-      <PageHeader
-        action={
-          <nav aria-label={translate(locale, "app.name")}>
-            <a className={headerNavItem} href="/discover">
-              {translate(locale, "nav.discover")}
-            </a>
-            <a className={headerNavItem} href="/sign-in">
-              {translate(locale, "nav.signIn")}
-            </a>
-          </nav>
-        }
-        locale={locale}
-        onLocaleChange={setLocale}
-      />
-
+    <SiteFrame locale={locale} onLocaleChange={setLocale}>
       <main id="main" tabIndex={-1}>
         <section
           aria-labelledby="hero-title"
@@ -95,7 +76,7 @@ export function Welcome() {
       <SiteFooter>
         <p>{translate(locale, "home.footer")}</p>
       </SiteFooter>
-    </div>
+    </SiteFrame>
   );
 }
 

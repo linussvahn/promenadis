@@ -8,6 +8,8 @@ import { formatCurrency, formatDateTime, type Locale, translate } from "@promena
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MapView, { Layer, type MapRef, Marker, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { accuracyRing, useWatchedPosition } from "../lib/geolocation";
+import { loadOffline, resetOfflineData, saveOffline, unpinOffline } from "../lib/offline-store";
 import {
   applySafetyFeed,
   clusterStops,
@@ -18,8 +20,6 @@ import {
   type StopFilters,
   type VisibleStop,
 } from "../lib/public-stops";
-import { accuracyRing, useWatchedPosition } from "../lib/geolocation";
-import { loadOffline, resetOfflineData, saveOffline, unpinOffline } from "../lib/offline-store";
 import {
   emptyRoute,
   loadRoute,
@@ -29,8 +29,8 @@ import {
   setSelected,
 } from "../lib/route-state";
 import { hasContent, useRouteSync } from "../lib/route-sync";
-import { cn } from "../lib/utils";
 import { getPromenadisApiClient } from "../lib/supabase";
+import { cn } from "../lib/utils";
 import { DEFAULT_CENTER, MAP_STYLE, MapErrorBoundary } from "./boundary-editor";
 import { RoutePlanner } from "./route-planner";
 import { Alert } from "./ui/alert";

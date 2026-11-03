@@ -5,8 +5,8 @@ import { type FormEvent, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getPromenadisApiClient } from "../lib/supabase";
-import { PageHeading, PageMain, siteShell, skipLink } from "./page";
-import { PageHeader } from "./page-header";
+import { PageHeading, PageMain } from "./page";
+import { SiteFrame } from "./site-frame";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -31,13 +31,9 @@ const reasons = [
 export function ReportPage() {
   const { locale, setLocale } = useStoredLocale();
   return (
-    <div className={siteShell}>
-      <a className={skipLink} href="#main">
-        {translate(locale, "home.skip")}
-      </a>
-      <PageHeader locale={locale} onLocaleChange={setLocale} />
+    <SiteFrame locale={locale} onLocaleChange={setLocale}>
       <ReportForm locale={locale} />
-    </div>
+    </SiteFrame>
   );
 }
 

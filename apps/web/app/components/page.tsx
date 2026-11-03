@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils";
 
-/** Shell around every page: centred column with side gutters. */
-export const siteShell = "mx-auto min-h-screen w-[min(100%-2rem,76rem)]";
-
 export const skipLink =
   "fixed top-3 left-3 z-50 -translate-y-[200%] rounded-lg bg-primary px-4 py-3 text-primary-foreground no-underline focus:translate-y-0";
 

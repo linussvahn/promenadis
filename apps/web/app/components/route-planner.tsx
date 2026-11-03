@@ -2,13 +2,14 @@ import type { PublicSnapshot, RoutingPackageContract } from "@promenadis/contrac
 import { type Locale, translate } from "@promenadis/i18n";
 import { MAX_ROUTE_STOPS, type Pace, visitMinutes } from "@promenadis/routing";
 import { useState } from "react";
-import type { ComputedPlan, ComputeResult } from "../lib/route-compute";
 import {
   locationPermissionState,
   MAX_START_ACCURACY_METERS,
   type PositionResult,
   requestPosition,
 } from "../lib/geolocation";
+import type { VisibleStop } from "../lib/public-stops";
+import type { ComputedPlan, ComputeResult } from "../lib/route-compute";
 import { planRoute } from "../lib/route-planner";
 import {
   clearRoute,
@@ -20,7 +21,6 @@ import {
   setSkipped,
   step,
 } from "../lib/route-state";
-import type { VisibleStop } from "../lib/public-stops";
 import { cn } from "../lib/utils";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";

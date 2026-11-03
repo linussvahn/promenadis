@@ -3,8 +3,8 @@ import { type FormEvent, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { getBrowserAuthClient, hasLocalBackendConfiguration } from "../lib/supabase";
-import { backLink, PageHeading, PageMain, siteShell, skipLink } from "./page";
-import { PageHeader } from "./page-header";
+import { backLink, PageHeading, PageMain } from "./page";
+import { SiteFrame } from "./site-frame";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -97,11 +97,7 @@ export function SignIn() {
   };
 
   return (
-    <div className={siteShell}>
-      <a className={skipLink} href="#main">
-        {translate(locale, "home.skip")}
-      </a>
-      <PageHeader locale={locale} onLocaleChange={setLocale} />
+    <SiteFrame locale={locale} onLocaleChange={setLocale}>
       <PageMain className="mx-auto w-full max-w-md" width="flow">
         <a className={backLink} href="/">
           ← {translate(locale, "common.backHome")}
@@ -200,6 +196,6 @@ export function SignIn() {
           {status}
         </p>
       </PageMain>
-    </div>
+    </SiteFrame>
   );
 }

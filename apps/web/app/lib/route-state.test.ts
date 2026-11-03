@@ -4,10 +4,10 @@ import {
   loadRoute,
   markStopVisited,
   moveStop,
+  type SavedRoute,
   saveRoute,
   setMustSee,
   setSelected,
-  type SavedRoute,
   setSkipped,
   step,
 } from "./route-state";

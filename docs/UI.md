@@ -7,10 +7,12 @@ other code:
 - `apps/web/app/components/ui/` — shadcn primitives (Button, Input, Textarea,
   NativeSelect, Label, Checkbox/Radio, Card, Badge, Alert, Separator, Field).
 - `apps/web/app/components/page.tsx` — page layout: `PageMain`, `PageHeading`,
-  `Eyebrow`, `EmptyState`, `SummaryList`, `SiteFooter`, and the `siteShell`,
-  `skipLink` and `backLink` class strings.
-- `apps/web/app/components/page-header.tsx` — the shared header and the
-  `headerNavItem` class for its links and buttons.
+  `Eyebrow`, `EmptyState`, `SummaryList`, `SiteFooter`, and the `skipLink` and
+  `backLink` class strings.
+- `apps/web/app/components/site-frame.tsx` — every page's frame: a left
+  sidebar on wide screens, a top bar with a menu button on phones. It reads
+  the browser session, so every page shows the account links when signed in
+  (`useSiteSession()` exposes it).
 - `apps/web/app/styles/app.css` — theme tokens. Colours are `light-dark()`
   pairs, so the theme switcher (which sets `color-scheme`) changes them all.
   Use the token utilities (`bg-card`, `text-muted-foreground`, `text-link`,

@@ -2,8 +2,8 @@ import { PromenadisApiError } from "@promenadis/api-client";
 import type { IdentityDashboard } from "@promenadis/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { getPromenadisApiClient, getBrowserAuthClient } from "./supabase";
 import { useExpectedAccountId } from "./account-session";
+import { getBrowserAuthClient, getPromenadisApiClient } from "./supabase";
 
 export function useAccountData() {
   const expectedAccountId = useExpectedAccountId();

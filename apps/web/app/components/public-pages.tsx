@@ -8,8 +8,8 @@ import type { ReactNode } from "react";
 import { Form, Link } from "react-router";
 import { useStoredLocale } from "../lib/locale";
 import { ContactOrganizer } from "./organizer-contact";
-import { PageHeading, PageMain, SiteFooter, SummaryList, siteShell, skipLink } from "./page";
-import { headerNavItem, PageHeader } from "./page-header";
+import { PageHeading, PageMain, SiteFooter, SummaryList } from "./page";
+import { SiteFrame } from "./site-frame";
 import { EventFeedback } from "./support-forms";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -22,24 +22,7 @@ import { Label } from "./ui/label";
 export function PublicShell({ children }: { readonly children: (locale: Locale) => ReactNode }) {
   const { locale, setLocale } = useStoredLocale();
   return (
-    <div className={siteShell}>
-      <a className={skipLink} href="#main">
-        {translate(locale, "home.skip")}
-      </a>
-      <PageHeader
-        action={
-          <>
-            <a className={headerNavItem} href="/discover">
-              {translate(locale, "nav.discover")}
-            </a>
-            <a className={headerNavItem} href="/sign-in">
-              {translate(locale, "nav.signIn")}
-            </a>
-          </>
-        }
-        locale={locale}
-        onLocaleChange={setLocale}
-      />
+    <SiteFrame locale={locale} onLocaleChange={setLocale}>
       <PageMain>{children(locale)}</PageMain>
       <SiteFooter>
         <a href="/support">{translate(locale, "support.footer")}</a> ·{" "}
@@ -48,7 +31,7 @@ export function PublicShell({ children }: { readonly children: (locale: Locale) 
         </a>{" "}
         · <a href="/support?topic=privacy">{translate(locale, "support.topic.privacy")}</a>
       </SiteFooter>
-    </div>
+    </SiteFrame>
   );
 }
 

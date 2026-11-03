@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import axe from "axe-core";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecoverAccount } from "./recover-account";
 
@@ -10,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   readAccountRecoveryClaim: vi.fn(),
 }));
 vi.mock("../lib/supabase", () => ({
+  // A signed-out visitor: the sidebar offers sign-in.
+  getBrowserAuthClient: () => ({
+    auth: { getSession: async () => ({ data: { session: null }, error: null }) },
+  }),
   getPromenadisApiClient: () => mocks,
   hasLocalBackendConfiguration: () => true,
 }));
@@ -35,7 +40,11 @@ afterEach(() => {
 });
 describe("RecoverAccount", () => {
   it("recognizes an emailed link opened in the already-mounted recovery page", async () => {
-    render(<RecoverAccount />);
+    render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     window.location.hash = `claim=${id}&token=${token}`;
     await screen.findByRole("button", { name: "Verify replacement email" });
     expect(window.location.hash).toBe("");
@@ -50,7 +59,11 @@ describe("RecoverAccount", () => {
       readyAt: "2030-09-10T10:00:00Z",
       expiresAt: "2030-09-16T10:00:00Z",
     });
-    render(<RecoverAccount />);
+    render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     const button = await screen.findByRole("button", { name: "Verify replacement email" });
     expect(window.location.hash).toBe("");
     expect(mocks.confirmAccountRecoveryEmail).not.toHaveBeenCalled();
@@ -63,7 +76,11 @@ describe("RecoverAccount", () => {
   });
   it("starts recovery and clears the code after successful local delivery", async () => {
     mocks.initiateAccountRecovery.mockResolvedValue({ delivery: "captured_locally" });
-    render(<RecoverAccount />);
+    render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     fireEvent.change(screen.getByLabelText("Current email address"), {
       target: { value: "owner@example.invalid" },
     });
@@ -85,7 +102,11 @@ describe("RecoverAccount", () => {
   it("allows retry after verification fails and makes no completion promise", async () => {
     window.history.replaceState(null, "", `/recover-account#claim=${id}&token=${token}`);
     mocks.confirmAccountRecoveryEmail.mockRejectedValue(new Error("expired"));
-    render(<RecoverAccount />);
+    render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Verify replacement email" }));
     await screen.findByText("The recovery link is invalid or has expired.");
     expect(screen.getByRole("button", { name: "Verify replacement email" })).toBeEnabled();
@@ -101,14 +122,21 @@ describe("RecoverAccount", () => {
       expiresAt: "2099-09-15T10:00:00Z",
     });
     mocks.completeAccountRecovery.mockResolvedValue({ state: "completed" });
-    render(<RecoverAccount />);
+    render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Verify replacement email" }));
     const finish = await screen.findByRole("button", { name: "Finish recovery" });
     expect(mocks.completeAccountRecovery).not.toHaveBeenCalled();
     fireEvent.click(finish);
     await screen.findByText(/Recovery is complete/u);
     expect(mocks.completeAccountRecovery).toHaveBeenCalledWith(id, { verificationToken: token });
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in");
+    expect(within(screen.getByRole("main")).getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "/sign-in",
+    );
   });
   it("reports an undecided or refused completion without claiming success", async () => {
     window.history.replaceState(null, "", `/recover-account#claim=${id}&token=${token}`);
@@ -122,7 +150,11 @@ describe("RecoverAccount", () => {
     mocks.completeAccountRecovery
       .mockResolvedValueOnce({ state: "finishing" })
       .mockRejectedValueOnce(new Error("unavailable"));
-    render(<RecoverAccount />);
+    render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Verify replacement email" }));
     fireEvent.click(await screen.findByRole("button", { name: "Finish recovery" }));
     await screen.findByText(/Recovery is finishing/u);
@@ -133,7 +165,11 @@ describe("RecoverAccount", () => {
   it("goes straight to the finish step when a verified link is reopened", async () => {
     window.history.replaceState(null, "", `/recover-account#claim=${id}&token=${token}`);
     mocks.readAccountRecoveryClaim.mockResolvedValue(verifiedReady);
-    render(<RecoverAccount />);
+    render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     await screen.findByRole("button", { name: "Finish recovery" });
     expect(mocks.readAccountRecoveryClaim).toHaveBeenCalledWith(id, { verificationToken: token });
     expect(mocks.confirmAccountRecoveryEmail).not.toHaveBeenCalled();
@@ -147,14 +183,22 @@ describe("RecoverAccount", () => {
       ...verifiedReady,
       readyAt: "2099-09-09T10:00:00Z",
     });
-    render(<RecoverAccount />);
+    render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     await screen.findByText("Waiting period in progress");
     expect(screen.queryByRole("button", { name: "Finish recovery" })).not.toBeInTheDocument();
     expect(mocks.confirmAccountRecoveryEmail).not.toHaveBeenCalled();
   });
   it("starts recovery with an authenticator code instead of the recovery code", async () => {
     mocks.initiateAccountRecovery.mockResolvedValue({ delivery: "captured_locally" });
-    render(<RecoverAccount />);
+    render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     fireEvent.click(screen.getByLabelText("A code from my authenticator app"));
     expect(screen.queryByLabelText("Recovery code")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Current email address"), {
@@ -175,7 +219,11 @@ describe("RecoverAccount", () => {
     });
   });
   it("has no detectable automated accessibility violations", async () => {
-    const { container } = render(<RecoverAccount />);
+    const { container } = render(
+      <MemoryRouter>
+        <RecoverAccount />
+      </MemoryRouter>,
+    );
     const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(result.violations).toEqual([]);
   });
