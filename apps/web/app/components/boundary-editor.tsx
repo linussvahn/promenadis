@@ -309,7 +309,7 @@ export function BoundaryEditor({
 
       <section
         aria-label={translate(locale, "boundary.mapLabel")}
-        className="h-[clamp(20rem,55vw,34rem)] overflow-hidden rounded-2xl border border-input bg-[#e7eadc]"
+        className="h-[clamp(20rem,55vw,34rem)] overflow-hidden rounded-2xl border border-input bg-[#e9ebe4]"
       >
         {mounted ? (
           <MapErrorBoundary
@@ -338,13 +338,13 @@ export function BoundaryEditor({
                   {ring.length >= 3 ? (
                     <Layer
                       id="draft-boundary-fill"
-                      paint={{ "fill-color": "#bd5b35", "fill-opacity": 0.2 }}
+                      paint={{ "fill-color": "#15803d", "fill-opacity": 0.2 }}
                       type="fill"
                     />
                   ) : null}
                   <Layer
                     id="draft-boundary-line"
-                    paint={{ "line-color": "#8d3d22", "line-width": 3 }}
+                    paint={{ "line-color": "#3f3f46", "line-width": 3 }}
                     type="line"
                   />
                 </Source>
@@ -353,9 +353,9 @@ export function BoundaryEditor({
                 <Layer
                   id="draft-boundary-point-circles"
                   paint={{
-                    "circle-color": "#fffdf8",
+                    "circle-color": "#ffffff",
                     "circle-radius": 7,
-                    "circle-stroke-color": "#8d3d22",
+                    "circle-stroke-color": "#3f3f46",
                     "circle-stroke-width": 3,
                   }}
                   type="circle"

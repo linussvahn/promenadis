@@ -58,13 +58,15 @@ export function PageHeading({
         {meta ? <div className="flex flex-wrap items-center gap-2">{meta}</div> : null}
         {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
         <h1
-          className="text-4xl leading-[1.05] font-extrabold tracking-[-0.03em] sm:text-5xl"
+          className="text-3xl leading-[1.1] font-bold tracking-[-0.025em] sm:text-4xl"
           id={titleId}
         >
           {title}
         </h1>
         {description ? (
-          <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">{description}</p>
+          <p className="max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+            {description}
+          </p>
         ) : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
@@ -76,7 +78,7 @@ export function Eyebrow({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
       className={cn(
-        "m-0 text-xs font-extrabold tracking-[0.08em] text-primary uppercase",
+        "m-0 text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase",
         className,
       )}
       {...props}

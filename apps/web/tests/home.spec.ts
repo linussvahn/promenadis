@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { openMenu } from "./menu";
 
 test("bilingual mobile shell is keyboard-operable", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Upptäck kvarteret till fots.");
+  await openMenu(page);
   await page.getByRole("button", { name: /English/u }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Discover the neighbourhood on foot.",
@@ -38,6 +40,7 @@ test("offers the bilingual passwordless sign-in entry point", async ({ page }) =
   await page.goto("/sign-in");
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Logga in utan lösenord");
+  await openMenu(page);
   await page.getByRole("button", { name: /English/u }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in without a password");
 });
@@ -56,6 +59,7 @@ test("scripts run only from this origin or with the response nonce", async ({ pa
   expect(policy).not.toContain("unsafe-inline");
   expect(policy).not.toContain("unsafe-eval");
   // Hydrated: the page's own inline scripts carried the nonce.
+  await openMenu(page);
   await expect(page.getByRole("button", { name: /English/u })).toBeEnabled();
   expect(violations).toEqual([]);
 

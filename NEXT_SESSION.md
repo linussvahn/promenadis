@@ -456,6 +456,18 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Neutral visual direction (2026-11-04)
+
+No migration. After user feedback (reference apps: a recipe app, an energy
+dashboard and a portfolio site), the palette is neutral greys/near-black
+with a single green accent (`--primary` #15803d light, #4ade80 dark), bold
+tight system-sans headings, white bordered cards, green-soft badges, and a
+Laddad-style sidebar (square logo, active page as a white/grey chip, SV/EN
+and an icon theme control at the bottom; on phones they sit in the menu).
+The theme control is three radios (Auto/Ljust/Mörkt); e2e tests open the
+phone menu through `tests/menu.ts`. Map lines use green and zinc. Service
+worker cache v5. All text and control colours pass WCAG AA.
+
 ### TanStack Start, Router and Query (2026-11-04)
 
 No migration. The web app moved from React Router v8 to TanStack Start

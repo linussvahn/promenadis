@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
   <title id="title">Promenadis</title>
-  <rect width="512" height="512" fill="#c4461b"/>
-  <circle cx="256" cy="256" r="184" fill="#fbf5ea"/>
-  <path d="M166 354V158h89c49 0 82 27 82 72 0 46-34 74-85 74h-33v50h-53Zm53-95h29c23 0 36-11 36-29s-13-27-36-27h-29v56Z" fill="#c4461b"/>
+  <rect width="512" height="512" fill="#15803d"/>
+  <circle cx="256" cy="256" r="184" fill="#f4f4f2"/>
+  <path d="M166 354V158h89c49 0 82 27 82 72 0 46-34 74-85 74h-33v50h-53Zm53-95h29c23 0 36-11 36-29s-13-27-36-27h-29v56Z" fill="#15803d"/>
   <circle cx="332" cy="342" r="25" fill="#c95f3b"/>
 </svg>

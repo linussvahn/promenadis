@@ -44,7 +44,7 @@ import { Label } from "./ui/label";
 import { NativeSelect } from "./ui/native-select";
 
 const stopMarker =
-  "grid min-h-9 min-w-9 cursor-pointer place-items-center rounded-full border-[3px] border-[#fffdf8] bg-primary px-2 font-display text-[0.95rem] font-extrabold text-primary-foreground shadow-[0_0.2rem_0.6rem_rgb(70_45_20/30%)] transition-transform hover:scale-110";
+  "grid min-h-9 min-w-9 cursor-pointer place-items-center rounded-full border-[3px] border-[#ffffff] bg-primary px-2 font-display text-[0.95rem] font-extrabold text-primary-foreground shadow-[0_0.2rem_0.6rem_rgb(70_45_20/30%)] transition-transform hover:scale-110";
 
 /** A toggle pill around a native checkbox; fills when checked. */
 const togglePill =
@@ -412,14 +412,14 @@ function StopsMap({
           <Layer
             filter={["!", ["get", "gap"]]}
             id="public-route-walk"
-            paint={{ "line-color": "#c4461b", "line-width": 4 }}
+            paint={{ "line-color": "#15803d", "line-width": 4 }}
             type="line"
           />
           {/* Manual connection: dotted, never a normal route line. */}
           <Layer
             filter={["get", "gap"]}
             id="public-route-gap"
-            paint={{ "line-color": "#8d3d22", "line-dasharray": [1, 2], "line-width": 3 }}
+            paint={{ "line-color": "#3f3f46", "line-dasharray": [1, 2], "line-width": 3 }}
             type="line"
           />
         </Source>
@@ -428,7 +428,7 @@ function StopsMap({
         <Marker latitude={shownStart[1]} longitude={shownStart[0]}>
           <span
             aria-label={translate(locale, "route.start")}
-            className="block size-5 rounded-full border-[3px] border-[#fffdf8] bg-[#2e6b4f] shadow-[0_0.2rem_0.6rem_rgb(70_45_20/30%)]"
+            className="block size-5 rounded-full border-[3px] border-[#ffffff] bg-[#18181b] shadow-[0_0.2rem_0.6rem_rgb(70_45_20/30%)]"
             role="img"
           />
         </Marker>
@@ -479,7 +479,7 @@ function StopsMap({
         >
           <Layer
             id="public-event-area-line"
-            paint={{ "line-color": "#8d3d22", "line-width": 2 }}
+            paint={{ "line-color": "#3f3f46", "line-width": 2 }}
             type="line"
           />
         </Source>
@@ -617,7 +617,7 @@ export function PublicEventMap({
         <div className="grid gap-5 lg:grid-cols-[minmax(22rem,0.85fr)_minmax(0,1.15fr)] lg:items-start">
           <section
             aria-label={translate(locale, "map.mapLabel")}
-            className="h-[min(62vh,30rem)] min-h-72 overflow-hidden rounded-2xl bg-[#e7eadc] shadow-xl shadow-amber-950/10 lg:sticky lg:top-4 lg:order-2 lg:h-[calc(100vh-2rem)] lg:max-h-[52rem]"
+            className="h-[min(62vh,30rem)] min-h-72 overflow-hidden rounded-2xl bg-[#e9ebe4] shadow-xl shadow-amber-950/10 lg:sticky lg:top-4 lg:order-2 lg:h-[calc(100vh-2rem)] lg:max-h-[52rem]"
           >
             {mounted ? (
               <MapErrorBoundary

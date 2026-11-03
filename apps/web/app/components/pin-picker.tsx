@@ -85,12 +85,12 @@ export function PinPicker({
                 >
                   <Layer
                     id={`${idPrefix}-event-area-fill`}
-                    paint={{ "fill-color": "#bd5b35", "fill-opacity": 0.12 }}
+                    paint={{ "fill-color": "#15803d", "fill-opacity": 0.12 }}
                     type="fill"
                   />
                   <Layer
                     id={`${idPrefix}-event-area-line`}
-                    paint={{ "line-color": "#8d3d22", "line-width": 2 }}
+                    paint={{ "line-color": "#3f3f46", "line-width": 2 }}
                     type="line"
                   />
                 </Source>
@@ -108,9 +108,9 @@ export function PinPicker({
                   <Layer
                     id={`${idPrefix}-marker-circle`}
                     paint={{
-                      "circle-color": "#8d3d22",
+                      "circle-color": "#3f3f46",
                       "circle-radius": 8,
-                      "circle-stroke-color": "#fffdf8",
+                      "circle-stroke-color": "#ffffff",
                       "circle-stroke-width": 3,
                     }}
                     type="circle"

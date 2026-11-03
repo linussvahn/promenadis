@@ -3,6 +3,7 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { openMenu } from "./menu";
 
 const localAuthEnabled = process.env.PROMENADIS_LOCAL_AUTH_E2E === "1";
 test.skip(!localAuthEnabled, "Run with pnpm test:e2e:local-auth against local Supabase.");
@@ -1831,7 +1832,7 @@ test("visitors search the public map, follow the safety feed and report a stop",
       ),
     );
     // Wait for hydration: before it, a submit is a native GET that drops the link.
-    await expect(page.getByLabel("Färgtema")).toBeEnabled();
+    await expect(page.getByRole("radio", { includeHidden: true, name: "Auto" })).toBeEnabled();
     await page.getByLabel("Vad gäller det?").selectOption("fraud");
     await page.getByLabel("Beskriv vad som är fel").fill("Säljer förfalskade böcker.");
     await page.getByRole("button", { name: "Skicka anmälan" }).click();
@@ -1926,7 +1927,7 @@ test("signed-in visitors sync chosen sellers to their account and delete them ev
     await addToWalk.nth(1).check();
     await expect.poll(stored, { timeout: 10_000 }).toBe("1:false");
     await page.goto("/dashboard");
-    await expect(page.getByLabel("Färgtema")).toBeEnabled();
+    await expect(page.getByRole("radio", { includeHidden: true, name: "Auto" })).toBeEnabled();
     await openMenu(page);
     await page.getByRole("button", { name: "Logga ut" }).click();
     await expect(page).toHaveURL(/\/sign-in$/u);
@@ -2703,14 +2704,6 @@ test("the newest magic link performs one PKCE exchange", async ({ page, request 
     await deleteSyntheticAccount(email);
   }
 });
-
-// On phones the main menu is collapsed behind a button.
-async function openMenu(page: Page) {
-  const toggle = page.getByRole("button", { name: "Meny" });
-  if ((await toggle.isVisible()) && (await toggle.getAttribute("aria-expanded")) !== "true") {
-    await toggle.click();
-  }
-}
 
 async function signIn(page: Page, email: string) {
   await page.goto("/sign-in");

@@ -1,6 +1,6 @@
 import { type Locale, translate } from "@promenadis/i18n";
-import { type ReactNode, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { type ReactNode, useEffect } from "react";
 import { AccountSessionContext } from "../lib/account-session";
 import { useStoredLocale } from "../lib/locale";
 import { hasLocalBackendConfiguration } from "../lib/supabase";

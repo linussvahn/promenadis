@@ -26,7 +26,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "description",
         content: "Plan and explore accessible neighbourhood walking events.",
       },
-      { name: "theme-color", content: "#fbf5ea" },
+      { name: "theme-color", content: "#f4f4f2" },
     ],
   }),
   component: () => (

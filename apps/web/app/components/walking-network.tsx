@@ -274,7 +274,7 @@ export function WalkingNetwork({
 
       {lines ? (
         <section aria-label={translate(locale, "walking.mapLabel")} className="grid gap-2">
-          <div className="h-[clamp(20rem,55vw,34rem)] overflow-hidden rounded-2xl border border-input bg-[#e7eadc]">
+          <div className="h-[clamp(20rem,55vw,34rem)] overflow-hidden rounded-2xl border border-input bg-[#e9ebe4]">
             {mounted ? (
               <MapErrorBoundary
                 fallback={
@@ -297,7 +297,7 @@ export function WalkingNetwork({
                     <Layer
                       id="walking-edges"
                       paint={{
-                        "line-color": ["case", ["get", "connector"], "#bd5b35", "#2e6b4f"],
+                        "line-color": ["case", ["get", "connector"], "#15803d", "#18181b"],
                         "line-width": 3,
                       }}
                       type="line"

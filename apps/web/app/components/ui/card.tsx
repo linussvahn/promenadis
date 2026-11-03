@@ -13,7 +13,7 @@ function Card({ className, asChild = false, ...props }: Slotted<"div">) {
     <Comp
       data-slot="card"
       className={cn(
-        "flex flex-col gap-5 rounded-2xl border bg-card py-6 text-card-foreground shadow-sm shadow-amber-950/5",
+        "flex flex-col gap-5 rounded-2xl border bg-card py-6 text-card-foreground shadow-[0_1px_2px_rgb(0_0_0/4%)] dark:shadow-none",
         className,
       )}
       {...props}
@@ -40,7 +40,7 @@ function CardTitle({ className, asChild = false, ...props }: Slotted<"h2">) {
   return (
     <Comp
       data-slot="card-title"
-      className={cn("font-display text-xl leading-tight font-extrabold", className)}
+      className={cn("font-display text-xl leading-tight font-bold tracking-tight", className)}
       {...props}
     />
   );
