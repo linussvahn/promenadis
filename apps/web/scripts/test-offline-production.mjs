@@ -62,7 +62,7 @@ try {
   await planner.getByRole("button", { name: "Markera besökt" }).first().click();
   // Give the worker time to copy what loaded before it took control.
   await page.waitForFunction(
-    async () => (await (await caches.open("promenadis-pages-v3")).keys()).length > 0,
+    async () => (await (await caches.open("promenadis-pages-v4")).keys()).length > 0,
     null,
     { timeout: 20_000 },
   );

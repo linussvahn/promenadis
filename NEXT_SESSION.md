@@ -456,6 +456,27 @@ Treat those documents as canonical rather than relying on chat memory.
 
 ## Recommended next work
 
+### Visual refresh (2026-11-03)
+
+No migration. `app/styles/app.css` now starts with design tokens (warm
+cream paper, terracotta `--brand` for actions, leaf green `--link`, sun
+yellow highlights; every token resolves through `light-dark()` so the theme
+override still works), a rounded display font stack (`ui-rounded` /
+SF Pro Rounded, system fallback, no downloaded fonts), pill buttons and one
+global style for every input, select and textarea. The header is shared by
+all pages (`PageHeader`): brand, navigation and theme/language on one row on
+wide screens, two compact rows on phones. The visitor map page leads with the
+map (sticky beside the list on wide screens), filters are chips, stop cards
+carry a numbered badge and "Lägg till i promenaden" / "Måste se" are toggle
+pills (still checkboxes underneath). Icons, manifest, offline page and the
+route line use the new palette; service worker cache is v4. Text and control
+contrast was checked against WCAG AA in both themes. `theme.spec.ts` expects
+the new background colours.
+
+The sync test exposed two races in `useRouteSync`, both fixed: a read that
+finished after the visitor changed the walk overwrote the change, and a sync
+in flight during "Delete the walk on all devices" could restore the walk.
+
 ### Signed-in route sync (2026-11-03)
 
 Migration `20261108000100_saved_routes.sql`: `app_private.saved_routes`, one

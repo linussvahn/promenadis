@@ -2,7 +2,7 @@
 // Event data, snapshots and walking packages are not cached here: the app
 // keeps those in its own managed store with hard expiry. A new version waits
 // until the visitor accepts it; it never forces a reload mid-walk.
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL_CACHE = `promenadis-shell-${VERSION}`;
 const PAGE_CACHE = `promenadis-pages-${VERSION}`;
 const ASSET_CACHE = `promenadis-assets-${VERSION}`;

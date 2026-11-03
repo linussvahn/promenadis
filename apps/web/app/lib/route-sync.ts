@@ -140,6 +140,8 @@ export function useRouteSync(
   const latest = useRef({ apply, walk });
   latest.current = { apply, walk };
   const busy = useRef(false);
+  // Bumped by remove(): a sync already in flight must not restore the walk.
+  const generation = useRef(0);
   const eventKey = walk.eventKey;
 
   const run = useCallback(
@@ -148,6 +150,8 @@ export function useRouteSync(
       const auth = getBrowserAuthClient();
       if (!api || !auth || busy.current) return;
       busy.current = true;
+      const started = generation.current;
+      const stale = () => started !== generation.current;
       try {
         const { data } = await auth.auth.getSession();
         const account = data.session?.user.id ?? null;
@@ -160,6 +164,8 @@ export function useRouteSync(
         let server: SyncedRoute | null | undefined;
         if (read || current.sync?.accountId !== account) {
           server = (await api.getSyncedRoute(account, visibility, eventKey)).route;
+          // The visitor may have changed the walk while the read was in flight.
+          current = latest.current.walk;
         } else if (!isDirty(current, account)) {
           setState("synced");
           return;
@@ -169,6 +175,7 @@ export function useRouteSync(
             server === undefined
               ? { push: current.sync?.version ?? 0, route: current }
               : reconcile(current, server, account);
+          if (stale()) return;
           if (result.route !== current) latest.current.apply(result.route);
           current = result.route;
           if (result.push === null) {
@@ -182,6 +189,7 @@ export function useRouteSync(
             expectedVersion: result.push,
           });
           if (!saved.conflict && saved.route) {
+            if (stale()) return;
             // The visitor may have changed the walk while this was in flight.
             const now = latest.current.walk;
             const confirmed = {
@@ -236,8 +244,10 @@ export function useRouteSync(
   const remove = useCallback(async () => {
     const api = getPromenadisApiClient();
     if (!api || !accountId) return;
+    generation.current += 1;
     try {
       const removed = await api.deleteSyncedRoute(accountId, visibility, eventKey);
+      generation.current += 1;
       const cleared = emptyRoute(eventKey, latest.current.walk.expiresAt);
       latest.current.apply(
         removed.route ? markSynced(cleared, accountId, removed.route.version) : cleared,

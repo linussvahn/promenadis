@@ -1,7 +1,6 @@
 import { translate } from "@promenadis/i18n";
 import { useStoredLocale } from "../lib/locale";
-import { LanguageSwitcher } from "./language-switcher";
-import { ThemeSwitcher } from "./theme-switcher";
+import { PageHeader } from "./page-header";
 
 export function Welcome() {
   const { locale, setLocale } = useStoredLocale();
@@ -12,27 +11,20 @@ export function Welcome() {
         {translate(locale, "home.skip")}
       </a>
 
-      <header className="site-header">
-        <a className="wordmark" href="/" aria-label={translate(locale, "app.name")}>
-          <span aria-hidden="true" className="wordmark-mark">
-            P
-          </span>
-          {translate(locale, "app.name")}
-        </a>
-
-        <nav className="header-actions" aria-label={translate(locale, "app.name")}>
-          <a className="header-action" href="/discover">
-            {translate(locale, "nav.discover")}
-          </a>
-          <a className="header-action" href="/sign-in">
-            {translate(locale, "nav.signIn")}
-          </a>
-          <div className="appearance-controls">
-            <ThemeSwitcher locale={locale} />
-            <LanguageSwitcher locale={locale} onChange={setLocale} />
-          </div>
-        </nav>
-      </header>
+      <PageHeader
+        action={
+          <nav className="header-links" aria-label={translate(locale, "app.name")}>
+            <a className="header-action" href="/discover">
+              {translate(locale, "nav.discover")}
+            </a>
+            <a className="header-action" href="/sign-in">
+              {translate(locale, "nav.signIn")}
+            </a>
+          </nav>
+        }
+        locale={locale}
+        onLocaleChange={setLocale}
+      />
 
       <main id="main" tabIndex={-1}>
         <section className="hero" aria-labelledby="hero-title">

@@ -42,7 +42,7 @@ export function ThemeSwitcher({ locale }: { readonly locale: Locale }) {
           }
         }}
       >
-        <option value="system">{locale === "sv" ? "Enhetens tema" : "Device theme"}</option>
+        <option value="system">Auto</option>
         <option value="light">{locale === "sv" ? "Ljust" : "Light"}</option>
         <option value="dark">{locale === "sv" ? "Mörkt" : "Dark"}</option>
       </select>

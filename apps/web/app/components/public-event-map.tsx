@@ -270,36 +270,38 @@ function SellerDetails({
             .join(", ")}
         </p>
       ) : null}
-      <label className="checkbox-field">
-        <input
-          checked={chosen}
-          onChange={(event) =>
-            onWalkChange(setSelected(walk, seller.id, event.currentTarget.checked))
-          }
-          type="checkbox"
-        />
-        <span>{translate(locale, "route.add")}</span>
-      </label>
-      {chosen ? (
-        <label className="checkbox-field">
+      <div className="seller-actions">
+        <label className="walk-toggle">
           <input
-            checked={walk.mustSee.includes(seller.id)}
-            disabled={!walk.mustSee.includes(seller.id) && walk.mustSee.length >= 10}
+            checked={chosen}
             onChange={(event) =>
-              onWalkChange(setMustSee(walk, seller.id, event.currentTarget.checked))
+              onWalkChange(setSelected(walk, seller.id, event.currentTarget.checked))
             }
             type="checkbox"
           />
-          <span>{translate(locale, "route.mustSee")}</span>
+          <span>{translate(locale, "route.add")}</span>
         </label>
-      ) : null}
-      <a
-        className="text-link"
-        href={`/report?key=${snapshot.eventKey}&route=${route}&type=participation&subject=${seller.id}`}
-        rel="nofollow"
-      >
-        {translate(locale, "map.report")}
-      </a>
+        {chosen ? (
+          <label className="walk-toggle walk-toggle-star">
+            <input
+              checked={walk.mustSee.includes(seller.id)}
+              disabled={!walk.mustSee.includes(seller.id) && walk.mustSee.length >= 10}
+              onChange={(event) =>
+                onWalkChange(setMustSee(walk, seller.id, event.currentTarget.checked))
+              }
+              type="checkbox"
+            />
+            <span>{translate(locale, "route.mustSee")}</span>
+          </label>
+        ) : null}
+        <a
+          className="report-link"
+          href={`/report?key=${snapshot.eventKey}&route=${route}&type=participation&subject=${seller.id}`}
+          rel="nofollow"
+        >
+          {translate(locale, "map.report")}
+        </a>
+      </div>
     </article>
   );
 }
@@ -381,7 +383,7 @@ function StopsMap({
           <Layer
             filter={["!", ["get", "gap"]]}
             id="public-route-walk"
-            paint={{ "line-color": "#20322b", "line-width": 4 }}
+            paint={{ "line-color": "#c4461b", "line-width": 4 }}
             type="line"
           />
           {/* Manual connection: dotted, never a normal route line. */}
@@ -583,95 +585,10 @@ export function PublicEventMap({
       {!snapshot || allStops.length === 0 ? (
         <p className="notice">{translate(locale, "map.noStopsYet")}</p>
       ) : (
-        <>
-          <search>
-            <form
-              className="panel form-panel discovery-search"
-              onSubmit={(event) => event.preventDefault()}
-            >
-              <label htmlFor="stop-search">{translate(locale, "map.search")}</label>
-              <input
-                id="stop-search"
-                maxLength={100}
-                onChange={(event) => setFilters({ ...filters, query: event.currentTarget.value })}
-                type="search"
-                value={filters.query}
-              />
-              <label htmlFor="stop-category">{translate(locale, "map.category")}</label>
-              <select
-                id="stop-category"
-                onChange={(event) =>
-                  setFilters({ ...filters, categoryId: event.currentTarget.value || null })
-                }
-                value={filters.categoryId ?? ""}
-              >
-                <option value="">{translate(locale, "map.allCategories")}</option>
-                {snapshot.categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.labels[locale]}
-                    {snapshot.counts.byCategory[category.id]
-                      ? ` (${snapshot.counts.byCategory[category.id]})`
-                      : ""}
-                  </option>
-                ))}
-              </select>
-              {(
-                [
-                  ["openNow", "map.filterOpen"],
-                  ["stepFree", "map.filterStepFree"],
-                  ["stroller", "map.filterStroller"],
-                ] as const
-              ).map(([key, label]) => (
-                <label className="checkbox-field" key={key}>
-                  <input
-                    checked={filters[key]}
-                    onChange={(event) =>
-                      setFilters({ ...filters, [key]: event.currentTarget.checked })
-                    }
-                    type="checkbox"
-                  />
-                  <span>{translate(locale, label)}</span>
-                </label>
-              ))}
-            </form>
-          </search>
-          <RoutePlanner
-            blockedEdgeIds={state.feed.blockedEdgeIds}
-            graphVersion={state.graphVersion}
-            livePosition={live}
-            locale={locale}
-            locationStart={locationStart}
-            onChange={changeWalk}
-            onLocationStart={setLocationStart}
-            onShowPosition={setShowPosition}
-            showPosition={showPosition}
-            pkg={state.pkg}
-            route={walk}
-            snapshot={snapshot}
-            stops={allStops}
-          />
-          {storageFailed ? <p className="notice">{translate(locale, "route.notSaved")}</p> : null}
-          {sync.signedIn ? (
-            <div className="route-sync">
-              <p className="field-hint" role="status">
-                {translate(locale, `route.sync.${sync.state}`)}
-              </p>
-              {sync.state === "synced" && hasContent(walk) ? (
-                <button className="quiet-button" onClick={() => void sync.remove()} type="button">
-                  {translate(locale, "route.sync.remove")}
-                </button>
-              ) : null}
-            </div>
-          ) : (
-            <p className="field-hint">
-              <a className="text-link" href="/sign-in">
-                {translate(locale, "route.sync.signIn")}
-              </a>
-            </p>
-          )}
+        <div className="map-layout">
           <section
             aria-label={translate(locale, "map.mapLabel")}
-            className="boundary-map public-map"
+            className="boundary-map public-map map-stage"
           >
             {mounted ? (
               <MapErrorBoundary
@@ -700,38 +617,135 @@ export function PublicEventMap({
               </MapErrorBoundary>
             ) : null}
           </section>
-          <section aria-labelledby="stop-list-heading" className="public-stop-list">
-            <h2 id="stop-list-heading">{translate(locale, "map.listLabel")}</h2>
-            <p className="field-hint">{translate(locale, "map.listIntro")}</p>
-            {stops.length === 0 ? (
-              <p role="status">{translate(locale, "map.noMatches")}</p>
-            ) : (
-              <ol className="stop-list">
-                {stops.map((stop) => (
-                  <li className="panel" id={`stop-${stop.id}`} key={stop.id} tabIndex={-1}>
-                    <h3>
-                      {translate(locale, "map.stop")} {stop.number}
-                    </h3>
-                    {stop.manualAccess ? (
-                      <p className="field-hint">{translate(locale, "route.manualAccess")}</p>
-                    ) : null}
-                    {stop.sellers.map((seller) => (
-                      <SellerDetails
-                        key={seller.id}
-                        locale={locale}
-                        onWalkChange={changeWalk}
-                        route={route}
-                        seller={seller}
-                        snapshot={snapshot}
-                        walk={walk}
+          <div className="map-sidebar">
+            <search>
+              <form
+                className="panel form-panel discovery-search map-filters"
+                onSubmit={(event) => event.preventDefault()}
+              >
+                <label htmlFor="stop-search">{translate(locale, "map.search")}</label>
+                <input
+                  id="stop-search"
+                  maxLength={100}
+                  onChange={(event) => setFilters({ ...filters, query: event.currentTarget.value })}
+                  type="search"
+                  value={filters.query}
+                />
+                <label htmlFor="stop-category">{translate(locale, "map.category")}</label>
+                <select
+                  id="stop-category"
+                  onChange={(event) =>
+                    setFilters({ ...filters, categoryId: event.currentTarget.value || null })
+                  }
+                  value={filters.categoryId ?? ""}
+                >
+                  <option value="">{translate(locale, "map.allCategories")}</option>
+                  {snapshot.categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.labels[locale]}
+                      {snapshot.counts.byCategory[category.id]
+                        ? ` (${snapshot.counts.byCategory[category.id]})`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+                <div className="filter-chips">
+                  {(
+                    [
+                      ["openNow", "map.filterOpen"],
+                      ["stepFree", "map.filterStepFree"],
+                      ["stroller", "map.filterStroller"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label className="filter-chip" key={key}>
+                      <input
+                        checked={filters[key]}
+                        onChange={(event) =>
+                          setFilters({ ...filters, [key]: event.currentTarget.checked })
+                        }
+                        type="checkbox"
                       />
-                    ))}
-                  </li>
-                ))}
-              </ol>
+                      <span>{translate(locale, label)}</span>
+                    </label>
+                  ))}
+                </div>
+              </form>
+            </search>
+            <RoutePlanner
+              blockedEdgeIds={state.feed.blockedEdgeIds}
+              graphVersion={state.graphVersion}
+              livePosition={live}
+              locale={locale}
+              locationStart={locationStart}
+              onChange={changeWalk}
+              onLocationStart={setLocationStart}
+              onShowPosition={setShowPosition}
+              showPosition={showPosition}
+              pkg={state.pkg}
+              route={walk}
+              snapshot={snapshot}
+              stops={allStops}
+            />
+            {storageFailed ? <p className="notice">{translate(locale, "route.notSaved")}</p> : null}
+            {sync.signedIn ? (
+              <div className="route-sync">
+                <p className="field-hint" role="status">
+                  {translate(locale, `route.sync.${sync.state}`)}
+                </p>
+                {sync.state === "synced" && hasContent(walk) ? (
+                  <button className="quiet-button" onClick={() => void sync.remove()} type="button">
+                    {translate(locale, "route.sync.remove")}
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="field-hint">
+                <a className="text-link" href="/sign-in">
+                  {translate(locale, "route.sync.signIn")}
+                </a>
+              </p>
             )}
-          </section>
-        </>
+            <section aria-labelledby="stop-list-heading" className="public-stop-list">
+              <h2 id="stop-list-heading">{translate(locale, "map.listLabel")}</h2>
+              <p className="field-hint">{translate(locale, "map.listIntro")}</p>
+              {stops.length === 0 ? (
+                <p role="status">{translate(locale, "map.noMatches")}</p>
+              ) : (
+                <ol className="stop-list">
+                  {stops.map((stop) => (
+                    <li
+                      className="panel stop-card"
+                      id={`stop-${stop.id}`}
+                      key={stop.id}
+                      tabIndex={-1}
+                    >
+                      <h3 className="stop-card-heading">
+                        <span aria-hidden="true" className="stop-badge">
+                          {stop.number}
+                        </span>
+                        {translate(locale, "map.stop")} {stop.number}
+                      </h3>
+                      {stop.manualAccess ? (
+                        <p className="field-hint">{translate(locale, "route.manualAccess")}</p>
+                      ) : null}
+                      {stop.sellers.map((seller) => (
+                        <SellerDetails
+                          key={seller.id}
+                          locale={locale}
+                          onWalkChange={changeWalk}
+                          route={route}
+                          seller={seller}
+                          snapshot={snapshot}
+                          walk={walk}
+                        />
+                      ))}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          </div>
+        </div>
       )}
       <p className="field-hint">{translate(locale, "map.offlineNote")}</p>
       <p>

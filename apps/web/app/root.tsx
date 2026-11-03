@@ -23,7 +23,7 @@ export const meta: Route.MetaFunction = () => [
     name: "description",
     content: "Plan and explore accessible neighbourhood walking events.",
   },
-  { name: "theme-color", content: "#f5efe2" },
+  { name: "theme-color", content: "#fbf5ea" },
 ];
 
 export function Layout({ children }: { readonly children: ReactNode }) {

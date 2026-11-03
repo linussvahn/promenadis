@@ -16,16 +16,14 @@ export function PageHeader({
     <header className="site-header">
       <a className="wordmark" href="/" aria-label={translate(locale, "app.name")}>
         <span aria-hidden="true" className="wordmark-mark">
-          P
+          <span>P</span>
         </span>
         {translate(locale, "app.name")}
       </a>
-      <div className="header-actions">
-        {action}
-        <div className="appearance-controls">
-          <ThemeSwitcher locale={locale} />
-          <LanguageSwitcher locale={locale} onChange={onLocaleChange} />
-        </div>
+      {action ? <div className="header-nav">{action}</div> : null}
+      <div className="appearance-controls">
+        <ThemeSwitcher locale={locale} />
+        <LanguageSwitcher locale={locale} onChange={onLocaleChange} />
       </div>
     </header>
   );
